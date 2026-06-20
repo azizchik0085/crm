@@ -7,6 +7,6 @@
     "openai_api_key": "",
     "groq_api_key": "",
     "telephony_provider": "sarkor",
-    "regos_endpoint": "",
-    "regos_token": ""
+    "regos_endpoint": "https://integration.regos.uz/gateway/out/bbdef54d1a37402eb4a0597d7da2c4b7",
+    "regos_token": "https://protech.up.railway.app/api/integration/regos/webhook"
 }

@@ -1747,195 +1747,233 @@ def sync_regos_receipts():
         "Content-Type": "application/json"
     }
     
+    # 1. Fetch closed receipts from the cloud in sequential 30-day chunks (REGOS API limit is 1 month max)
     now_ts = int(time.time())
-    start_ts = now_ts - (365 * 24 * 3600) # Sync up to 365 days ago (1 year)
-    
-    payload = {
-        "start_date": start_ts,
-        "end_date": now_ts,
-        "statuses": ["Closed"]
-    }
+    chunk_days = 30
+    cheques_list = []
     
     try:
-        print(f"Syncing receipts from REGOS Cloud API: {cloud_url}...")
-        response = requests.post(cloud_url, headers=headers, json=payload, timeout=25)
-        response.raise_for_status()
-        resp_data = response.json()
-        
-        cheques_list = []
-        if isinstance(resp_data, list):
-            cheques_list = resp_data
-        elif isinstance(resp_data, dict):
-            for key in ["result", "cheques", "data", "list"]:
-                if key in resp_data and isinstance(resp_data[key], list):
-                    cheques_list = resp_data[key]
-                    break
-            else:
-                for val in resp_data.values():
-                    if isinstance(val, list):
-                        cheques_list = val
-                        break
-                        
-        if not cheques_list:
-            return {"status": "success", "count": 0, "message": "Yangi cheklar topilmadi."}
+        # Loop 12 times to cover 360 days (~1 year)
+        for i in range(12):
+            start_ts = now_ts - ((i + 1) * chunk_days * 24 * 3600)
+            end_ts = now_ts - (i * chunk_days * 24 * 3600)
             
-        print(f"Found {len(cheques_list)} receipts in REGOS Cloud. Saving new ones to Supabase...")
-        
-        # Fetch existing receipts to skip duplicates and save requests
-        existing_ids = set()
-        try:
-            existing_receipts = supabase_req("GET", "receipts?select=id")
-            existing_ids = {r["id"] for r in existing_receipts if isinstance(r, dict) and "id" in r}
-            print(f"Already have {len(existing_ids)} receipts in DB. Skipping duplicates.")
-        except Exception as e_db:
-            print(f"Failed to fetch existing receipts (might be empty/migration error): {e_db}")
-        
-        saved_count = 0
-        for cheque in cheques_list:
-            if not isinstance(cheque, dict):
-                continue
-            try:
-                c_uuid = cheque.get("uuid") or cheque.get("id")
-                if not c_uuid:
+            payload = {
+                "start_date": start_ts,
+                "end_date": end_ts,
+                "statuses": ["Closed"]
+            }
+            
+            print(f"Syncing receipts chunk {i+1}/12: {datetime.fromtimestamp(start_ts).strftime('%Y-%m-%d')} to {datetime.fromtimestamp(end_ts).strftime('%Y-%m-%d')}...")
+            response = requests.post(cloud_url, headers=headers, json=payload, timeout=20)
+            if response.status_code == 200:
+                resp_data = response.json()
+                if isinstance(resp_data, dict) and not resp_data.get("ok"):
+                    print(f"REGOS Cloud API returned error for chunk {i+1}: {resp_data.get('result')}")
                     continue
                     
-                # Skip already synced receipts
-                if c_uuid in existing_ids:
-                    continue
+                chunk_cheques = []
+                if isinstance(resp_data, list):
+                    chunk_cheques = resp_data
+                elif isinstance(resp_data, dict):
+                    for key in ["result", "cheques", "data", "list"]:
+                        if key in resp_data and isinstance(resp_data[key], list):
+                            chunk_cheques = resp_data[key]
+                            break
+                    else:
+                        for val in resp_data.values():
+                            if isinstance(val, list):
+                                chunk_cheques = val
+                                break
                 
-                # Attempt to retrieve detailed items/payments from POS API for new receipts
-                cheque_details = None
+                cheques_list.extend(chunk_cheques)
+            else:
+                print(f"Failed to fetch chunk {i+1} from cloud API (status: {response.status_code})")
+    except Exception as e_fetch:
+        print(f"Error fetching from REGOS Cloud API: {e_fetch}")
+        raise HTTPException(status_code=500, detail=f"REGOS API-dan cheklarni olishda xatolik: {str(e_fetch)}")
+        
+    if not cheques_list:
+        return {"status": "success", "count": 0, "message": "Yangi cheklar topilmadi."}
+        
+    print(f"Found total {len(cheques_list)} receipts in REGOS Cloud. Saving new ones to Supabase...")
+    
+    # 2. Fetch existing receipts to skip duplicates and save requests
+    existing_ids = set()
+    try:
+        existing_receipts = supabase_req("GET", "receipts?select=id")
+        existing_ids = {r["id"] for r in existing_receipts if isinstance(r, dict) and "id" in r}
+        print(f"Already have {len(existing_ids)} receipts in DB. Skipping duplicates.")
+    except Exception as e_db:
+        print(f"Failed to fetch existing receipts (might be empty/migration error): {e_db}")
+    
+    # 3. Check if POS terminal is online by doing a quick test query (with small timeout)
+    # If offline, we set pos_online = False and skip POS queries to avoid long 4-second timeouts per cheque.
+    pos_online = True
+    try:
+        test_payload = {"uuid": "test-pos-online-connection"}
+        print("Checking if POS terminal is online and occupied...")
+        test_resp = requests.post(pos_url, headers=headers, json=test_payload, timeout=2.5)
+        if test_resp.status_code == 200:
+            test_json = test_resp.json()
+            if isinstance(test_json, dict) and not test_json.get("ok"):
+                err_code = test_json.get("result", {}).get("error")
+                if err_code == 5054:
+                    print("POS cash register is logged out/not occupied (error 5054). Skipping POS detail queries.")
+                    pos_online = False
+    except Exception as e_pos_check:
+        print(f"POS connection check failed (register offline): {e_pos_check}")
+        pos_online = False
+        
+    saved_count = 0
+    for cheque in cheques_list:
+        if not isinstance(cheque, dict):
+            continue
+        try:
+            c_uuid = cheque.get("uuid") or cheque.get("id")
+            if not c_uuid:
+                continue
+                
+            # Skip already synced receipts
+            if c_uuid in existing_ids:
+                continue
+            
+            # Attempt to retrieve detailed items/payments from POS API for new receipts (only if POS is online)
+            cheque_details = None
+            if pos_online:
                 try:
                     pos_payload = {
                         "uuid": c_uuid,
-                        "start_date": start_ts,
+                        "start_date": now_ts - (30 * 24 * 3600),
                         "end_date": now_ts
                     }
-                    # Small timeout so offline register doesn't block sync
                     pos_resp = requests.post(pos_url, headers=headers, json=pos_payload, timeout=4)
                     if pos_resp.status_code == 200:
                         pos_json = pos_resp.json()
-                        if isinstance(pos_json, list) and len(pos_json) > 0:
-                            cheque_details = pos_json[0]
-                        elif isinstance(pos_json, dict):
-                            if "result" in pos_json and isinstance(pos_json["result"], list) and len(pos_json["result"]) > 0:
-                                cheque_details = pos_json["result"][0]
-                            elif "cheque" in pos_json:
-                                cheque_details = pos_json["cheque"]
-                            elif "doccheque" in pos_json:
-                                cheque_details = pos_json["doccheque"]
-                            elif pos_json.get("ok"):
-                                res = pos_json.get("result")
-                                if isinstance(res, list) and len(res) > 0:
-                                    cheque_details = res[0]
-                                elif isinstance(res, dict):
-                                    cheque_details = res
-                            else:
-                                cheque_details = pos_json
-                except Exception as pos_ex:
-                    print(f"POS details request failed for {c_uuid} (using cloud fallback): {pos_ex}")
-                
-                # Use POS cheque details if retrieved, otherwise fall back to cloud cheque summary info
-                target_cheque = cheque_details if (cheque_details and isinstance(cheque_details, dict) and ("rows" in cheque_details or "payments" in cheque_details)) else cheque
-                
-                c_code = target_cheque.get("code") or target_cheque.get("number") or target_cheque.get("receipt_no") or f"CH-{c_uuid[:8]}"
-                c_date = target_cheque.get("date") or target_cheque.get("created_at")
-                
-                c_time_str = None
-                if c_date:
-                    try:
-                        ts = float(c_date)
-                        if ts > 1e11: # ms
-                            ts = ts / 1000.0
-                        c_time_str = datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
-                    except Exception:
-                        c_time_str = str(c_date)
-                if not c_time_str:
-                    c_time_str = datetime.now(timezone.utc).isoformat()
-                    
-                cashier = target_cheque.get("cashier")
-                cashier_name = ""
-                if isinstance(cashier, dict):
-                    cashier_name = cashier.get("full_name") or cashier.get("name") or cashier.get("username") or ""
-                else:
-                    cashier_name = target_cheque.get("cashier_name") or target_cheque.get("seller_name") or str(cashier or "")
-                if not cashier_name:
-                    cashier_name = "Noma'lum kassa xodimi"
-                    
-                total_amount = target_cheque.get("sum") or target_cheque.get("amount") or target_cheque.get("total_amount") or target_cheque.get("total") or 0.0
-                discount = target_cheque.get("discount") or target_cheque.get("discount_sum") or 0.0
-                
-                payments = target_cheque.get("payments") or target_cheque.get("payment_type") or target_cheque.get("pay_type") or "cash"
-                payment_type = "Naqd"
-                if isinstance(payments, list):
-                    types = []
-                    for p in payments:
-                        if isinstance(p, dict):
-                            t = p.get("type") or p.get("name") or p.get("payment_type") or "cash"
-                            types.append(str(t))
+                        if isinstance(pos_json, dict) and not pos_json.get("ok") and pos_json.get("result", {}).get("error") == 5054:
+                            print("POS cashier logged out during sync. Disabling POS detail queries.")
+                            pos_online = False
                         else:
-                            types.append(str(p))
-                    payment_type = ", ".join(types) if types else "Naqd"
-                elif isinstance(payments, dict):
-                    payment_type = payments.get("type") or payments.get("name") or "Naqd"
-                else:
-                    payment_type = str(payments)
-                    
-                pay_lower = payment_type.lower()
-                if "cash" in pay_lower or "naqd" in pay_lower:
-                    payment_type = "Naqd"
-                elif "card" in pay_lower or "karta" in pay_lower or "terminal" in pay_lower:
-                    payment_type = "Karta"
-                elif "click" in pay_lower or "payme" in pay_lower or "apelsin" in pay_lower or "uzum" in pay_lower:
-                    payment_type = "Elektron"
-                    
-                rows = target_cheque.get("rows") or target_cheque.get("items") or target_cheque.get("goods") or []
-                items_list = []
-                if isinstance(rows, list):
-                    for row in rows:
-                        if isinstance(row, dict):
-                            row_item = row.get("item")
-                            row_name = ""
-                            row_sku = ""
-                            if isinstance(row_item, dict):
-                                row_name = row_item.get("name") or ""
-                                row_sku = row_item.get("code") or row_item.get("articul") or ""
-                            else:
-                                row_name = row.get("name") or row.get("item_name") or ""
-                                row_sku = row.get("sku") or row.get("code") or row.get("articul") or ""
-                                
-                            row_qty = row.get("quantity") or row.get("qty") or 1
-                            row_price = row.get("price") or 0
-                            row_total = row.get("sum") or row.get("total") or (row_qty * row_price)
-                            
-                            items_list.append({
-                                "name": row_name,
-                                "sku": row_sku,
-                                "quantity": int(row_qty),
-                                "price": float(row_price),
-                                "total": float(row_total)
-                            })
-                            
-                receipt_payload = {
-                    "id": c_uuid,
-                    "code": c_code,
-                    "cashier_name": cashier_name,
-                    "total_amount": float(total_amount),
-                    "discount": float(discount),
-                    "payment_type": payment_type,
-                    "items": items_list,
-                    "created_at": c_time_str
-                }
+                            if isinstance(pos_json, list) and len(pos_json) > 0:
+                                cheque_details = pos_json[0]
+                            elif isinstance(pos_json, dict):
+                                if "result" in pos_json and isinstance(pos_json["result"], list) and len(pos_json["result"]) > 0:
+                                    cheque_details = pos_json["result"][0]
+                                elif "cheque" in pos_json:
+                                    cheque_details = pos_json["cheque"]
+                                elif "doccheque" in pos_json:
+                                    cheque_details = pos_json["doccheque"]
+                                elif pos_json.get("ok"):
+                                    res = pos_json.get("result")
+                                    if isinstance(res, list) and len(res) > 0:
+                                        cheque_details = res[0]
+                                    elif isinstance(res, dict):
+                                        cheque_details = res
+                                else:
+                                    cheque_details = pos_json
+                except Exception as pos_ex:
+                    print(f"POS details query failed for {c_uuid} (falling back to cloud summary): {pos_ex}")
+                    # If it times out or connection drops, assume POS went offline
+                    pos_online = False
+            
+            # Use POS cheque details if retrieved, otherwise fall back to cloud cheque summary info
+            target_cheque = cheque_details if (cheque_details and isinstance(cheque_details, dict) and ("rows" in cheque_details or "payments" in cheque_details)) else cheque
+            
+            c_code = target_cheque.get("code") or target_cheque.get("number") or target_cheque.get("receipt_no") or f"CH-{c_uuid[:8]}"
+            c_date = target_cheque.get("date") or target_cheque.get("created_at")
+            
+            c_time_str = None
+            if c_date:
+                try:
+                    ts = float(c_date)
+                    if ts > 1e11: # ms
+                        ts = ts / 1000.0
+                    c_time_str = datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
+                except Exception:
+                    c_time_str = str(c_date)
+            if not c_time_str:
+                c_time_str = datetime.now(timezone.utc).isoformat()
                 
-                supabase_req("POST", "receipts?on_conflict=id", json_data=receipt_payload)
-                saved_count += 1
-            except Exception as e_row:
-                print(f"Skipping row error during sync receipts: {e_row}")
+            cashier = target_cheque.get("cashier")
+            cashier_name = ""
+            if isinstance(cashier, dict):
+                cashier_name = cashier.get("full_name") or cashier.get("name") or cashier.get("username") or ""
+            else:
+                cashier_name = target_cheque.get("cashier_name") or target_cheque.get("seller_name") or str(cashier or "")
+            if not cashier_name:
+                cashier_name = "Noma'lum kassa xodimi"
                 
-        return {"status": "success", "count": saved_count, "message": f"{saved_count} ta yangi chek muvaffaqiyatli sinxronlashtirildi."}
-    except Exception as e:
-        print(f"REGOS receipts sync error: {e}")
-        raise HTTPException(status_code=500, detail=f"REGOS API-dan cheklarni olishda xatolik: {str(e)}")
+            total_amount = target_cheque.get("sum") or target_cheque.get("amount") or target_cheque.get("total_amount") or target_cheque.get("total") or 0.0
+            discount = target_cheque.get("discount") or target_cheque.get("discount_sum") or 0.0
+            
+            payments = target_cheque.get("payments") or target_cheque.get("payment_type") or target_cheque.get("pay_type") or "cash"
+            payment_type = "Naqd"
+            if isinstance(payments, list):
+                types = []
+                for p in payments:
+                    if isinstance(p, dict):
+                        t = p.get("type") or p.get("name") or p.get("payment_type") or "cash"
+                        types.append(str(t))
+                    else:
+                        types.append(str(p))
+                payment_type = ", ".join(types) if types else "Naqd"
+            elif isinstance(payments, dict):
+                payment_type = payments.get("type") or payments.get("name") or "Naqd"
+            else:
+                payment_type = str(payments)
+                
+            pay_lower = payment_type.lower()
+            if "cash" in pay_lower or "naqd" in pay_lower:
+                payment_type = "Naqd"
+            elif "card" in pay_lower or "karta" in pay_lower or "terminal" in pay_lower:
+                payment_type = "Karta"
+            elif "click" in pay_lower or "payme" in pay_lower or "apelsin" in pay_lower or "uzum" in pay_lower:
+                payment_type = "Elektron"
+                
+            rows = target_cheque.get("rows") or target_cheque.get("items") or target_cheque.get("goods") or []
+            items_list = []
+            if isinstance(rows, list):
+                for row in rows:
+                    if isinstance(row, dict):
+                        row_item = row.get("item")
+                        row_name = ""
+                        row_sku = ""
+                        if isinstance(row_item, dict):
+                            row_name = row_item.get("name") or ""
+                            row_sku = row_item.get("code") or row_item.get("articul") or ""
+                        else:
+                            row_name = row.get("name") or row.get("item_name") or ""
+                            row_sku = row.get("sku") or row.get("code") or row.get("articul") or ""
+                            
+                        row_qty = row.get("quantity") or row.get("qty") or 1
+                        row_price = row.get("price") or 0
+                        row_total = row.get("sum") or row.get("total") or (row_qty * row_price)
+                        
+                        items_list.append({
+                            "name": row_name,
+                            "sku": row_sku,
+                            "quantity": int(row_qty),
+                            "price": float(row_price),
+                            "total": float(row_total)
+                        })
+                        
+            receipt_payload = {
+                "id": c_uuid,
+                "code": c_code,
+                "cashier_name": cashier_name,
+                "total_amount": float(total_amount),
+                "discount": float(discount),
+                "payment_type": payment_type,
+                "items": items_list,
+                "created_at": c_time_str
+            }
+            
+            supabase_req("POST", "receipts?on_conflict=id", json_data=receipt_payload)
+            saved_count += 1
+        except Exception as e_row:
+            print(f"Skipping row error during sync receipts: {e_row}")
+            
+    return {"status": "success", "count": saved_count, "message": f"{saved_count} ta yangi chek muvaffaqiyatli sinxronlashtirildi."}
 
 @app.post("/api/test/simulate-receipt")
 def simulate_receipt(payload: dict):
