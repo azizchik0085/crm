@@ -317,6 +317,9 @@ window.DB = {
             const response = await fetch('/api/receipts');
             if (!response.ok) throw new Error("HTTP error " + response.status);
             const data = await response.json();
+            if (data && data.error === "migration_required") {
+                return data;
+            }
             AppStorage.updateKey('receipts', data);
             return data;
         } catch (e) {

@@ -1676,6 +1676,12 @@ def get_receipts():
         return supabase_get_all("receipts?select=*&order=created_at.desc")
     except Exception as e:
         print(f"Failed to fetch receipts: {e}")
+        err_msg = str(e)
+        if "PGRST205" in err_msg or "Could not find the table" in err_msg or "404" in err_msg:
+            return {
+                "error": "migration_required", 
+                "sql": "CREATE TABLE IF NOT EXISTS public.receipts (\n    id TEXT PRIMARY KEY,\n    code TEXT,\n    cashier_name TEXT,\n    total_amount NUMERIC DEFAULT 0,\n    discount NUMERIC DEFAULT 0,\n    payment_type TEXT DEFAULT 'cash',\n    items JSONB,\n    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()\n);\nALTER TABLE public.receipts DISABLE ROW LEVEL SECURITY;"
+            }
         return []
 
 @app.delete("/api/receipts/{id}")

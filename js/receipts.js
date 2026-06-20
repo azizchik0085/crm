@@ -28,12 +28,36 @@ window.Receipts = {
             </div>
         `;
 
+        let dataRes;
         try {
-            this.receiptsList = await DB.getReceipts();
+            dataRes = await DB.getReceipts();
         } catch (e) {
             console.error("Failed to load receipts:", e);
-            this.receiptsList = [];
+            dataRes = [];
         }
+
+        if (dataRes && dataRes.error === "migration_required") {
+            container.innerHTML = `
+                <div class="card" style="padding: 24px; border: 1px solid rgba(239, 68, 68, 0.2); background: rgba(239, 68, 68, 0.02); margin-top: 16px;">
+                    <div style="display: flex; gap: 16px; align-items: flex-start; text-align: left;">
+                        <div style="width: 40px; height: 40px; border-radius: 50%; background: rgba(239, 68, 68, 0.1); display: flex; align-items: center; justify-content: center; color: var(--danger); flex-shrink: 0;">
+                            <i class="fas fa-exclamation-triangle" style="font-size: 18px;"></i>
+                        </div>
+                        <div style="flex-grow: 1;">
+                            <h3 style="color: var(--text-main); font-size: 16px; margin: 0 0 6px 0;">Supabase-da "receipts" (cheklar) jadvali topilmadi!</h3>
+                            <p style="color: var(--text-muted); font-size: 14px; margin: 0 0 16px 0; line-height: 1.5;">
+                                Cheklar tarixini saqlash va ko'rsatish uchun Supabase bazasida jadval yaratish kerak.
+                                Iltimos, Supabase boshqaruv panelidagi <strong>SQL Editor</strong>-ga kirib, quyidagi SQL kodini nusxalab ishga tushiring (Run qiling):
+                            </p>
+                            <pre style="background: rgba(0,0,0,0.3); padding: 12px; border-radius: 6px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #a5b4fc; overflow-x: auto; max-width: 100%; border: 1px solid var(--border-color); margin: 0;">${dataRes.sql}</pre>
+                        </div>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+
+        this.receiptsList = Array.isArray(dataRes) ? dataRes : [];
 
         const settings = AppStorage.load().settings;
         const currency = settings.currency;
