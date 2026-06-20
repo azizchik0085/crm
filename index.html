@@ -751,7 +751,14 @@
                     </div>
                     <div class="form-group">
                         <label for="emp-role">Lavozimi <span style="color:var(--danger)">*</span></label>
-                        <input type="text" id="emp-role" class="form-control" required placeholder="Masalan: Sotuv menejeri">
+                        <select id="emp-role" class="form-control" required>
+                            <option value="" disabled selected>Lavozimni tanlang...</option>
+                            <option value="Direktor">Direktor (Tizim boshqaruvchisi)</option>
+                            <option value="Sotuv menejeri">Sotuv menejeri (CRM, Telefoniya, Chats)</option>
+                            <option value="Omborchi">Omborchi (Omborxona)</option>
+                            <option value="Buxgalter">Buxgalter (Moliya, Omborxona)</option>
+                            <option value="HR menejeri">HR menejeri (Xodimlar boshqaruvi)</option>
+                        </select>
                     </div>
                     <div class="form-group">
                         <label for="emp-salary">Oylik maoshi</label>
