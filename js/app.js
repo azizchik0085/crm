@@ -281,7 +281,7 @@ window.App = {
         if (isSupervisor) {
             allowedViews = ['dashboard', 'crm', 'telephony', 'erp', 'finance', 'chats', 'hr', 'settings'];
         } else if (isSales) {
-            allowedViews = ['dashboard', 'crm', 'telephony', 'chats'];
+            allowedViews = ['dashboard', 'crm', 'telephony', 'chats', 'erp'];
         } else if (isWarehouse) {
             allowedViews = ['dashboard', 'erp'];
         } else if (isAccountant) {
