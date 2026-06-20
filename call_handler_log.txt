@@ -1,0 +1,16 @@
+[2026-06-20 16:04:30] Python Trigger - Event: incoming, Phone: 998909998877
+[2026-06-20 16:04:33] API Success (incoming) - Response: Created call call_998909998877_1781953473221
+[2026-06-20 16:04:55] Python Trigger - Event: start, Phone: 998909998877
+[2026-06-20 16:04:58] API Success (start) - Response: Call answered: call_998909998877_1781953473221
+[2026-06-20 16:05:02] Python Trigger - Event: end, Phone: 998909998877
+[2026-06-20 16:05:06] API Success (end) - Response: Call ended: call_998909998877_1781953473221, status: answered, duration: 31s
+[2026-06-20 16:07:42] Python Trigger - Event: outgoing, Phone: 996262462
+[2026-06-20 16:07:48] API Success (outgoing) - Response: Created call call_996262462_1781953667063
+[2026-06-20 16:07:48] Python Trigger - Event: start, Phone: 996262462
+[2026-06-20 16:07:54] API Success (start) - Response: Call answered: call_996262462_1781953667063
+[2026-06-20 16:07:54] Python Trigger - Event: end, Phone: 996262462
+[2026-06-20 16:07:59] API Success (end) - Response: Call ended: call_996262462_1781953667063, status: answered, duration: 11s
+[2026-06-20 16:26:03] Python Trigger - Event: outgoing, Phone: +998712003040
+[2026-06-20 16:26:10] API Success (outgoing) - Response: Created call call_+998712003040_1781954768552
+[2026-06-20 16:26:10] Python Trigger - Event: end, Phone: +998712003040
+[2026-06-20 16:26:15] API Success (end) - Response: No active call found for +998712003040

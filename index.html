@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Smart ERP & CRM System</title>
+    
+    <!-- Meta SEO -->
+    <meta name="description" content="Kichik va o'rta bizneslar uchun mukammal va sodda ERP/CRM tizimi. Omborxona, xodimlar boshqaruvi, moliya va mijozlar bazasi bitta joyda.">
+    
+    <!-- Ikonkalar va Shriftlar -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="css/styles.css">
+    
+    <!-- Grafik chizish uchun Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+    <div class="app-container">
+        <!-- Sidebar (Desktop uchun yon menyu) -->
+        <aside class="sidebar">
+            <div class="logo-container" style="justify-content: space-between; width: 100%; gap: 10px;">
+                <div class="logo">
+                    <i class="fas fa-cubes"></i> SmartCore
+                </div>
+                <div id="sip-status-label"></div>
+            </div>
+            
+            <nav style="flex-grow: 1;">
+                <ul class="nav-links">
+                    <li class="nav-item active" data-view="dashboard">
+                        <a href="#" data-view="dashboard"><i class="fas fa-chart-pie"></i> Dashboard</a>
+                    </li>
+                    <li class="nav-item" data-view="crm">
+                        <a href="#" data-view="crm"><i class="fas fa-users-cog"></i> CRM Tizimi</a>
+                    </li>
+                    <li class="nav-item" data-view="telephony">
+                        <a href="#" data-view="telephony"><i class="fas fa-phone-alt"></i> Telefoniya</a>
+                    </li>
+                    <li class="nav-item" data-view="erp">
+                        <a href="#" data-view="erp"><i class="fas fa-warehouse"></i> ERP Tizimi</a>
+                    </li>
+                    <li class="nav-item" data-view="finance">
+                        <a href="#" data-view="finance"><i class="fas fa-wallet"></i> Moliya</a>
+                    </li>
+                    <li class="nav-item" data-view="chats">
+                        <a href="#" data-view="chats"><i class="fas fa-comments"></i> Xabarlar</a>
+                    </li>
+                    <li class="nav-item" data-view="settings">
+                        <a href="#" data-view="settings"><i class="fas fa-sliders-h"></i> Sozlamalar</a>
+                    </li>
+                </ul>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div style="display:flex; flex-direction:column; gap:2px; max-width: 140px;">
+                    <span id="company-name-label" style="font-size:13px; font-weight:600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Kompaniya</span>
+                    <span style="font-size:10px; color:var(--text-muted);">Boshqaruv paneli</span>
+                </div>
+                <button class="theme-toggle-btn" id="theme-toggle" title="Mavzuni o'zgartirish">
+                    <i class="fas fa-sun"></i>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Mobil pastki navigatsiya -->
+        <nav class="bottom-nav">
+            <a href="#" class="bottom-nav-item active" data-view="dashboard">
+                <i class="fas fa-chart-pie"></i>
+                <span>Statistika</span>
+            </a>
+            <a href="#" class="bottom-nav-item" data-view="crm">
+                <i class="fas fa-users-cog"></i>
+                <span>CRM</span>
+            </a>
+            <a href="#" class="bottom-nav-item" data-view="telephony">
+                <i class="fas fa-phone-alt"></i>
+                <span>Telefoniya</span>
+            </a>
+            <a href="#" class="bottom-nav-item" data-view="erp">
+                <i class="fas fa-warehouse"></i>
+                <span>ERP</span>
+            </a>
+            <a href="#" class="bottom-nav-item" data-view="finance">
+                <i class="fas fa-wallet"></i>
+                <span>Moliya</span>
+            </a>
+            <a href="#" class="bottom-nav-item" data-view="chats">
+                <i class="fas fa-comments"></i>
+                <span>Xabarlar</span>
+            </a>
+            <a href="#" class="bottom-nav-item" data-view="settings">
+                <i class="fas fa-sliders-h"></i>
+                <span>Sozlamalar</span>
+            </a>
+        </nav>
+
+        <!-- Asosiy ishchi oyna -->
+        <main class="main-content">
+            
+            <!-- 1. DASHBOARD BOLIHI -->
+            <section id="view-dashboard" class="view-section active-view">
+                <div class="header">
+                    <div class="header-title">
+                        <h1 id="main-header-title">Boshqaruv Paneli</h1>
+                        <p>Kompaniyangiz ko'rsatkichlarining qisqacha tahlili</p>
+                    </div>
+                </div>
+
+                <!-- Statistika nishonlari -->
+                <div class="stats-grid">
+                    <div class="card stat-card">
+                        <div class="stat-info">
+                            <h3>Jami Kirim</h3>
+                            <div class="stat-value" id="dash-income" style="color: var(--success);">0</div>
+                        </div>
+                        <div class="stat-icon-box income"><i class="fas fa-arrow-down"></i></div>
+                    </div>
+                    <div class="card stat-card">
+                        <div class="stat-info">
+                            <h3>Jami Chiqim</h3>
+                            <div class="stat-value" id="dash-expense" style="color: var(--danger);">0</div>
+                        </div>
+                        <div class="stat-icon-box expense"><i class="fas fa-arrow-up"></i></div>
+                    </div>
+                    <div class="card stat-card">
+                        <div class="stat-info">
+                            <h3>Mijozlar</h3>
+                            <div class="stat-value" id="dash-clients">0</div>
+                        </div>
+                        <div class="stat-icon-box clients"><i class="fas fa-user-friends"></i></div>
+                    </div>
+                    <div class="card stat-card">
+                        <div class="stat-info">
+                            <h3>Ombor Ogohlantirishlari</h3>
+                            <div class="stat-value" id="dash-alerts" style="color: var(--warning);">0</div>
+                        </div>
+                        <div class="stat-icon-box inventory"><i class="fas fa-exclamation-triangle"></i></div>
+                    </div>
+                </div>
+
+                <!-- Grafik va jadvallar -->
+                <div class="dashboard-grid">
+                    <div class="card">
+                        <div class="dashboard-title-bar">
+                            <h3>Pul oqimi (Cash Flow)</h3>
+                            <span style="font-size:12px; color:var(--text-muted);">Oxirgi faollik kunlari bo'yicha</span>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="cashflowChart"></canvas>
+                        </div>
+                    </div>
+                    
+                    <div style="display: flex; flex-direction: column; gap: 24px;">
+                        <div class="card" style="flex-grow: 1;">
+                            <h3>Yangi Bitimlar / Leadlar</h3>
+                            <div id="dash-recent-leads" style="margin-top: 16px;">
+                                <!-- Dinamik leadlar chiqadi -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Oxirgi tranzaksiyalar -->
+                <div class="card">
+                    <div class="dashboard-title-bar">
+                        <h3>Oxirgi Moliyaviy Amallar</h3>
+                        <button class="btn btn-secondary btn-sm" onclick="App.renderView('finance')">Barchasi <i class="fas fa-chevron-right"></i></button>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="custom-table">
+                            <thead>
+                                <tr>
+                                    <th>Kategoriya</th>
+                                    <th>Tavsif</th>
+                                    <th style="text-align: right;">Soni</th>
+                                </tr>
+                            </thead>
+                            <tbody id="dash-recent-transactions">
+                                <!-- Dinamik tranzaksiyalar -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 2. CRM BO'LIMI -->
+            <section id="view-crm" class="view-section">
+                <div class="header">
+                    <div class="header-title">
+                        <h1>Mijozlar Boshqaruvi (CRM)</h1>
+                        <p>Sotuvlar voronkasi va mijozlar ma'lumotlari</p>
+                    </div>
+                    <div class="header-actions">
+                        <button class="btn btn-primary" onclick="CRM.openAddCustomerModal()">
+                            <i class="fas fa-plus"></i> Yangi Mijoz
+                        </button>
+                    </div>
+                </div>
+
+                <div class="filter-row card" style="padding: 16px;">
+                    <div class="search-box">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="crm-search" class="form-control" placeholder="Mijoz ismi yoki kompaniya bo'yicha qidirish...">
+                    </div>
+                    <div class="filter-group">
+                        <button class="btn btn-primary" id="crm-tab-kanban"><i class="fas fa-columns"></i> Kanban</button>
+                        <button class="btn btn-secondary" id="crm-tab-list"><i class="fas fa-list"></i> Ro'yxat</button>
+                        <button class="btn btn-secondary" id="crm-tab-calls"><i class="fas fa-phone-alt"></i> Qo'ng'iroqlar</button>
+                    </div>
+                </div>
+
+                <div id="crm-content">
+                    <!-- Dinamik Kanban yoki Ro'yxat ko'rinishi -->
+                </div>
+            </section>
+
+            <!-- 2.5. TELEFONIYA BO'LIMI -->
+            <section id="view-telephony" class="view-section">
+                <div class="header">
+                    <div class="header-title">
+                        <h1>Sarkor Telecom Telefoniya</h1>
+                        <p>Qo'ng'iroqlar jurnali va raqam terish paneli</p>
+                    </div>
+                </div>
+
+                <div class="dashboard-grid" style="grid-template-columns: 1fr 2fr; gap: 24px;">
+                    <!-- Raqam Terish Paneli (Numpad Dialer) -->
+                    <div class="card" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 32px 24px;">
+                        <h3 style="margin-bottom: 20px;"><i class="fas fa-th" style="color: var(--accent);"></i> Raqam Terish</h3>
+                        
+                        <div class="dialer-screen" style="width: 100%; max-width: 240px; margin-bottom: 24px; position: relative;">
+                            <input type="text" id="dialer-input" class="form-control" placeholder="+998" style="font-family: 'JetBrains Mono'; font-size: 20px; font-weight: 600; text-align: center; padding-right: 40px; letter-spacing: 1px;">
+                            <button onclick="Telephony.dialerBackspace()" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 16px;">
+                                <i class="fas fa-backspace"></i>
+                            </button>
+                        </div>
+
+                        <div class="dialpad-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 28px; width: 100%; max-width: 240px;">
+                            <button class="dialpad-btn" onclick="Telephony.dialerPress('1')">1</button>
+                            <button class="dialpad-btn" onclick="Telephony.dialerPress('2')">2</button>
+                            <button class="dialpad-btn" onclick="Telephony.dialerPress('3')">3</button>
+                            <button class="dialpad-btn" onclick="Telephony.dialerPress('4')">4</button>
+                            <button class="dialpad-btn" onclick="Telephony.dialerPress('5')">5</button>
+                            <button class="dialpad-btn" onclick="Telephony.dialerPress('6')">6</button>
+                            <button class="dialpad-btn" onclick="Telephony.dialerPress('7')">7</button>
+                            <button class="dialpad-btn" onclick="Telephony.dialerPress('8')">8</button>
+                            <button class="dialpad-btn" onclick="Telephony.dialerPress('9')">9</button>
+                            <button class="dialpad-btn" onclick="Telephony.dialerPress('*')">*</button>
+                            <button class="dialpad-btn" onclick="Telephony.dialerPress('0')">0</button>
+                            <button class="dialpad-btn" onclick="Telephony.dialerPress('#')">#</button>
+                        </div>
+
+                        <button class="btn" style="background-color: var(--success); width: 56px; height: 56px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; color: white; box-shadow: 0 6px 16px rgba(16, 185, 129, 0.3);" onclick="Telephony.dialerCall()">
+                            <i class="fas fa-phone"></i>
+                        </button>
+                    </div>
+
+                    <!-- Qo'ng'iroqlar tarixi (Logs) -->
+                    <div>
+                        <div class="dashboard-title-bar" style="margin-bottom: 12px;">
+                            <h3>Qo'ng'iroqlar Jurnali</h3>
+                        </div>
+                        <div id="calls-logs-content">
+                            <!-- Dinamik qo'ng'iroqlar jurnali -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 3. ERP BO'LIMI -->
+            <section id="view-erp" class="view-section">
+                <div class="header">
+                    <div class="header-title">
+                        <h1>Korxona Resurslari (ERP)</h1>
+                        <p>Ombor mahsulotlari va xodimlar boshqaruvi</p>
+                    </div>
+                    <div class="header-actions">
+                        <button class="btn btn-primary" id="erp-add-product-btn" onclick="showModal('product-modal')">
+                            <i class="fas fa-plus"></i> Mahsulot qo'shish
+                        </button>
+                        <button class="btn btn-primary" id="erp-add-employee-btn" style="display:none;" onclick="showModal('employee-modal')">
+                            <i class="fas fa-user-plus"></i> Xodim qo'shish
+                        </button>
+                    </div>
+                </div>
+
+                <div class="filter-row card" style="padding: 16px;">
+                    <div class="search-box">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="erp-search" class="form-control" placeholder="Qidirish...">
+                    </div>
+                    <div class="filter-group">
+                        <button class="btn btn-primary" id="erp-subtab-inventory"><i class="fas fa-boxes"></i> Omborxona</button>
+                        <button class="btn btn-secondary" id="erp-subtab-hr"><i class="fas fa-users"></i> Xodimlar (HR)</button>
+                    </div>
+                </div>
+
+                <div id="erp-content">
+                    <!-- Dinamik Ombor yoki HR ko'rinishi -->
+                </div>
+            </section>
+
+            <!-- 4. MOLIYA BO'LIMI -->
+            <section id="view-finance" class="view-section">
+                <div class="header">
+                    <div class="header-title">
+                        <h1>Moliya Balansi</h1>
+                        <p>Kirim-chiqim operatsiyalari va tahlillar</p>
+                    </div>
+                    <div class="header-actions">
+                        <button class="btn btn-primary" onclick="showModal('transaction-modal')">
+                            <i class="fas fa-plus"></i> Tranzaksiya qo'shish
+                        </button>
+                    </div>
+                </div>
+
+                <div class="filter-row card" style="padding: 16px;">
+                    <div class="search-box">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="finance-search" class="form-control" placeholder="Tavsif yoki kategoriya bo'yicha...">
+                    </div>
+                    <div class="filter-group">
+                        <button class="btn btn-primary" id="fin-filter-all">Barchasi</button>
+                        <button class="btn btn-secondary" id="fin-filter-income"><i class="fas fa-arrow-down" style="color:var(--success)"></i> Kirim</button>
+                        <button class="btn btn-secondary" id="fin-filter-expense"><i class="fas fa-arrow-up" style="color:var(--danger)"></i> Chiqim</button>
+                    </div>
+                </div>
+
+                <div id="finance-content">
+                    <!-- Dinamik moliya ma'lumotlari -->
+                </div>
+            </section>
+
+            <!-- 5. SOZLAMALAR BO'LIMI -->
+            <section id="view-settings" class="view-section">
+                <div class="header">
+                    <div class="header-title">
+                        <h1>Tizim Sozlamalari</h1>
+                        <p>Kompaniya va tizim parametrlarini o'zgartirish</p>
+                    </div>
+                </div>
+
+                <div class="card" style="max-width: 600px; margin: 0 auto;">
+                    <form id="settings-form">
+                        <div class="form-group">
+                            <label for="settings-company-name">Kompaniya nomi</label>
+                            <input type="text" id="settings-company-name" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="settings-currency">Tizim valyutasi</label>
+                            <select id="settings-currency" class="form-control">
+                                <option value="UZS">O'zbek so'mi (UZS)</option>
+                                <option value="USD">AQSh dollari (USD)</option>
+                            </select>
+                        </div>
+                        <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 24px 0;">
+                        <h4 style="margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+                            <i class="fas fa-database" style="color: #3ECF8E"></i> Supabase Bulutli Baza Sozlamalari
+                        </h4>
+                        <div class="form-group">
+                            <label for="settings-sb-url">Supabase Project URL</label>
+                            <input type="text" id="settings-sb-url" class="form-control" placeholder="https://xxxxxxxxxxxxxxxxxxxx.supabase.co">
+                        </div>
+                        <div class="form-group">
+                            <label for="settings-sb-key">Supabase Anon Key (API key)</label>
+                            <input type="password" id="settings-sb-key" class="form-control" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...">
+                        </div>
+                        <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 24px 0;">
+                        <h4 style="margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+                            <i class="fas fa-phone-alt" style="color: var(--success)"></i> IP-Telefoniya Sozlamalari
+                        </h4>
+                        <div class="form-group">
+                            <label for="settings-telephony-provider">Telefoniya provayderi</label>
+                            <select id="settings-telephony-provider" class="form-control" onchange="App.onTelephonyProviderChange()">
+                                <option value="sarkor">Sarkor Telecom (SIP WebRTC)</option>
+                                <option value="sipuni">Sipuni (WebRTC & API Webhook)</option>
+                            </select>
+                        </div>
+                        <div id="sipuni-webhook-guideline" style="display: none; border-left: 3px solid var(--success); padding-left: 15px; margin-bottom: 20px; font-size: 13px;">
+                            <label>Sipuni Webhook URL (Xabarlar qabul qilish manzili)</label>
+                            <input type="text" id="settings-sipuni-webhook" class="form-control" readonly value="http://127.0.0.1:8000/api/integration/sipuni/webhook" style="font-family: 'JetBrains Mono'; font-size: 12px; background: rgba(0,0,0,0.1); cursor: text;">
+                            <small style="color: var(--text-muted); font-size: 11px; display:block; margin-top: 4px;">Ushbu manzilni nusxalab, <strong>Sipuni kabinetingiz -> API -> Webhooks</strong> bo'limiga kiriting. (Tashqi internetdan kirish uchun ngrok orqali portni ochishingiz kerak bo'ladi).</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="settings-sip-server">SIP Server / Proxy</label>
+                            <input type="text" id="settings-sip-server" class="form-control" placeholder="Masalan: sip.sarkor.uz yoki sipuni.com">
+                        </div>
+                        <div class="form-group">
+                            <label for="settings-sip-user">SIP Login (Telefon raqam yoki extension)</label>
+                            <input type="text" id="settings-sip-user" class="form-control" placeholder="Masalan: 998712000000 yoki 001">
+                        </div>
+                        <div class="form-group">
+                            <label for="settings-sip-password">SIP Parol</label>
+                            <input type="password" id="settings-sip-password" class="form-control" placeholder="SIP parolingiz">
+                        </div>
+                         <div class="form-group">
+                            <label for="settings-sip-wss">WebSocket Gateway URL (WebRTC)</label>
+                            <input type="text" id="settings-sip-wss" class="form-control" placeholder="Masalan: wss://sip.sarkor.uz:8089/ws yoki voice.sipuni.com:8089/ws">
+                        </div>
+                        <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 24px 0;">
+                        <h4 style="margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+                            <i class="fas fa-comments" style="color: var(--accent)"></i> Ijtimoiy Tarmoq Integratsiyalari
+                        </h4>
+                        <div class="form-group">
+                            <label for="settings-telegram-token">Telegram Bot Token</label>
+                            <input type="password" id="settings-telegram-token" class="form-control" placeholder="1234567890:ABCdefGhIJKlmNoPQRsTUVwxyZ...">
+                        </div>
+                        <div class="form-group">
+                            <label for="settings-instagram-username">Instagram Profil nomi (Username)</label>
+                            <input type="text" id="settings-instagram-username" class="form-control" placeholder="Masalan: smartsoft_uz">
+                        </div>
+                        
+                        <div style="margin-top: 10px; margin-bottom: 20px;">
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="App.toggleAdvancedSettings()" style="font-size: 11px; height: 32px; padding: 0 12px;">
+                                <i class="fas fa-cog"></i> Qo'shimcha API Sozlamalari (Token/Webhook)
+                            </button>
+                        </div>
+                        
+                        <div id="advanced-api-settings" style="display: none; border-left: 3px solid var(--accent); padding-left: 15px; margin-bottom: 20px;">
+                            <div class="form-group">
+                                <label for="settings-instagram-token">Instagram Page Access Token</label>
+                                <input type="password" id="settings-instagram-token" class="form-control" placeholder="EAACW...">
+                            </div>
+                            <div class="form-group">
+                                <label>Instagram Webhook URL (Qabul qilish manzili)</label>
+                                <input type="text" id="settings-instagram-webhook" class="form-control" readonly value="http://127.0.0.1:8000/api/integration/instagram/webhook" style="font-family: 'JetBrains Mono'; font-size: 12px; background: rgba(0,0,0,0.1); cursor: text;">
+                                <small style="color: var(--text-muted); font-size: 11px;">Instagramdan avtomatik xabarlar kelishi uchun ushbu manzilni ngrok orqali ochish kerak.</small>
+                            </div>
+                        </div>
+                        <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 24px 0;">
+                        <h4 style="margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+                            <i class="fas fa-brain" style="color: #6366f1"></i> Sun'iy Intellekt (AI Copilot & Auto-Pilot) Sozlamalari
+                        </h4>
+                        <div class="form-group">
+                            <label for="settings-ai-provider">AI Provayderi (Dvigateli)</label>
+                            <select id="settings-ai-provider" class="form-control" onchange="App.onAIProviderChange()">
+                                <option value="local">Lokal (Offline) zaxira tizimi</option>
+                                <option value="gemini">Google Gemini AI</option>
+                                <option value="openai">OpenAI (ChatGPT)</option>
+                                <option value="groq">Groq (Llama-3)</option>
+                            </select>
+                        </div>
+                        <div class="form-group ai-provider-key-group" id="group-gemini-key" style="display: none;">
+                            <label for="settings-gemini-key">Gemini API Key</label>
+                            <input type="password" id="settings-gemini-key" class="form-control" placeholder="AIzaSy...">
+                            <small style="color: var(--text-muted); font-size: 11px;">Kalitni <a href="https://aistudio.google.com/" target="_blank" style="color:var(--accent);">Google AI Studio</a> saytidan bepul olishingiz mumkin.</small>
+                        </div>
+                        <div class="form-group ai-provider-key-group" id="group-openai-key" style="display: none;">
+                            <label for="settings-openai-key">OpenAI API Key</label>
+                            <input type="password" id="settings-openai-key" class="form-control" placeholder="sk-proj-...">
+                            <small style="color: var(--text-muted); font-size: 11px;">Kalitni <a href="https://platform.openai.com/api-keys" target="_blank" style="color:var(--accent);">OpenAI Platform</a> saytidan olishingiz mumkin.</small>
+                        </div>
+                        <div class="form-group ai-provider-key-group" id="group-groq-key" style="display: none;">
+                            <label for="settings-groq-key">Groq API Key</label>
+                            <input type="password" id="settings-groq-key" class="form-control" placeholder="gsk_...">
+                            <small style="color: var(--text-muted); font-size: 11px;">Kalitni <a href="https://console.groq.com/keys" target="_blank" style="color:var(--accent);">Groq Console</a> saytidan bepul olishingiz mumkin.</small>
+                        </div>
+                        <div class="form-group" style="display: flex; align-items: center; gap: 10px; margin-top: 15px;">
+                            <input type="checkbox" id="settings-ai-auto-reply" style="width: 18px; height: 18px; cursor: pointer;">
+                            <label for="settings-ai-auto-reply" style="margin-bottom: 0; cursor: pointer; font-weight: 500; color: var(--text-main); user-select: none;">
+                                Telegram & Instagram xabarlariga avtomatik javob berish (AI Auto-Pilot)
+                            </label>
+                        </div>
+                        <div style="margin-top: 24px; display:flex; gap:16px;">
+                            <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Sozlamalarni saqlash</button>
+                            <button type="button" id="settings-reset-data" class="btn btn-secondary" style="border-color:var(--danger); color:var(--danger);"><i class="fas fa-trash-restore"></i> Tizimni tozalash</button>
+                        </div>
+                    </form>
+                </div>
+            </section>
+
+            <!-- 6. CHATS (XABARLAR) BO'LIMI -->
+            <section id="view-chats" class="view-section">
+                <div class="header">
+                    <div class="header-title">
+                        <h1>Muloqotlar (Live Chat)</h1>
+                        <p>Telegram va Instagram orqali kelgan xabarlar bilan ishlash</p>
+                    </div>
+                </div>
+
+                <div class="card chats-container" style="padding: 0; background: none; border: none; box-shadow: none;">
+                    <!-- Chap tomondagi chat ro'yxati -->
+                    <div class="chats-list-panel card" style="padding: 16px;">
+                        <div class="chats-search search-box">
+                            <i class="fas fa-search"></i>
+                            <input type="text" id="chats-search-input" class="form-control" placeholder="Mijozlarni qidirish...">
+                        </div>
+                        <div class="chats-list" id="chats-list-content">
+                            <!-- Dinamik chatlar ro'yxati -->
+                        </div>
+                        <div style="display: flex; gap: 8px; margin-top: 12px; border-top: 1px solid var(--border-color); padding-top: 12px;">
+                            <button class="btn btn-secondary btn-sm" onclick="window.Chats.showSimulatorModal()" style="flex-grow: 1; font-size: 11px; justify-content: center; height: 36px;">
+                                <i class="fas fa-flask" style="color: var(--accent);"></i> Xabar Simulyatori
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- O'ng tomondagi faol chat oynasi -->
+                    <div class="chat-window" id="active-chat-window">
+                        <!-- Default holat (Hech narsa tanlanmaganda) -->
+                        <div class="chat-no-select" id="chat-no-select-view">
+                            <i class="fas fa-comments"></i>
+                            <h3>Muloqotni boshlash uchun mijozni tanlang</h3>
+                            <p>Chap tomondagi ro'yxatdan Telegram yoki Instagram foydalanuvchisini bosing.</p>
+                        </div>
+
+                        <!-- Chat faol holati (Yashirin bo'ladi) -->
+                        <div id="chat-active-view" style="display: none; flex-direction: column; height: 100%;">
+                            <div class="chat-window-header" style="justify-content: space-between; display: flex; align-items: center; width: 100%;">
+                                <div style="display: flex; align-items: center; gap: 12px;">
+                                    <div class="chat-item-avatar" id="active-chat-avatar">T</div>
+                                    <div>
+                                        <div class="chat-window-title" id="active-chat-name">Tanlanmagan</div>
+                                        <div class="chat-window-subtitle">
+                                            <span id="active-chat-platform-badge"></span>
+                                            <span id="active-chat-platform-text">Telegram</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div id="chat-header-actions" style="display: flex; gap: 8px;">
+                                    <!-- Dinamik "Directda ochish" tugmali harakatlar -->
+                                </div>
+                            </div>
+                            <div class="chat-window-messages" id="chat-messages-container">
+                                <!-- Dinamik chat xabarlari -->
+                            </div>
+                            <form id="chat-send-form" class="chat-window-input-area">
+                                <button type="button" id="chat-ai-suggest-btn" class="btn btn-secondary" style="height: 40px; padding: 0 12px; display: flex; align-items: center; gap: 6px; border-color: #6366f1; color: #a5b4fc; background: rgba(99, 102, 241, 0.05);" title="AI Loyha yozish">
+                                    <i class="fas fa-magic" style="color: #818cf8;"></i> <span>✨ AI Loyha</span>
+                                </button>
+                                <input type="text" id="chat-input-field" class="form-control chat-window-input" placeholder="Xabaringizni yozing..." required autocomplete="off">
+                                <button type="submit" class="btn btn-primary" style="height: 40px; padding: 0 16px;">
+                                    <i class="fas fa-paper-plane"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- MODAL OYNAlari (YANGI ELEMENT QO'SHISH SHAKLLARI) -->
+
+    <!-- 1. CRM Yangi mijoz qo'shish modal oynasi -->
+    <div class="modal" id="crm-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Yangi Mijoz Qo'shish</h3>
+                <button class="close-modal-btn" onclick="closeModal('crm-modal')">&times;</button>
+            </div>
+            <form id="add-customer-form">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="cust-name">Mijoz Ismi <span style="color:var(--danger)">*</span></label>
+                        <input type="text" id="cust-name" class="form-control" required placeholder="Masalan: Sardor Komilov">
+                    </div>
+                    <div class="form-group">
+                        <label for="cust-phone">Asosiy Telefon Raqami <span style="color:var(--danger)">*</span></label>
+                        <input type="text" id="cust-phone" class="form-control" required placeholder="+998 90 123 45 67">
+                    </div>
+                    <div class="form-group">
+                        <label for="cust-phone2">Qo'shimcha Telefon Raqami</label>
+                        <input type="text" id="cust-phone2" class="form-control" placeholder="+998 90 999 88 77">
+                    </div>
+                    <div class="form-group">
+                        <label for="cust-source">Lid Manbasi</label>
+                        <select id="cust-source" class="form-control">
+                            <option value="manual">Qo'lda kiritilgan</option>
+                            <option value="telephony">IP-Telefoniya</option>
+                            <option value="telegram">Telegram</option>
+                            <option value="instagram">Instagram</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="cust-operator">Mas'ul Operator</label>
+                        <select id="cust-operator" class="form-control class-operator-select">
+                            <option value="">Tanlanmagan</option>
+                            <!-- Dinamik to'ldiriladi -->
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="cust-value">Bitim summasi (Qiymati)</label>
+                        <input type="number" id="cust-value" class="form-control" min="0" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="cust-status">Boshlang'ich holati (Status)</label>
+                        <select id="cust-status" class="form-control">
+                            <option value="lead">Yangi (Lead)</option>
+                            <option value="contacted">Muzokarada</option>
+                            <option value="proposal">Taklif yuborilgan</option>
+                            <option value="won">Muvaffaqiyatli bitim</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('crm-modal')">Bekor qilish</button>
+                    <button type="submit" class="btn btn-primary">Qo'shish</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 2. ERP Yangi mahsulot qo'shish modal oynasi -->
+    <div class="modal" id="product-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Yangi Mahsulot Qo'shish</h3>
+                <button class="close-modal-btn" onclick="closeModal('product-modal')">&times;</button>
+            </div>
+            <form id="add-product-form">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="prod-name">Mahsulot nomi <span style="color:var(--danger)">*</span></label>
+                        <input type="text" id="prod-name" class="form-control" required placeholder="Masalan: iPhone 15 Pro Max">
+                    </div>
+                    <div class="form-group">
+                        <label for="prod-sku">SKU kod <span style="color:var(--danger)">*</span></label>
+                        <input type="text" id="prod-sku" class="form-control" required placeholder="IPH-15PM-256">
+                    </div>
+                    <div class="form-group">
+                        <label for="prod-cat">Kategoriya <span style="color:var(--danger)">*</span></label>
+                        <input type="text" id="prod-cat" class="form-control" required placeholder="Masalan: Elektronika, Mebel">
+                    </div>
+                    <div class="form-group">
+                        <label for="prod-price">Sotish narxi</label>
+                        <input type="number" id="prod-price" class="form-control" min="0" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="prod-stock">Boshlang'ich ombor qoldig'i (Dona)</label>
+                        <input type="number" id="prod-stock" class="form-control" min="0" value="0">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('product-modal')">Bekor qilish</button>
+                    <button type="submit" class="btn btn-primary">Saqlash</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 3. ERP Yangi xodim qo'shish modal oynasi -->
+    <div class="modal" id="employee-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Xodim ro'yxatga olish</h3>
+                <button class="close-modal-btn" onclick="closeModal('employee-modal')">&times;</button>
+            </div>
+            <form id="add-employee-form">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="emp-name">Ismi va Familiyasi <span style="color:var(--danger)">*</span></label>
+                        <input type="text" id="emp-name" class="form-control" required placeholder="Masalan: Dilshod Rahmonov">
+                    </div>
+                    <div class="form-group">
+                        <label for="emp-role">Lavozimi <span style="color:var(--danger)">*</span></label>
+                        <input type="text" id="emp-role" class="form-control" required placeholder="Masalan: Sotuv menejeri">
+                    </div>
+                    <div class="form-group">
+                        <label for="emp-salary">Oylik maoshi</label>
+                        <input type="number" id="emp-salary" class="form-control" min="0" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="emp-kpi">Samaradorlik ko'rsatkichi (KPI, %)</label>
+                        <input type="number" id="emp-kpi" class="form-control" min="0" max="100" value="100">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('employee-modal')">Bekor qilish</button>
+                    <button type="submit" class="btn btn-primary">Xodimni qo'shish</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 4. MOLIYA Yangi tranzaksiya qo'shish modal oynasi -->
+    <div class="modal" id="transaction-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Yangi Tranzaksiya Yozish</h3>
+                <button class="close-modal-btn" onclick="closeModal('transaction-modal')">&times;</button>
+            </div>
+            <form id="add-transaction-form">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="tx-type">Tranzaksiya turi</label>
+                        <select id="tx-type" class="form-control">
+                            <option value="income">Kirim (Daromad)</option>
+                            <option value="expense">Chiqim (Xarajat)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="tx-cat">Kategoriya <span style="color:var(--danger)">*</span></label>
+                        <input type="text" id="tx-cat" class="form-control" required placeholder="Masalan: Sotuvlar, Ish haqi, Ofis ijarasi, Reklama">
+                    </div>
+                    <div class="form-group">
+                        <label for="tx-amount">Tranzaksiya summasi <span style="color:var(--danger)">*</span></label>
+                        <input type="number" id="tx-amount" class="form-control" min="0.01" step="any" required placeholder="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="tx-date">Sana <span style="color:var(--danger)">*</span></label>
+                        <input type="date" id="tx-date" class="form-control" required value="2026-06-20">
+                    </div>
+                    <div class="form-group">
+                        <label for="tx-desc">Tavsif (Qo'shimcha izoh)</label>
+                        <textarea id="tx-desc" class="form-control" rows="2" placeholder="Operatsiya bo'yicha batafsil izoh..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('transaction-modal')">Bekor qilish</button>
+                    <button type="submit" class="btn btn-primary">Saqlash</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- CRM Mijoz ma'lumotlari va tahrirlash modal oynasi -->
+    <div class="modal" id="customer-details-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Mijoz Ma'lumotlari</h3>
+                <button class="close-modal-btn" onclick="closeModal('customer-details-modal')">&times;</button>
+            </div>
+            <form id="edit-customer-form">
+                <input type="hidden" id="edit-cust-id">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="edit-cust-name">Mijoz Ismi <span style="color:var(--danger)">*</span></label>
+                        <input type="text" id="edit-cust-name" class="form-control" required placeholder="Masalan: Sardor Komilov">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-cust-phone">Asosiy Telefon Raqami <span style="color:var(--danger)">*</span></label>
+                        <input type="text" id="edit-cust-phone" class="form-control" required placeholder="+998 90 123 45 67">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-cust-phone2">Qo'shimcha Telefon Raqami</label>
+                        <input type="text" id="edit-cust-phone2" class="form-control" placeholder="+998 90 999 88 77">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-cust-source">Lid Manbasi</label>
+                        <select id="edit-cust-source" class="form-control">
+                            <option value="manual">Qo'lda kiritilgan</option>
+                            <option value="telephony">IP-Telefoniya</option>
+                            <option value="telegram">Telegram</option>
+                            <option value="instagram">Instagram</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-cust-operator">Mas'ul Operator</label>
+                        <select id="edit-cust-operator" class="form-control class-operator-select">
+                            <option value="">Tanlanmagan</option>
+                            <!-- Dinamik to'ldiriladi -->
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-cust-value">Bitim summasi (Qiymati)</label>
+                        <input type="number" id="edit-cust-value" class="form-control" min="0" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-cust-status">Holati (Status)</label>
+                        <select id="edit-cust-status" class="form-control">
+                            <option value="lead">Yangi (Lead)</option>
+                            <option value="contacted">Muzokarada</option>
+                            <option value="proposal">Taklif yuborilgan</option>
+                            <option value="won">Muvaffaqiyatli bitim</option>
+                            <option value="lost">Boy berilgan (Lost)</option>
+                        </select>
+                    </div>
+                    <div id="customer-platform-info" style="font-size: 13px; color: var(--text-muted); margin-top: 12px; display: none; padding: 10px; background: rgba(255,255,255,0.03); border-radius: 8px;">
+                        <!-- Platforma ma'lumotlari chiqadi -->
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('customer-details-modal')">Yopish</button>
+                    <button type="submit" class="btn btn-primary">Saqlash</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 5. Qo'ng'iroq Dialer modal oynasi (Chiquvchi/Kiruvchi suhbatlar uchun) -->
+    <div class="modal" id="call-modal">
+        <div class="modal-content" style="max-width: 360px; text-align: center; padding: 32px 24px;">
+            <div style="margin-bottom: 24px;">
+                <div style="font-size: 13px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                    <i id="call-direction-icon" class="fas fa-arrow-up-right"></i>
+                    <span id="call-direction-text">Chiquvchi qo'ng'iroq</span>
+                </div>
+            </div>
+            
+            <div style="margin-bottom: 32px;">
+                <div id="call-name" style="font-size: 24px; font-weight: 700; margin-bottom: 4px; color: var(--text-main);">Alisher Navoiy</div>
+                <div id="call-company" style="font-size: 14px; color: var(--text-muted); margin-bottom: 8px;">Navoiy Media</div>
+                <div id="call-phone" style="font-size: 16px; font-weight: 500; font-family: 'JetBrains Mono'; color: var(--accent);">+998 90 123 45 67</div>
+            </div>
+
+            <div style="margin-bottom: 40px;">
+                <div id="call-status" style="font-size: 14px; color: var(--text-muted); margin-bottom: 12px; font-weight: 500;">Ulanmoqda...</div>
+                <div id="call-timer" style="font-size: 36px; font-weight: 700; font-family: 'JetBrains Mono'; color: var(--text-muted);">00:00</div>
+            </div>
+
+            <div>
+                <button class="btn" style="background-color: var(--danger); width: 64px; height: 64px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 24px; color: white; box-shadow: 0 8px 24px rgba(239, 68, 68, 0.4);" onclick="Telephony.hangup()">
+                    <i class="fas fa-phone-slash"></i>
+                </button>
+            </div>
+        </div>
+    <!-- 6. Chats Simulyatori modal oynasi -->
+    <div class="modal" id="chats-simulator-modal">
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header">
+                <h3>Xabar Simulyatori</h3>
+                <button class="close-modal-btn" onclick="closeModal('chats-simulator-modal')">&times;</button>
+            </div>
+            <form id="simulate-message-form">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="sim-platform">Platforma</label>
+                        <select id="sim-platform" class="form-control" onchange="window.Chats.onSimulatorPlatformChange()">
+                            <option value="telegram">Telegram Bot</option>
+                            <option value="instagram">Instagram Direct</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="sim-sender-id">Foydalanuvchi ID (Chat ID / Sender ID)</label>
+                        <input type="text" id="sim-sender-id" class="form-control" value="888777" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="sim-name">Foydalanuvchi ismi</label>
+                        <input type="text" id="sim-name" class="form-control" value="Telegram Test User" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="sim-text">Xabar matni</label>
+                        <textarea id="sim-text" class="form-control" rows="3" required placeholder="Salom, bu test xabari..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('chats-simulator-modal')">Yopish</button>
+                    <button type="submit" class="btn btn-primary">Simulyatsiya qilish</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Supabase JS SDK (CDN) -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <!-- JsSIP (Sarkor Telecom SIP Client CDN) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jssip/3.9.0/jssip.min.js"></script>
+
+    <!-- Tizim fayllari ulash -->
+    <script src="js/storage.js"></script>
+    <script src="js/db.js"></script>
+    <script src="js/telephony.js"></script>
+    <script src="js/crm.js"></script>
+    <script src="js/chats.js"></script>
+    <script src="js/erp.js"></script>
+    <script src="js/finance.js"></script>
+    <script src="js/app.js"></script>
+    
+    <!-- Floating AI Assistant Widget -->
+    <div id="ai-assistant-widget" class="ai-widget-closed">
+        <!-- Floating Toggle Button -->
+        <button id="ai-widget-toggle" class="ai-pulse-button" title="AI Yordamchi">
+            <i class="fas fa-robot"></i>
+        </button>
+        
+        <!-- Chat Window Overlay -->
+        <div id="ai-widget-window">
+            <div class="ai-widget-header">
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <i class="fas fa-robot" style="color: #818cf8; font-size: 18px;"></i>
+                    <div style="text-align: left;">
+                        <h4 style="margin: 0; font-size: 13px; font-weight: 600; color: var(--text-main);">Smart AI Yordamchi</h4>
+                        <span style="font-size: 9px; color: var(--success); display:flex; align-items:center; gap:3px; font-weight: 500;">
+                            <span class="pulse-dot"></span> Active AI Assistant
+                        </span>
+                    </div>
+                </div>
+                <button id="ai-widget-close" class="close-btn">&times;</button>
+            </div>
+            
+            <div id="ai-widget-messages" class="ai-widget-body">
+                <div class="ai-message assistant">
+                    Assalomu alaykum! Men sizning sun'iy intellekt yordamchingizman. Biznesingiz tahlili, ombor qoldiqlari, daromadlar yoki mijozlar bo'yicha savol bering (masalan: *"Omborda nimalar tugayapti?"*).
+                </div>
+            </div>
+            
+            <form id="ai-widget-form" class="ai-widget-footer">
+                <input type="text" id="ai-widget-input" placeholder="Savol yozing..." required autocomplete="off">
+                <button type="submit" id="ai-widget-send-btn">
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Modal tranzaksiya sanasini bugungi sanaga avtomatik moslash
+        document.getElementById('tx-date').value = new Date().toISOString().split('T')[0];
+    </script>
+
+</body>
+</html>
