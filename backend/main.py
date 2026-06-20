@@ -1340,7 +1340,7 @@ def sync_regos_inventory():
     
     try:
         while True:
-            payload = {"limit": limit, "offset": offset}
+            payload = {"limit": limit, "offset": offset, "price_type_id": 1}
             print(f"Fetching from REGOS URL: {url} with offset {offset}...")
             response = requests.post(url, headers=headers, json=payload, timeout=20)
             response.raise_for_status()
