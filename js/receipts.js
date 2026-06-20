@@ -145,57 +145,82 @@ window.Receipts = {
     },
 
     openDetails: function(id) {
-        const receipt = this.receiptsList.find(r => r.id === id);
-        if (!receipt) return;
-
-        const settings = AppStorage.load().settings;
-        const currency = settings.currency;
-
-        const codeEl = document.getElementById('rec-detail-code');
-        const cashierEl = document.getElementById('rec-detail-cashier');
-        const dateEl = document.getElementById('rec-detail-date');
-        const paytypeEl = document.getElementById('rec-detail-paytype');
-        const itemsEl = document.getElementById('rec-detail-items');
-        const discountEl = document.getElementById('rec-detail-discount');
-        const totalEl = document.getElementById('rec-detail-total');
-
-        if (codeEl) codeEl.textContent = receipt.code || 'CH-' + receipt.id.substring(0, 8);
-        if (cashierEl) cashierEl.textContent = receipt.cashier_name || 'Noma\'lum';
-        
-        const dateObj = new Date(receipt.created_at);
-        if (dateEl) dateEl.textContent = isNaN(dateObj.getTime()) ? receipt.created_at : dateObj.toLocaleString('uz-UZ', { hour12: false });
-        
-        if (paytypeEl) {
-            paytypeEl.textContent = receipt.payment_type || 'Naqd';
-            paytypeEl.className = 'badge ' + (receipt.payment_type === 'Karta' 
-                ? 'badge-primary' 
-                : (receipt.payment_type === 'Elektron' ? 'badge-success' : 'badge-secondary'));
-        }
-
-        if (discountEl) discountEl.textContent = formatMoney(receipt.discount || 0, currency);
-        if (totalEl) totalEl.textContent = formatMoney(receipt.total_amount || 0, currency);
-
-        if (itemsEl) {
-            itemsEl.innerHTML = '';
-            const items = receipt.items || [];
-            if (items.length === 0) {
-                itemsEl.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted);">Mahsulotlar topilmadi.</td></tr>`;
-            } else {
-                items.forEach(item => {
-                    itemsEl.innerHTML += `
-                        <tr>
-                            <td><strong>${item.name || 'Noma\'lum mahsulot'}</strong></td>
-                            <td><span style="font-family: 'JetBrains Mono'; font-size: 12px; color: var(--text-muted);">${item.sku || '-'}</span></td>
-                            <td style="text-align: center;">${item.quantity || 1}</td>
-                            <td style="text-align: right; font-family: 'JetBrains Mono';">${formatMoney(item.price || 0, currency)}</td>
-                            <td style="text-align: right; font-family: 'JetBrains Mono';"><strong>${formatMoney(item.total || 0, currency)}</strong></td>
-                        </tr>
-                    `;
-                });
+        try {
+            const receipt = this.receiptsList.find(r => String(r.id) === String(id));
+            if (!receipt) {
+                console.warn("Chek topilmadi, ID:", id);
+                return;
             }
-        }
 
-        showModal('receipt-details-modal');
+            const settings = AppStorage.load().settings;
+            const currency = settings.currency;
+
+            const codeEl = document.getElementById('rec-detail-code');
+            const cashierEl = document.getElementById('rec-detail-cashier');
+            const dateEl = document.getElementById('rec-detail-date');
+            const paytypeEl = document.getElementById('rec-detail-paytype');
+            const itemsEl = document.getElementById('rec-detail-items');
+            const discountEl = document.getElementById('rec-detail-discount');
+            const totalEl = document.getElementById('rec-detail-total');
+
+            if (codeEl) codeEl.textContent = receipt.code || 'CH-' + String(receipt.id).substring(0, 8);
+            if (cashierEl) cashierEl.textContent = receipt.cashier_name || 'Noma\'lum';
+            
+            const dateObj = new Date(receipt.created_at);
+            if (dateEl) dateEl.textContent = isNaN(dateObj.getTime()) ? receipt.created_at : dateObj.toLocaleString('uz-UZ', { hour12: false });
+            
+            if (paytypeEl) {
+                paytypeEl.textContent = receipt.payment_type || 'Naqd';
+                paytypeEl.className = 'badge ' + (receipt.payment_type === 'Karta' 
+                    ? 'badge-primary' 
+                    : (receipt.payment_type === 'Elektron' ? 'badge-success' : 'badge-secondary'));
+            }
+
+            if (discountEl) discountEl.textContent = formatMoney(receipt.discount || 0, currency);
+            if (totalEl) totalEl.textContent = formatMoney(receipt.total_amount || 0, currency);
+
+            if (itemsEl) {
+                itemsEl.innerHTML = '';
+                let items = receipt.items || [];
+                if (typeof items === 'string') {
+                    try {
+                        items = JSON.parse(items);
+                    } catch (e) {
+                        items = [];
+                    }
+                }
+                if (!Array.isArray(items)) {
+                    items = [];
+                }
+                
+                if (items.length === 0) {
+                    itemsEl.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted);">Mahsulotlar topilmadi.</td></tr>`;
+                } else {
+                    items.forEach(item => {
+                        itemsEl.innerHTML += `
+                            <tr>
+                                <td><strong>${item.name || 'Noma\'lum mahsulot'}</strong></td>
+                                <td><span style="font-family: 'JetBrains Mono'; font-size: 12px; color: var(--text-muted);">${item.sku || '-'}</span></td>
+                                <td style="text-align: center;">${item.quantity || 1}</td>
+                                <td style="text-align: right; font-family: 'JetBrains Mono';">${formatMoney(item.price || 0, currency)}</td>
+                                <td style="text-align: right; font-family: 'JetBrains Mono';"><strong>${formatMoney(item.total || 0, currency)}</strong></td>
+                            </tr>
+                        `;
+                    });
+                }
+            }
+
+            if (window.showModal) {
+                window.showModal('receipt-details-modal');
+            } else if (typeof showModal === 'function') {
+                showModal('receipt-details-modal');
+            } else {
+                console.error("showModal funksiyasi topilmadi!");
+            }
+        } catch (err) {
+            console.error("Chek tafsilotlarini ochishda xatolik:", err);
+            alert("Chek tafsilotlarini ko'rsatishda xatolik yuz berdi: " + err.message);
+        }
     },
 
     deleteReceipt: async function(id) {
