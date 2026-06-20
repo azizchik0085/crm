@@ -1409,3 +1409,52 @@ body.light-theme .ai-widget-footer input {
     background: var(--border-color);
     border-radius: 2px;
 }
+
+/* Active Profile Card Styles */
+.active-profile-card {
+    transition: background-color 0.2s ease;
+}
+.active-profile-card:hover {
+    background-color: rgba(255, 255, 255, 0.03) !important;
+}
+.logout-btn:hover {
+    color: var(--danger) !important;
+    transform: scale(1.1);
+}
+
+/* Premium Login Styles */
+#login-screen {
+    animation: fadeIn 0.4s ease-out;
+}
+.login-card {
+    animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.login-card .form-control {
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+.login-card .form-control:focus {
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+    outline: none;
+}
+.login-card .btn {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+.login-card .btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4) !important;
+    filter: brightness(1.1);
+}
+.login-card .btn:active {
+    transform: translateY(0);
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+@keyframes slideUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}

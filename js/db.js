@@ -160,15 +160,18 @@ window.DB = {
     },
 
     saveEmployee: async function(employee) {
-        try {
-            const response = await fetch('/api/employees', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(employee)
-            });
-            if (!response.ok) throw new Error("HTTP error " + response.status);
-        } catch (e) {
-            console.error("Backend-ga xodimni saqlashda xatolik:", e);
+        const response = await fetch('/api/employees', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(employee)
+        });
+        if (!response.ok) {
+            let errorDetail = "";
+            try {
+                const errJson = await response.json();
+                errorDetail = errJson.detail || errJson.message || "";
+            } catch(p) {}
+            throw new Error(errorDetail || ("HTTP error " + response.status));
         }
         const data = AppStorage.load();
         const index = data.employees.findIndex(e => e.id === employee.id);

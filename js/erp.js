@@ -451,6 +451,8 @@ window.ERP = {
         const role = document.getElementById('emp-role').value;
         const salary = parseFloat(document.getElementById('emp-salary').value) || 0;
         const kpi = parseInt(document.getElementById('emp-kpi').value) || 100;
+        const loginVal = document.getElementById('emp-login').value.trim();
+        const passwordVal = document.getElementById('emp-password').value.trim();
 
         if (!name || !role || salary <= 0) {
             alert('Iltimos, ism, lavozim va maoshni to\'liq kiriting!');
@@ -463,21 +465,28 @@ window.ERP = {
             role,
             salary,
             kpi: Math.min(100, Math.max(0, kpi)),
-            status: 'active'
+            status: 'active',
+            login: loginVal || null,
+            password: passwordVal || null
         };
 
-        await DB.saveEmployee(newEmployee);
-        
-        // Refresh active user switcher dropdown in layout
-        if (window.App && typeof window.App.updateUserSwitcherOptions === 'function') {
-            await window.App.updateUserSwitcherOptions();
+        try {
+            await DB.saveEmployee(newEmployee);
+
+            // Formani tozalash va modal yopish
+            document.getElementById('add-employee-form').reset();
+            closeModal('employee-modal');
+
+            await this.render();
+        } catch (err) {
+            console.error("Xodimni saqlashda xatolik:", err);
+            const errStr = err.message || "";
+            if (errStr.includes("column") || errStr.includes("login") || errStr.includes("password") || errStr.includes("400") || errStr.toLowerCase().includes("bad request") || errStr.includes("does not exist")) {
+                alert("Xatolik: Supabase bazasida 'login' va 'password' ustunlari topilmadi!\n\nIltimos, Supabase Dashboard SQL Editor oynasida quyidagi SQL so'rovni ishga tushiring:\n\nALTER TABLE public.employees ADD COLUMN IF NOT EXISTS login TEXT UNIQUE;\nALTER TABLE public.employees ADD COLUMN IF NOT EXISTS password TEXT;");
+            } else {
+                alert("Xodimni saqlashda xatolik yuz berdi: " + errStr);
+            }
         }
-
-        // Formani tozalash va modal yopish
-        document.getElementById('add-employee-form').reset();
-        closeModal('employee-modal');
-
-        await this.render();
     },
 
     updateKPI: async function(id) {
@@ -490,26 +499,38 @@ window.ERP = {
             return;
         }
 
-        const employees = await DB.getEmployees();
-        const employee = employees.find(e => e.id === id);
-        if (employee) {
-            employee.kpi = newKpi;
-            await DB.saveEmployee(employee);
-            await this.render();
+        try {
+            const employees = await DB.getEmployees();
+            const employee = employees.find(e => e.id === id);
+            if (employee) {
+                employee.kpi = newKpi;
+                await DB.saveEmployee(employee);
+                await this.render();
+            }
+        } catch (err) {
+            console.error("KPI yangilashda xatolik:", err);
+            alert("KPI qiymatini saqlashda xatolik yuz berdi: " + err.message);
         }
     },
 
     deleteEmployee: async function(id) {
         if (!confirm('Xodimni o\'chirishni tasdiqlaysizmi?')) return;
 
-        await DB.deleteEmployee(id);
-        
-        // Refresh active user switcher dropdown in layout
-        if (window.App && typeof window.App.updateUserSwitcherOptions === 'function') {
-            await window.App.updateUserSwitcherOptions();
+        try {
+            await DB.deleteEmployee(id);
+
+            // If currently logged in user is deleted, force logout
+            const activeUserId = localStorage.getItem('activeUserId');
+            if (activeUserId === id && window.App && typeof window.App.logout === 'function') {
+                window.App.logout();
+                return;
+            }
+
+            await this.render();
+        } catch (err) {
+            console.error("Xodimni o'chirishda xatolik:", err);
+            alert("Xodimni o'chirishda xatolik yuz berdi: " + err.message);
         }
-        
-        await this.render();
     },
 
     setPage: function(pageNum) {

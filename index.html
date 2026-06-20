@@ -17,6 +17,45 @@
 </head>
 <body>
 
+    <!-- Beautiful Login Screen Overlay -->
+    <div id="login-screen" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: radial-gradient(circle at 50% 50%, #1e1b4b 0%, #09090b 100%); z-index: 99999; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box;">
+        <div class="login-card" style="width: 100%; max-width: 420px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 16px; padding: 40px 32px; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); text-align: center; box-sizing: border-box; display: flex; flex-direction: column; gap: 24px;">
+            <div class="login-header" style="display: flex; flex-direction: column; gap: 8px; align-items: center;">
+                <div class="login-logo" style="font-size: 32px; font-weight: 800; background: linear-gradient(135deg, #818cf8 0%, #c084fc 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; display: flex; align-items: center; gap: 10px;">
+                    <i class="fas fa-cubes"></i> SmartCore
+                </div>
+                <h2 style="font-size: 20px; font-weight: 600; color: var(--text-main); margin: 0; margin-top: 10px;">Tizimga kirish</h2>
+                <p style="font-size: 13px; color: var(--text-muted); margin: 0;">Biznesingizni boshqarish uchun hisobingizga kiring</p>
+            </div>
+            
+            <form id="login-form" style="display: flex; flex-direction: column; gap: 16px; text-align: left;" onsubmit="App.handleLoginSubmit(event)">
+                <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
+                    <label for="login-username" style="font-size: 13px; font-weight: 500; color: var(--text-main);">Foydalanuvchi logini</label>
+                    <div style="position: relative;">
+                        <span style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--text-muted);"><i class="fas fa-user"></i></span>
+                        <input type="text" id="login-username" class="form-control" required placeholder="Login yoki Telefon raqami" style="padding-left: 40px; background-color: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); color: var(--text-main); height: 44px; border-radius: 8px; width: 100%; box-sizing: border-box;">
+                    </div>
+                </div>
+                
+                <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
+                    <label for="login-password" style="font-size: 13px; font-weight: 500; color: var(--text-main);">Parol</label>
+                    <div style="position: relative;">
+                        <span style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--text-muted);"><i class="fas fa-lock"></i></span>
+                        <input type="password" id="login-password" class="form-control" required placeholder="Sizning maxfiy parolingiz" style="padding-left: 40px; background-color: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); color: var(--text-main); height: 44px; border-radius: 8px; width: 100%; box-sizing: border-box;">
+                    </div>
+                </div>
+                
+                <div id="login-error-msg" style="display: none; color: #ef4444; font-size: 13px; font-weight: 500; text-align: center; background: rgba(239, 68, 68, 0.1); padding: 8px; border-radius: 6px; border: 1px solid rgba(239, 68, 68, 0.2);">
+                    Noto'g'ri login yoki parol kiritildi!
+                </div>
+                
+                <button type="submit" class="btn" style="background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); color: white; font-weight: 600; height: 44px; border-radius: 8px; margin-top: 10px; cursor: pointer; transition: all 0.3s; border: none; box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3); font-size: 14px; display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%;">
+                    <i class="fas fa-sign-in-alt"></i> Tizimga kirish
+                </button>
+            </form>
+        </div>
+    </div>
+
     <div class="app-container">
         <!-- Sidebar (Desktop uchun yon menyu) -->
         <aside class="sidebar">
@@ -53,14 +92,18 @@
                 </ul>
             </nav>
 
-            <!-- Active User Selector -->
-            <div class="user-switcher-container" style="padding: 16px; border-top: 1px solid var(--border-color); margin-top: auto;">
-                <label for="active-user-select" style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 6px; font-weight: 500;">
-                    <i class="fas fa-user-circle"></i> Tizimga kirgan xodim:
-                </label>
-                <select id="active-user-select" class="form-control" style="font-size: 13px; padding: 6px; border-radius: 6px; background-color: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-main); width: 100%; cursor: pointer;">
-                    <option value="admin">Administrator (Direktor)</option>
-                </select>
+            <!-- Active Profile Card -->
+            <div id="active-profile-card" class="active-profile-card" style="padding: 12px 16px; border-top: 1px solid var(--border-color); margin-top: auto; display: flex; align-items: center; gap: 12px; background: rgba(255,255,255,0.01);">
+                <div class="profile-avatar" id="active-user-avatar" style="width: 38px; height: 38px; border-radius: 50%; background: var(--accent-gradient); display: flex; align-items: center; justify-content: center; font-weight: 700; color: white; font-size: 14px; flex-shrink: 0; box-shadow: 0 4px 10px rgba(99, 102, 241, 0.2);">
+                    A
+                </div>
+                <div class="profile-info" style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column;">
+                    <span class="profile-name" id="active-user-name" style="font-size: 13px; font-weight: 600; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Administrator</span>
+                    <span class="profile-role" id="active-user-role" style="font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Direktor</span>
+                </div>
+                <button class="logout-btn" onclick="App.logout()" title="Tizimdan chiqish" style="background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 6px; font-size: 16px; transition: color 0.2s, transform 0.2s; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                    <i class="fas fa-sign-out-alt"></i>
+                </button>
             </div>
 
             <div class="sidebar-footer">
@@ -691,6 +734,14 @@
                     <div class="form-group">
                         <label for="emp-kpi">Samaradorlik ko'rsatkichi (KPI, %)</label>
                         <input type="number" id="emp-kpi" class="form-control" min="0" max="100" value="100">
+                    </div>
+                    <div class="form-group">
+                        <label for="emp-login">Tizimga kirish logini (Login)</label>
+                        <input type="text" id="emp-login" class="form-control" placeholder="Masalan: dilshod123">
+                    </div>
+                    <div class="form-group">
+                        <label for="emp-password">Tizimga kirish paroli (Parol)</label>
+                        <input type="password" id="emp-password" class="form-control" placeholder="Masalan: parol123">
                     </div>
                 </div>
                 <div class="modal-footer">

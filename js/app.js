@@ -33,8 +33,7 @@ window.App = {
         this.setupSettingsForm();
         this.syncSettingsToBackend();
         this.initAIAssistantWidget();
-        this.setupUserSwitcher();
-        this.renderView('dashboard');
+        this.setupAuth();
     },
 
     syncSettingsToBackend: function() {
@@ -148,51 +147,108 @@ window.App = {
         this.onAIProviderChange();
     },
 
-    setupUserSwitcher: async function() {
-        const switcher = document.getElementById('active-user-select');
-        if (!switcher) return;
+    setupAuth: async function() {
+        const activeUserId = localStorage.getItem('activeUserId');
+        const loginScreen = document.getElementById('login-screen');
+        const appContainer = document.querySelector('.app-container');
         
-        await this.updateUserSwitcherOptions();
+        if (!activeUserId) {
+            if (loginScreen) loginScreen.style.display = 'flex';
+            if (appContainer) appContainer.style.display = 'none';
+            return;
+        }
         
-        const activeUserId = localStorage.getItem('activeUserId') || 'admin';
-        switcher.value = activeUserId;
+        if (loginScreen) loginScreen.style.display = 'none';
+        if (appContainer) appContainer.style.display = 'flex';
         
-        switcher.onchange = () => {
-            localStorage.setItem('activeUserId', switcher.value);
-            this.applyPermissions();
-        };
-        
+        await this.updateProfileCard(activeUserId);
         this.applyPermissions();
+        this.renderView(this.currentView || 'dashboard');
     },
 
-    updateUserSwitcherOptions: async function() {
-        const switcher = document.getElementById('active-user-select');
-        if (!switcher) return;
+    updateProfileCard: async function(activeUserId) {
+        const nameLabel = document.getElementById('active-user-name');
+        const roleLabel = document.getElementById('active-user-role');
+        const avatarLabel = document.getElementById('active-user-avatar');
         
-        const currentValue = switcher.value;
-        
-        while (switcher.options.length > 1) {
-            switcher.remove(1);
+        if (activeUserId === 'admin') {
+            if (nameLabel) nameLabel.textContent = 'Administrator';
+            if (roleLabel) roleLabel.textContent = 'Direktor';
+            if (avatarLabel) avatarLabel.textContent = 'A';
+            return;
         }
         
         try {
             const employees = await DB.getEmployees();
-            employees.forEach(emp => {
-                const opt = document.createElement('option');
-                opt.value = emp.id;
-                opt.textContent = `${emp.name} (${emp.role})`;
-                switcher.appendChild(opt);
-            });
+            const currentEmp = employees.find(e => e.id === activeUserId);
+            if (currentEmp) {
+                if (nameLabel) nameLabel.textContent = currentEmp.name;
+                if (roleLabel) roleLabel.textContent = currentEmp.role || 'Xodim';
+                if (avatarLabel) {
+                    const firstChar = (currentEmp.name || 'X').charAt(0).toUpperCase();
+                    avatarLabel.textContent = firstChar;
+                }
+            } else {
+                this.logout();
+            }
         } catch(err) {
-            console.error("Failed to refresh employees in switcher:", err);
+            console.error("Failed to load active employee for profile card:", err);
+        }
+    },
+
+    handleLoginSubmit: async function(event) {
+        event.preventDefault();
+        const usernameInput = document.getElementById('login-username');
+        const passwordInput = document.getElementById('login-password');
+        const errorMsg = document.getElementById('login-error-msg');
+        
+        if (!usernameInput || !passwordInput) return;
+        
+        const login = usernameInput.value.trim();
+        const password = passwordInput.value.trim();
+        
+        if (errorMsg) errorMsg.style.display = 'none';
+        
+        if (login === 'admin' && password === 'admin') {
+            localStorage.setItem('activeUserId', 'admin');
+            usernameInput.value = '';
+            passwordInput.value = '';
+            await this.setupAuth();
+            return;
         }
         
-        switcher.value = currentValue;
-        if (switcher.value !== currentValue) {
-            switcher.value = 'admin';
-            localStorage.setItem('activeUserId', 'admin');
-            this.applyPermissions();
+        try {
+            const employees = await DB.getEmployees();
+            const foundEmp = employees.find(e => e.login === login && e.password === password);
+            if (foundEmp) {
+                localStorage.setItem('activeUserId', foundEmp.id);
+                usernameInput.value = '';
+                passwordInput.value = '';
+                await this.setupAuth();
+            } else {
+                if (errorMsg) {
+                    errorMsg.textContent = "Noto'g'ri login yoki parol kiritildi!";
+                    errorMsg.style.display = 'block';
+                }
+            }
+        } catch (err) {
+            console.error("Login verification failed:", err);
+            if (errorMsg) {
+                errorMsg.textContent = "Tizimga ulanishda xatolik yuz berdi.";
+                errorMsg.style.display = 'block';
+            }
         }
+    },
+
+    logout: function() {
+        localStorage.removeItem('activeUserId');
+        const usernameInput = document.getElementById('login-username');
+        const passwordInput = document.getElementById('login-password');
+        const errorMsg = document.getElementById('login-error-msg');
+        if (usernameInput) usernameInput.value = '';
+        if (passwordInput) passwordInput.value = '';
+        if (errorMsg) errorMsg.style.display = 'none';
+        this.setupAuth();
     },
 
     applyPermissions: async function() {
