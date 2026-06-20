@@ -1902,6 +1902,7 @@ def run_sync_in_background(days: int):
             print(f"POS connection check failed: {e_pos_check}")
             pos_online = False
             
+        saved_count = 0
         processed_receipts = []
         for idx, cheque in enumerate(cheques_list):
             if not isinstance(cheque, dict):
@@ -2075,28 +2076,41 @@ def run_sync_in_background(days: int):
                     "created_at": c_time_str
                 }
                 processed_receipts.append(receipt_payload)
+                
+                # Flush to database in batches of 100 to provide real-time updates and prevent memory exhaustion
+                if len(processed_receipts) >= 100:
+                    sync_progress["message"] = f"Cheklar saqlanmoqda: {idx}/{len(cheques_list)}..."
+                    try:
+                        supabase_req("POST", "receipts?on_conflict=id", json_data=processed_receipts)
+                        saved_count += len(processed_receipts)
+                    except Exception as ex:
+                        print(f"Background Sync: batch upsert failed, doing single inserts... Error: {ex}")
+                        for payload in processed_receipts:
+                            try:
+                                supabase_req("POST", "receipts?on_conflict=id", json_data=payload)
+                                saved_count += 1
+                            except Exception as single_ex:
+                                print(f"Background Sync: Fallback insert failed for {payload['id']}: {single_ex}")
+                    processed_receipts = []
             except Exception as e_row:
                 print(f"Background Sync: error parsing receipt {c_uuid}: {e_row}")
                 
-        # 4. Upsert in chunks of 500
-        saved_count = 0
-        chunk_size = 500
-        for i in range(0, len(processed_receipts), chunk_size):
-            chunk = processed_receipts[i:i + chunk_size]
-            sync_progress["message"] = f"Cheklar saqlanmoqda: {i}/{len(processed_receipts)}..."
+        # 4. Flush remaining processed receipts
+        if processed_receipts:
+            sync_progress["message"] = f"Cheklar saqlanmoqda: so'nggi qism..."
             try:
-                supabase_req("POST", "receipts?on_conflict=id", json_data=chunk)
-                saved_count += len(chunk)
-                print(f"Background Sync: synced chunk {i//chunk_size + 1} ({len(chunk)} items)")
+                supabase_req("POST", "receipts?on_conflict=id", json_data=processed_receipts)
+                saved_count += len(processed_receipts)
             except Exception as ex:
-                print(f"Background Sync: chunk upsert failed, doing single inserts... Error: {ex}")
-                for payload in chunk:
+                print(f"Background Sync: final batch upsert failed, doing single inserts... Error: {ex}")
+                for payload in processed_receipts:
                     try:
                         supabase_req("POST", "receipts?on_conflict=id", json_data=payload)
                         saved_count += 1
                     except Exception as single_ex:
                         print(f"Background Sync: Fallback insert failed for {payload['id']}: {single_ex}")
-                        
+            processed_receipts = []
+            
         sync_progress["running"] = False
         sync_progress["processed"] = len(cheques_list)
         sync_progress["message"] = f"Muvaffaqiyatli yakunlandi. {saved_count} ta yangi chek saqlandi."
