@@ -1535,40 +1535,74 @@ def fetch_and_save_regos_receipt(cheque_uuid: str):
         endpoint = "https://" + endpoint
         
     if "/v1" not in endpoint:
-        url = f"{endpoint}/v1/pos/doccheque/get"
+        pos_url = f"{endpoint}/v1/pos/doccheque/get"
+        cloud_url = f"{endpoint}/v1/doccheque/get"
     else:
-        url = f"{endpoint}/pos/doccheque/get"
+        pos_url = f"{endpoint}/pos/doccheque/get"
+        cloud_url = f"{endpoint}/doccheque/get"
         
     headers = {
         "Authorization": f"Bearer {regos_token}",
         "Content-Type": "application/json"
     }
     
+    cheque = None
+    # 1. Try POS url first (has full rows and payments if cashier session is occupied)
     try:
         payload = {"uuid": cheque_uuid}
-        print(f"Fetching receipt {cheque_uuid} from REGOS: {url}...")
-        response = requests.post(url, headers=headers, json=payload, timeout=20)
-        response.raise_for_status()
-        resp_data = response.json()
-        print(f"REGOS receipt response: {resp_data}")
-        
-        cheque = None
-        if isinstance(resp_data, list) and len(resp_data) > 0:
-            cheque = resp_data[0]
-        elif isinstance(resp_data, dict):
-            if "result" in resp_data and isinstance(resp_data["result"], list) and len(resp_data["result"]) > 0:
-                cheque = resp_data["result"][0]
-            elif "cheque" in resp_data:
-                cheque = resp_data["cheque"]
-            elif "doccheque" in resp_data:
-                cheque = resp_data["doccheque"]
+        print(f"Fetching receipt {cheque_uuid} from REGOS POS API: {pos_url}...")
+        response = requests.post(pos_url, headers=headers, json=payload, timeout=10)
+        if response.status_code == 200:
+            resp_data = response.json()
+            if isinstance(resp_data, dict) and not resp_data.get("ok") and resp_data.get("result", {}).get("error") == 5054:
+                print("POS cash register is offline/not occupied (error 5054). Will fallback to Cloud API.")
             else:
-                cheque = resp_data
-                
-        if cheque and isinstance(cheque, dict):
-            save_parsed_receipt(cheque)
+                if isinstance(resp_data, list) and len(resp_data) > 0:
+                    cheque = resp_data[0]
+                elif isinstance(resp_data, dict):
+                    if "result" in resp_data and isinstance(resp_data["result"], list) and len(resp_data["result"]) > 0:
+                        cheque = resp_data["result"][0]
+                    elif "cheque" in resp_data:
+                        cheque = resp_data["cheque"]
+                    elif "doccheque" in resp_data:
+                        cheque = resp_data["doccheque"]
+                    else:
+                        cheque = resp_data
     except Exception as e:
-        print(f"Failed to fetch REGOS receipt {cheque_uuid}: {e}")
+        print(f"Failed to fetch REGOS receipt {cheque_uuid} from POS API: {e}")
+
+    # 2. If POS failed or register is logged out, fall back to Cloud url
+    if not cheque:
+        try:
+            now_ts = int(time.time())
+            start_ts = now_ts - (30 * 24 * 3600) # 30 days range
+            payload = {
+                "uuid": cheque_uuid,
+                "start_date": start_ts,
+                "end_date": now_ts
+            }
+            print(f"Fetching receipt {cheque_uuid} from REGOS Cloud API: {cloud_url}...")
+            response = requests.post(cloud_url, headers=headers, json=payload, timeout=10)
+            if response.status_code == 200:
+                resp_data = response.json()
+                if isinstance(resp_data, list) and len(resp_data) > 0:
+                    cheque = resp_data[0]
+                elif isinstance(resp_data, dict):
+                    if "result" in resp_data and isinstance(resp_data["result"], list) and len(resp_data["result"]) > 0:
+                        cheque = resp_data["result"][0]
+                    elif "cheque" in resp_data:
+                        cheque = resp_data["cheque"]
+                    elif "doccheque" in resp_data:
+                        cheque = resp_data["doccheque"]
+                    else:
+                        cheque = resp_data
+        except Exception as e:
+            print(f"Failed to fetch REGOS receipt {cheque_uuid} from Cloud API fallback: {e}")
+
+    if cheque and isinstance(cheque, dict):
+        save_parsed_receipt(cheque)
+    else:
+        print(f"Could not retrieve receipt data for {cheque_uuid} from either POS or Cloud APIs.")
 
 def save_parsed_receipt(cheque: dict):
     try:
@@ -1700,10 +1734,13 @@ def sync_regos_receipts():
     if not endpoint.startswith(("http://", "https://")):
         endpoint = "https://" + endpoint
         
+    # Use cloud endpoint for fetching the full list to avoid error 5054 (which happens when POS is offline)
     if "/v1" not in endpoint:
-        url = f"{endpoint}/v1/pos/doccheque/get"
+        cloud_url = f"{endpoint}/v1/doccheque/get"
+        pos_url = f"{endpoint}/v1/pos/doccheque/get"
     else:
-        url = f"{endpoint}/pos/doccheque/get"
+        cloud_url = f"{endpoint}/doccheque/get"
+        pos_url = f"{endpoint}/pos/doccheque/get"
         
     headers = {
         "Authorization": f"Bearer {regos_token}",
@@ -1711,7 +1748,7 @@ def sync_regos_receipts():
     }
     
     now_ts = int(time.time())
-    start_ts = now_ts - (30 * 24 * 3600) # 30 days ago
+    start_ts = now_ts - (365 * 24 * 3600) # Sync up to 365 days ago (1 year)
     
     payload = {
         "start_date": start_ts,
@@ -1720,14 +1757,8 @@ def sync_regos_receipts():
     }
     
     try:
-        print(f"Syncing receipts from REGOS API: {url}...")
-        response = requests.post(url, headers=headers, json=payload, timeout=25)
-        
-        if response.status_code != 200:
-            print("Failed with date filters, retrying with simple payload...")
-            payload = {"statuses": ["Closed"]}
-            response = requests.post(url, headers=headers, json=payload, timeout=25)
-            
+        print(f"Syncing receipts from REGOS Cloud API: {cloud_url}...")
+        response = requests.post(cloud_url, headers=headers, json=payload, timeout=25)
         response.raise_for_status()
         resp_data = response.json()
         
@@ -1748,7 +1779,16 @@ def sync_regos_receipts():
         if not cheques_list:
             return {"status": "success", "count": 0, "message": "Yangi cheklar topilmadi."}
             
-        print(f"Found {len(cheques_list)} receipts in REGOS API. Saving to Supabase...")
+        print(f"Found {len(cheques_list)} receipts in REGOS Cloud. Saving new ones to Supabase...")
+        
+        # Fetch existing receipts to skip duplicates and save requests
+        existing_ids = set()
+        try:
+            existing_receipts = supabase_req("GET", "receipts?select=id")
+            existing_ids = {r["id"] for r in existing_receipts if isinstance(r, dict) and "id" in r}
+            print(f"Already have {len(existing_ids)} receipts in DB. Skipping duplicates.")
+        except Exception as e_db:
+            print(f"Failed to fetch existing receipts (might be empty/migration error): {e_db}")
         
         saved_count = 0
         for cheque in cheques_list:
@@ -1759,8 +1799,47 @@ def sync_regos_receipts():
                 if not c_uuid:
                     continue
                     
-                c_code = cheque.get("code") or cheque.get("number") or cheque.get("receipt_no") or f"CH-{c_uuid[:8]}"
-                c_date = cheque.get("date") or cheque.get("created_at")
+                # Skip already synced receipts
+                if c_uuid in existing_ids:
+                    continue
+                
+                # Attempt to retrieve detailed items/payments from POS API for new receipts
+                cheque_details = None
+                try:
+                    pos_payload = {
+                        "uuid": c_uuid,
+                        "start_date": start_ts,
+                        "end_date": now_ts
+                    }
+                    # Small timeout so offline register doesn't block sync
+                    pos_resp = requests.post(pos_url, headers=headers, json=pos_payload, timeout=4)
+                    if pos_resp.status_code == 200:
+                        pos_json = pos_resp.json()
+                        if isinstance(pos_json, list) and len(pos_json) > 0:
+                            cheque_details = pos_json[0]
+                        elif isinstance(pos_json, dict):
+                            if "result" in pos_json and isinstance(pos_json["result"], list) and len(pos_json["result"]) > 0:
+                                cheque_details = pos_json["result"][0]
+                            elif "cheque" in pos_json:
+                                cheque_details = pos_json["cheque"]
+                            elif "doccheque" in pos_json:
+                                cheque_details = pos_json["doccheque"]
+                            elif pos_json.get("ok"):
+                                res = pos_json.get("result")
+                                if isinstance(res, list) and len(res) > 0:
+                                    cheque_details = res[0]
+                                elif isinstance(res, dict):
+                                    cheque_details = res
+                            else:
+                                cheque_details = pos_json
+                except Exception as pos_ex:
+                    print(f"POS details request failed for {c_uuid} (using cloud fallback): {pos_ex}")
+                
+                # Use POS cheque details if retrieved, otherwise fall back to cloud cheque summary info
+                target_cheque = cheque_details if (cheque_details and isinstance(cheque_details, dict) and ("rows" in cheque_details or "payments" in cheque_details)) else cheque
+                
+                c_code = target_cheque.get("code") or target_cheque.get("number") or target_cheque.get("receipt_no") or f"CH-{c_uuid[:8]}"
+                c_date = target_cheque.get("date") or target_cheque.get("created_at")
                 
                 c_time_str = None
                 if c_date:
@@ -1774,19 +1853,19 @@ def sync_regos_receipts():
                 if not c_time_str:
                     c_time_str = datetime.now(timezone.utc).isoformat()
                     
-                cashier = cheque.get("cashier")
+                cashier = target_cheque.get("cashier")
                 cashier_name = ""
                 if isinstance(cashier, dict):
-                    cashier_name = cashier.get("name") or cashier.get("username") or ""
+                    cashier_name = cashier.get("full_name") or cashier.get("name") or cashier.get("username") or ""
                 else:
-                    cashier_name = cheque.get("cashier_name") or cheque.get("seller_name") or str(cashier or "")
+                    cashier_name = target_cheque.get("cashier_name") or target_cheque.get("seller_name") or str(cashier or "")
                 if not cashier_name:
-                    cashier_name = "smena2"
+                    cashier_name = "Noma'lum kassa xodimi"
                     
-                total_amount = cheque.get("sum") or cheque.get("total_amount") or cheque.get("total") or 0.0
-                discount = cheque.get("discount") or cheque.get("discount_sum") or 0.0
+                total_amount = target_cheque.get("sum") or target_cheque.get("amount") or target_cheque.get("total_amount") or target_cheque.get("total") or 0.0
+                discount = target_cheque.get("discount") or target_cheque.get("discount_sum") or 0.0
                 
-                payments = cheque.get("payments") or cheque.get("payment_type") or cheque.get("pay_type") or "cash"
+                payments = target_cheque.get("payments") or target_cheque.get("payment_type") or target_cheque.get("pay_type") or "cash"
                 payment_type = "Naqd"
                 if isinstance(payments, list):
                     types = []
@@ -1810,7 +1889,7 @@ def sync_regos_receipts():
                 elif "click" in pay_lower or "payme" in pay_lower or "apelsin" in pay_lower or "uzum" in pay_lower:
                     payment_type = "Elektron"
                     
-                rows = cheque.get("rows") or cheque.get("items") or cheque.get("goods") or []
+                rows = target_cheque.get("rows") or target_cheque.get("items") or target_cheque.get("goods") or []
                 items_list = []
                 if isinstance(rows, list):
                     for row in rows:
@@ -1853,7 +1932,7 @@ def sync_regos_receipts():
             except Exception as e_row:
                 print(f"Skipping row error during sync receipts: {e_row}")
                 
-        return {"status": "success", "count": saved_count, "message": f"{saved_count} ta chek muvaffaqiyatli sinxronlashtirildi."}
+        return {"status": "success", "count": saved_count, "message": f"{saved_count} ta yangi chek muvaffaqiyatli sinxronlashtirildi."}
     except Exception as e:
         print(f"REGOS receipts sync error: {e}")
         raise HTTPException(status_code=500, detail=f"REGOS API-dan cheklarni olishda xatolik: {str(e)}")
