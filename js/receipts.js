@@ -88,6 +88,7 @@ window.Receipts = {
                             <tr>
                                 <th>Chek kodi</th>
                                 <th>Kassa xodimi</th>
+                                <th>Mijoz</th>
                                 <th>To'lov turi</th>
                                 <th>Sana</th>
                                 <th>Chegirma</th>
@@ -99,7 +100,7 @@ window.Receipts = {
         `;
 
         if (filtered.length === 0) {
-            html += `<tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 32px;">Cheklar topilmadi.</td></tr>`;
+            html += `<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 32px;">Cheklar topilmadi.</td></tr>`;
         } else {
             filtered.forEach(r => {
                 const dateObj = new Date(r.created_at);
@@ -111,10 +112,28 @@ window.Receipts = {
                     ? 'badge-primary' 
                     : (r.payment_type === 'Elektron' ? 'badge-success' : 'badge-secondary');
 
+                let customerInfo = '-';
+                let itemsObj = r.items;
+                if (typeof itemsObj === 'string') {
+                    try {
+                        itemsObj = JSON.parse(itemsObj);
+                    } catch (e) {
+                        itemsObj = null;
+                    }
+                }
+                if (itemsObj && !Array.isArray(itemsObj) && typeof itemsObj === 'object') {
+                    const cName = itemsObj.customer_name || '';
+                    const cPhone = itemsObj.customer_phone || '';
+                    if (cName || cPhone) {
+                        customerInfo = `<strong>${cName || 'Mijoz'}</strong><br><span style="font-size: 11px; color: var(--text-muted); font-family: 'JetBrains Mono';">${cPhone || ''}</span>`;
+                    }
+                }
+
                 html += `
                     <tr>
                         <td><strong>${r.code || 'CH-' + r.id.substring(0, 8)}</strong></td>
                         <td>${r.cashier_name || 'Noma\'lum'}</td>
+                        <td>${customerInfo}</td>
                         <td><span class="badge ${badgeClass}">${r.payment_type || 'Naqd'}</span></td>
                         <td><span style="font-family: 'JetBrains Mono'; font-size: 13px;">${formattedDate}</span></td>
                         <td><span style="color: var(--danger); font-family: 'JetBrains Mono';">${formatMoney(r.discount || 0, currency)}</span></td>
@@ -179,24 +198,54 @@ window.Receipts = {
             if (discountEl) discountEl.textContent = formatMoney(receipt.discount || 0, currency);
             if (totalEl) totalEl.textContent = formatMoney(receipt.total_amount || 0, currency);
 
-            if (itemsEl) {
-                itemsEl.innerHTML = '';
-                let items = receipt.items || [];
-                if (typeof items === 'string') {
-                    try {
-                        items = JSON.parse(items);
-                    } catch (e) {
-                        items = [];
-                    }
-                }
-                if (!Array.isArray(items)) {
+            // Parse items payload to extract products list and customer card details
+            let items = receipt.items || [];
+            if (typeof items === 'string') {
+                try {
+                    items = JSON.parse(items);
+                } catch (e) {
                     items = [];
                 }
-                
-                if (items.length === 0) {
+            }
+
+            let customerName = '';
+            let customerPhone = '';
+            let products = [];
+
+            if (items && !Array.isArray(items) && typeof items === 'object') {
+                customerName = items.customer_name || '';
+                customerPhone = items.customer_phone || '';
+                products = items.products || [];
+            } else if (Array.isArray(items)) {
+                products = items;
+            }
+
+            // Display customer card name and phone inside modal rows
+            const customerRowEl = document.getElementById('rec-detail-customer-row');
+            const phoneRowEl = document.getElementById('rec-detail-phone-row');
+            const customerNameEl = document.getElementById('rec-detail-customer');
+            const customerPhoneEl = document.getElementById('rec-detail-phone');
+
+            if (customerName) {
+                if (customerNameEl) customerNameEl.textContent = customerName;
+                if (customerRowEl) customerRowEl.style.display = 'flex';
+            } else {
+                if (customerRowEl) customerRowEl.style.display = 'none';
+            }
+
+            if (customerPhone) {
+                if (customerPhoneEl) customerPhoneEl.textContent = customerPhone;
+                if (phoneRowEl) phoneRowEl.style.display = 'flex';
+            } else {
+                if (phoneRowEl) phoneRowEl.style.display = 'none';
+            }
+
+            if (itemsEl) {
+                itemsEl.innerHTML = '';
+                if (products.length === 0) {
                     itemsEl.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted);">Mahsulotlar topilmadi.</td></tr>`;
                 } else {
-                    items.forEach(item => {
+                    products.forEach(item => {
                         itemsEl.innerHTML += `
                             <tr>
                                 <td><strong>${item.name || 'Noma\'lum mahsulot'}</strong></td>

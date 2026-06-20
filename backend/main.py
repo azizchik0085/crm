@@ -1714,6 +1714,21 @@ def save_parsed_receipt(cheque: dict):
                         "total": float(row_total)
                     })
                     
+        card = cheque.get("card")
+        cust_name = ""
+        cust_phone = ""
+        if isinstance(card, dict):
+            customer = card.get("customer")
+            if isinstance(customer, dict):
+                cust_name = (customer.get("full_name") or "").strip()
+                cust_phone = (customer.get("main_phone") or "").strip()
+
+        items_payload = {
+            "customer_name": cust_name,
+            "customer_phone": cust_phone,
+            "products": items_list
+        }
+
         receipt_payload = {
             "id": c_uuid,
             "code": c_code,
@@ -1721,7 +1736,7 @@ def save_parsed_receipt(cheque: dict):
             "total_amount": float(total_amount),
             "discount": float(discount),
             "payment_type": payment_type,
-            "items": items_list,
+            "items": items_payload,
             "created_at": c_time_str
         }
         
@@ -1841,11 +1856,11 @@ def run_sync_in_background(days: int):
         start_iso = datetime.fromtimestamp(start_range_ts, tz=timezone.utc).isoformat().replace("+", "%2B")
         end_iso = datetime.fromtimestamp(now_ts, tz=timezone.utc).isoformat().replace("+", "%2B")
         
-        existing_ids = set()
+        existing_receipts = {}  # id -> is_new_format (bool)
         limit = 1000
         offset = 0
         while True:
-            path = f"receipts?select=id&created_at=gte.{start_iso}&created_at=lte.{end_iso}"
+            path = f"receipts?select=id,items&created_at=gte.{start_iso}&created_at=lte.{end_iso}"
             url = f"{SUPABASE_URL}/rest/v1/{path}"
             req_headers = headers.copy()
             req_headers["Range"] = f"{offset}-{offset + limit - 1}"
@@ -1857,7 +1872,11 @@ def run_sync_in_background(days: int):
                     break
                 for r in chunk:
                     if isinstance(r, dict) and "id" in r:
-                        existing_ids.add(r["id"])
+                        items_val = r.get("items")
+                        is_new = False
+                        if isinstance(items_val, dict) and "products" in items_val:
+                            is_new = True
+                        existing_receipts[r["id"]] = is_new
                 if len(chunk) < limit:
                     break
                 offset += limit
@@ -1865,7 +1884,7 @@ def run_sync_in_background(days: int):
                 print(f"Background Sync: Error fetching existing IDs: {e}")
                 break
                 
-        print(f"Background Sync: Found {len(existing_ids)} existing receipts in DB for the range. Filtering duplicates...")
+        print(f"Background Sync: Found {len(existing_receipts)} existing receipts in DB for the range. Filtering duplicates...")
         
         # 3. Check if POS terminal is online
         pos_online = True
@@ -1892,7 +1911,7 @@ def run_sync_in_background(days: int):
             if not c_uuid:
                 continue
                 
-            if c_uuid in existing_ids:
+            if c_uuid in existing_receipts and existing_receipts[c_uuid]:
                 continue
                 
             if idx % 50 == 0 or idx == len(cheques_list) - 1:
@@ -2030,6 +2049,21 @@ def run_sync_in_background(days: int):
                                 "total": float(row_total)
                             })
                             
+                card = target_cheque.get("card")
+                cust_name = ""
+                cust_phone = ""
+                if isinstance(card, dict):
+                    customer = card.get("customer")
+                    if isinstance(customer, dict):
+                        cust_name = (customer.get("full_name") or "").strip()
+                        cust_phone = (customer.get("main_phone") or "").strip()
+
+                items_payload = {
+                    "customer_name": cust_name,
+                    "customer_phone": cust_phone,
+                    "products": items_list
+                }
+
                 receipt_payload = {
                     "id": c_uuid,
                     "code": c_code,
@@ -2037,7 +2071,7 @@ def run_sync_in_background(days: int):
                     "total_amount": float(total_amount),
                     "discount": float(discount),
                     "payment_type": payment_type,
-                    "items": items_list,
+                    "items": items_payload,
                     "created_at": c_time_str
                 }
                 processed_receipts.append(receipt_payload)
