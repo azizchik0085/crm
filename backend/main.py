@@ -1444,6 +1444,21 @@ def sync_regos_inventory():
                 
     return {"status": "success", "count": sync_count}
 
+@app.post("/api/integration/regos/webhook")
+async def regos_webhook(request: Request):
+    try:
+        data = await request.json()
+        print(f"REGOS Webhook received: {data}")
+    except Exception as e:
+        print(f"Error reading REGOS webhook JSON: {e}")
+        data = {}
+        
+    # Trigger sync in background thread
+    import threading
+    threading.Thread(target=sync_regos_inventory).start()
+    
+    return {"status": "success", "message": "Sync triggered in background"}
+
 # Mount frontend files (HTML, CSS, JS) to run at root url (must be mounted last)
 STATIC_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if os.path.exists(STATIC_DIR):
