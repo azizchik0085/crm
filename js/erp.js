@@ -1,0 +1,397 @@
+// ERP & CRM Tizimi - ERP Moduli (Omborxona va HR) - SUPABASE ULANISHI BILAN
+
+window.ERP = {
+    activeSubSection: 'inventory', // 'inventory' yoki 'hr'
+
+    init: function() {
+        this.render();
+        this.setupEventListeners();
+    },
+
+    setupEventListeners: function() {
+        const invSubTabBtn = document.getElementById('erp-subtab-inventory');
+        const hrSubTabBtn = document.getElementById('erp-subtab-hr');
+
+        if (invSubTabBtn && hrSubTabBtn) {
+            invSubTabBtn.onclick = () => {
+                this.activeSubSection = 'inventory';
+                invSubTabBtn.classList.add('btn-primary');
+                invSubTabBtn.classList.remove('btn-secondary');
+                hrSubTabBtn.classList.add('btn-secondary');
+                hrSubTabBtn.classList.remove('btn-primary');
+                this.render();
+            };
+
+            hrSubTabBtn.onclick = () => {
+                this.activeSubSection = 'hr';
+                hrSubTabBtn.classList.add('btn-primary');
+                hrSubTabBtn.classList.remove('btn-secondary');
+                invSubTabBtn.classList.add('btn-secondary');
+                invSubTabBtn.classList.remove('btn-primary');
+                this.render();
+            };
+        }
+
+        // Qidiruv
+        const searchInput = document.getElementById('erp-search');
+        if (searchInput) {
+            searchInput.oninput = () => this.render();
+        }
+
+        // Formalar yuborilishi
+        const invForm = document.getElementById('add-product-form');
+        if (invForm) {
+            invForm.onsubmit = (e) => {
+                e.preventDefault();
+                this.addProduct();
+            };
+        }
+
+        const hrForm = document.getElementById('add-employee-form');
+        if (hrForm) {
+            hrForm.onsubmit = (e) => {
+                e.preventDefault();
+                this.addEmployee();
+            };
+        }
+    },
+
+    render: async function() {
+        const searchVal = document.getElementById('erp-search')?.value.toLowerCase() || '';
+        const container = document.getElementById('erp-content');
+        if (!container) return;
+
+        if (this.activeSubSection === 'inventory') {
+            document.getElementById('erp-add-product-btn').style.display = 'inline-flex';
+            document.getElementById('erp-add-employee-btn').style.display = 'none';
+            await this.renderInventory(container, searchVal);
+        } else {
+            document.getElementById('erp-add-product-btn').style.display = 'none';
+            document.getElementById('erp-add-employee-btn').style.display = 'inline-flex';
+            await this.renderHR(container, searchVal);
+        }
+    },
+
+    renderInventory: async function(container, searchVal) {
+        // Supabase yoki keshdan ombor ma'lumotlarini yuklash
+        const inventory = await DB.getInventory();
+        
+        const settings = AppStorage.load().settings;
+        const currency = settings.currency;
+
+        const filtered = inventory.filter(p => 
+            p.name.toLowerCase().includes(searchVal) || 
+            p.sku.toLowerCase().includes(searchVal) || 
+            p.category.toLowerCase().includes(searchVal)
+        );
+
+        // Ombor statistikasi
+        const totalProducts = inventory.length;
+        const totalStockValuation = inventory.reduce((sum, p) => sum + (p.price * p.stock), 0);
+        const lowStockCount = inventory.filter(p => p.stock > 0 && p.stock <= 3).length;
+        const outOfStockCount = inventory.filter(p => p.stock === 0).length;
+
+        let html = `
+            <div class="stats-grid" style="margin-top: 16px;">
+                <div class="card stat-card" style="padding: 16px;">
+                    <div class="stat-info">
+                        <h3>Jami Mahsulot turlari</h3>
+                        <div class="stat-value">${totalProducts} ta</div>
+                    </div>
+                    <div class="stat-icon-box info"><i class="fas fa-boxes"></i></div>
+                </div>
+                <div class="card stat-card" style="padding: 16px;">
+                    <div class="stat-info">
+                        <h3>Ombor Qiymati</h3>
+                        <div class="stat-value" style="color: var(--success);">${formatMoney(totalStockValuation, currency)}</div>
+                    </div>
+                    <div class="stat-icon-box income"><i class="fas fa-coins"></i></div>
+                </div>
+                <div class="card stat-card" style="padding: 16px;">
+                    <div class="stat-info">
+                        <h3>Kam Qolgan</h3>
+                        <div class="stat-value" style="color: var(--warning);">${lowStockCount} ta</div>
+                    </div>
+                    <div class="stat-icon-box warning"><i class="fas fa-exclamation-triangle"></i></div>
+                </div>
+                <div class="card stat-card" style="padding: 16px;">
+                    <div class="stat-info">
+                        <h3>Tugagan</h3>
+                        <div class="stat-value" style="color: var(--danger);">${outOfStockCount} ta</div>
+                    </div>
+                    <div class="stat-icon-box danger"><i class="fas fa-times-circle"></i></div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="table-responsive">
+                    <table class="custom-table">
+                        <thead>
+                            <tr>
+                                <th>Mahsulot nomi</th>
+                                <th>SKU</th>
+                                <th>Kategoriya</th>
+                                <th>Narxi</th>
+                                <th>Qoldiq</th>
+                                <th>Holat</th>
+                                <th style="text-align: right;">Amallar</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+        `;
+
+        if (filtered.length === 0) {
+            html += `<tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 32px;">Mahsulotlar topilmadi.</td></tr>`;
+        } else {
+            filtered.forEach(p => {
+                let stockBadge = '<span class="badge badge-success">Mavjud</span>';
+                let stockColor = 'var(--text-main)';
+                
+                if (p.stock === 0) {
+                    stockBadge = '<span class="badge badge-danger">Tugagan</span>';
+                    stockColor = 'var(--danger)';
+                } else if (p.stock <= 3) {
+                    stockBadge = '<span class="badge badge-warning">Kam qolgan</span>';
+                    stockColor = 'var(--warning)';
+                }
+
+                html += `
+                    <tr>
+                        <td><strong>${p.name}</strong></td>
+                        <td><code style="font-family:'JetBrains Mono';">${p.sku}</code></td>
+                        <td>${p.category}</td>
+                        <td>${formatMoney(p.price, currency)}</td>
+                        <td><strong style="color: ${stockColor}">${p.stock} ta</strong></td>
+                        <td>${stockBadge}</td>
+                        <td style="text-align: right; display: flex; justify-content: flex-end; gap: 8px;">
+                            <button class="btn btn-secondary btn-sm" onclick="ERP.adjustStock('${p.id}', 1)"><i class="fas fa-plus"></i></button>
+                            <button class="btn btn-secondary btn-sm" onclick="ERP.adjustStock('${p.id}', -1)" ${p.stock <= 0 ? 'disabled' : ''}><i class="fas fa-minus"></i></button>
+                            <button class="btn btn-secondary btn-sm" onclick="ERP.deleteProduct('${p.id}')"><i class="fas fa-trash-alt" style="color: var(--danger)"></i></button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        html += `
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+
+        container.innerHTML = html;
+    },
+
+    renderHR: async function(container, searchVal) {
+        // Supabase yoki keshdan xodimlarni yuklash
+        const employees = await DB.getEmployees();
+        
+        const settings = AppStorage.load().settings;
+        const currency = settings.currency;
+
+        const filtered = employees.filter(e => 
+            e.name.toLowerCase().includes(searchVal) || 
+            e.role.toLowerCase().includes(searchVal)
+        );
+
+        let html = `
+            <div class="hr-grid" style="margin-top: 24px;">
+        `;
+
+        if (filtered.length === 0) {
+            html += `<div class="card" style="grid-column: 1/-1; text-align: center; color: var(--text-muted); padding: 32px;">Xodimlar topilmadi.</div>`;
+        } else {
+            filtered.forEach(e => {
+                // Name initials
+                const initials = e.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+                
+                // KPI bar rangini hisoblash
+                let kpiColor = 'var(--accent-gradient)';
+                if (e.kpi < 50) kpiColor = 'linear-gradient(135deg, #EF4444 0%, #F59E0B 100%)';
+                else if (e.kpi >= 90) kpiColor = 'linear-gradient(135deg, #10B981 0%, #06B6D4 100%)';
+
+                html += `
+                    <div class="card employee-card">
+                        <div class="employee-header">
+                            <div class="employee-avatar">${initials}</div>
+                            <div class="employee-title">
+                                <h4>${e.name}</h4>
+                                <p>${e.role}</p>
+                            </div>
+                        </div>
+                        
+                        <div class="kpi-container">
+                            <div style="display: flex; justify-content: space-between; font-size: 13px; font-weight: 500;">
+                                <span style="color: var(--text-muted);">Samaradorlik (KPI)</span>
+                                <span style="color: var(--text-main); font-family: 'JetBrains Mono';">${e.kpi}%</span>
+                            </div>
+                            <div class="kpi-bar-bg">
+                                <div class="kpi-bar-fill" style="width: ${e.kpi}%; background: ${kpiColor}"></div>
+                            </div>
+                        </div>
+
+                        <div class="employee-stats">
+                            <div>
+                                <span style="display:block; font-size:11px; color: var(--text-muted)">Maosh</span>
+                                <strong style="color: var(--text-main)">${formatMoney(e.salary, currency)}</strong>
+                            </div>
+                            <div style="text-align: right;">
+                                <span style="display:block; font-size:11px; color: var(--text-muted)">Holati</span>
+                                <span class="badge badge-success">Faol</span>
+                            </div>
+                        </div>
+
+                        <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; border-top: 1px solid var(--border-color); padding-top: 12px;">
+                            <button class="btn btn-secondary btn-sm" onclick="ERP.updateKPI('${e.id}')"><i class="fas fa-chart-line"></i> KPI</button>
+                            <button class="btn btn-secondary btn-sm" onclick="ERP.deleteEmployee('${e.id}')"><i class="fas fa-trash-alt" style="color: var(--danger)"></i> O'chirish</button>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        html += `
+            </div>
+        `;
+
+        container.innerHTML = html;
+    },
+
+    addProduct: async function() {
+        const name = document.getElementById('prod-name').value;
+        const sku = document.getElementById('prod-sku').value;
+        const category = document.getElementById('prod-cat').value;
+        const price = parseFloat(document.getElementById('prod-price').value) || 0;
+        const stock = parseInt(document.getElementById('prod-stock').value) || 0;
+
+        if (!name || !sku || !category) {
+            alert('Iltimos, barcha maydonlarni to\'ldiring!');
+            return;
+        }
+
+        // SKU takrorlanishini tekshirish
+        const inventory = await DB.getInventory();
+        if (inventory.some(p => p.sku.toUpperCase() === sku.toUpperCase())) {
+            alert('Bu SKU kodli mahsulot allaqachon mavjud!');
+            return;
+        }
+
+        const newProduct = {
+            id: 'i_' + Date.now(),
+            name,
+            sku: sku.toUpperCase(),
+            category,
+            price,
+            stock
+        };
+
+        await DB.saveProduct(newProduct);
+
+        // Formani tozalash va modalni yopish
+        document.getElementById('add-product-form').reset();
+        closeModal('product-modal');
+
+        await this.render();
+        if (window.App && typeof window.App.updateDashboardStats === 'function') {
+            window.App.updateDashboardStats();
+        }
+    },
+
+    adjustStock: async function(id, amount) {
+        const inventory = await DB.getInventory();
+        const product = inventory.find(p => p.id === id);
+        
+        if (product) {
+            const newStock = product.stock + amount;
+            if (newStock < 0) return;
+
+            product.stock = newStock;
+            
+            await DB.saveProduct(product);
+            
+            // Agar omborga mahsulot sotib olinsa, moliya xarajatiga yozamiz
+            if (amount > 0) {
+                await DB.saveTransaction({
+                    id: 't_' + Date.now(),
+                    type: 'expense',
+                    category: 'Omborni to\'ldirish',
+                    amount: product.price * 0.7 * amount, // Ulgurji narxi 70% deb hisoblandi
+                    date: new Date().toISOString().split('T')[0],
+                    description: `${product.name} ombor qoldig'i +${amount} ta to'ldirildi`
+                });
+            }
+
+            await this.render();
+            if (window.App && typeof window.App.updateDashboardStats === 'function') {
+                window.App.updateDashboardStats();
+            }
+        }
+    },
+
+    deleteProduct: async function(id) {
+        if (!confirm('Ushbu mahsulotni o\'chirib tashlamoqchimisiz?')) return;
+
+        await DB.deleteProduct(id);
+
+        await this.render();
+        if (window.App && typeof window.App.updateDashboardStats === 'function') {
+            window.App.updateDashboardStats();
+        }
+    },
+
+    addEmployee: async function() {
+        const name = document.getElementById('emp-name').value;
+        const role = document.getElementById('emp-role').value;
+        const salary = parseFloat(document.getElementById('emp-salary').value) || 0;
+        const kpi = parseInt(document.getElementById('emp-kpi').value) || 100;
+
+        if (!name || !role || salary <= 0) {
+            alert('Iltimos, ism, lavozim va maoshni to\'liq kiriting!');
+            return;
+        }
+
+        const newEmployee = {
+            id: 'e_' + Date.now(),
+            name,
+            role,
+            salary,
+            kpi: Math.min(100, Math.max(0, kpi)),
+            status: 'active'
+        };
+
+        await DB.saveEmployee(newEmployee);
+
+        // Formani tozalash va modal yopish
+        document.getElementById('add-employee-form').reset();
+        closeModal('employee-modal');
+
+        await this.render();
+    },
+
+    updateKPI: async function(id) {
+        const newKpiStr = prompt('Yangi KPI qiymatini kiriting (0 - 100):');
+        if (newKpiStr === null) return;
+
+        const newKpi = parseInt(newKpiStr);
+        if (isNaN(newKpi) || newKpi < 0 || newKpi > 100) {
+            alert('Noto\'g\'ri KPI kiritildi. Qiymat 0 va 100 orasida bo\'lishi shart.');
+            return;
+        }
+
+        const employees = await DB.getEmployees();
+        const employee = employees.find(e => e.id === id);
+        if (employee) {
+            employee.kpi = newKpi;
+            await DB.saveEmployee(employee);
+            await this.render();
+        }
+    },
+
+    deleteEmployee: async function(id) {
+        if (!confirm('Xodimni o\'chirishni tasdiqlaysizmi?')) return;
+
+        await DB.deleteEmployee(id);
+        await this.render();
+    }
+};
