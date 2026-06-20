@@ -2112,6 +2112,7 @@ def run_sync_in_background(days: int):
             processed_receipts = []
             
         sync_progress["running"] = False
+        # Force restart trigger comment
         sync_progress["processed"] = len(cheques_list)
         sync_progress["message"] = f"Muvaffaqiyatli yakunlandi. {saved_count} ta yangi chek saqlandi."
         print(f"Background Sync: completed successfully. Saved {saved_count} receipts.")
