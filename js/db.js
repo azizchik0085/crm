@@ -312,15 +312,18 @@ window.DB = {
     },
 
     // --- CHEKLAR (RECEIPTS) OPERATSIYALARI ---
-    getReceipts: async function() {
+    getReceipts: async function(search) {
         try {
-            const response = await fetch('/api/receipts');
+            const url = search ? `/api/receipts?search=${encodeURIComponent(search)}` : '/api/receipts';
+            const response = await fetch(url);
             if (!response.ok) throw new Error("HTTP error " + response.status);
             const data = await response.json();
             if (data && data.error === "migration_required") {
                 return data;
             }
-            AppStorage.updateKey('receipts', data);
+            if (!search) {
+                AppStorage.updateKey('receipts', data);
+            }
             return data;
         } catch (e) {
             console.warn("Backend-dan cheklarni yuklab bo'lmadi, keshdan o'qiladi:", e);

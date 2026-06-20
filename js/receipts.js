@@ -11,7 +11,13 @@ window.Receipts = {
     setupEventListeners: function() {
         const searchInput = document.getElementById('receipts-search');
         if (searchInput) {
-            searchInput.oninput = () => this.render();
+            let debounceTimer;
+            searchInput.oninput = () => {
+                clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(() => {
+                    this.render();
+                }, 300);
+            };
         }
     },
 
@@ -30,7 +36,7 @@ window.Receipts = {
 
         let dataRes;
         try {
-            dataRes = await DB.getReceipts();
+            dataRes = await DB.getReceipts(searchVal);
         } catch (e) {
             console.error("Failed to load receipts:", e);
             dataRes = [];
@@ -209,28 +215,53 @@ window.Receipts = {
         const btn = document.getElementById('receipts-sync-btn');
         if (!btn) return;
 
+        let days = 3;
+        if (confirm("Barcha (1 yillik) tarixiy cheklarni sinxronlashtirmoqchimisiz?\n(Bekor qilish bosilsa, faqat oxirgi 3 kunlik yangi cheklar tezkor sinxronlanadi)")) {
+            days = 360;
+        }
+
         const originalText = btn.innerHTML;
         btn.disabled = true;
-        btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Sinxronizatsiya qilinmoqda...`;
+        btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Sinxronizatsiya boshlanmoqda...`;
 
         try {
-            const response = await fetch('/api/integration/regos/sync-receipts', {
+            const response = await fetch(`/api/integration/regos/sync-receipts?days=${days}`, {
                 method: 'POST'
             });
             
             const data = await response.json();
             if (!response.ok) {
-                throw new Error(data.detail || "Sinxronizatsiya muvaffaqiyatsiz tugadi.");
+                throw new Error(data.detail || "Sinxronizatsiya boshlashda xatolik yuz berdi.");
             }
             
-            alert(data.message || "Sinxronizatsiya yakunlandi.");
-            this.render();
+            this.pollSyncStatus(btn, originalText);
         } catch (e) {
             console.error("REGOS sync receipts failed:", e);
             alert("Xatolik: " + e.message);
-        } finally {
             btn.disabled = false;
             btn.innerHTML = originalText;
         }
+    },
+
+    pollSyncStatus: function(btn, originalText) {
+        const interval = setInterval(async () => {
+            try {
+                const res = await fetch('/api/integration/regos/sync-status');
+                if (!res.ok) return;
+                const status = await res.json();
+                
+                if (status.running) {
+                    btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${status.message || 'Sinxronizatsiya qilinmoqda...'}`;
+                } else {
+                    clearInterval(interval);
+                    btn.disabled = false;
+                    btn.innerHTML = originalText;
+                    alert(status.message || "Sinxronizatsiya yakunlandi.");
+                    this.render();
+                }
+            } catch (e) {
+                console.error("Error polling sync status:", e);
+            }
+        }, 1500);
     }
 };
