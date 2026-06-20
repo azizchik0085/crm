@@ -69,6 +69,18 @@ CREATE TABLE IF NOT EXISTS public.messages (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- 7. Receipts Table (Sotuv cheklari)
+CREATE TABLE IF NOT EXISTS public.receipts (
+    id TEXT PRIMARY KEY,
+    code TEXT,
+    cashier_name TEXT,
+    total_amount NUMERIC DEFAULT 0,
+    discount NUMERIC DEFAULT 0,
+    payment_type TEXT DEFAULT 'cash',
+    items JSONB,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- Eslatma: Sinov rejimida ishlash uchun RLS (Row Level Security) ni o'chirib qo'yish yoki ochiq ruxsat berish kerak:
 ALTER TABLE public.customers DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.inventory DISABLE ROW LEVEL SECURITY;
@@ -76,3 +88,4 @@ ALTER TABLE public.employees DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.transactions DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.calls DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.messages DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.receipts DISABLE ROW LEVEL SECURITY;

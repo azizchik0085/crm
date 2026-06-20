@@ -1522,6 +1522,174 @@ def sync_regos_inventory():
                 
     return {"status": "success", "count": sync_count}
 
+def fetch_and_save_regos_receipt(cheque_uuid: str):
+    regos_endpoint = settings_state.get("regos_endpoint", "")
+    regos_token = settings_state.get("regos_token", "")
+    
+    if not regos_endpoint or not regos_token:
+        print("REGOS API is not configured. Cannot fetch receipt details.")
+        return
+        
+    endpoint = regos_endpoint.strip().rstrip("/")
+    if not endpoint.startswith(("http://", "https://")):
+        endpoint = "https://" + endpoint
+        
+    if "/v1" not in endpoint:
+        url = f"{endpoint}/v1/pos/doccheque/get"
+    else:
+        url = f"{endpoint}/pos/doccheque/get"
+        
+    headers = {
+        "Authorization": f"Bearer {regos_token}",
+        "Content-Type": "application/json"
+    }
+    
+    try:
+        payload = {"uuid": cheque_uuid}
+        print(f"Fetching receipt {cheque_uuid} from REGOS: {url}...")
+        response = requests.post(url, headers=headers, json=payload, timeout=20)
+        response.raise_for_status()
+        resp_data = response.json()
+        print(f"REGOS receipt response: {resp_data}")
+        
+        cheque = None
+        if isinstance(resp_data, list) and len(resp_data) > 0:
+            cheque = resp_data[0]
+        elif isinstance(resp_data, dict):
+            if "result" in resp_data and isinstance(resp_data["result"], list) and len(resp_data["result"]) > 0:
+                cheque = resp_data["result"][0]
+            elif "cheque" in resp_data:
+                cheque = resp_data["cheque"]
+            elif "doccheque" in resp_data:
+                cheque = resp_data["doccheque"]
+            else:
+                cheque = resp_data
+                
+        if cheque and isinstance(cheque, dict):
+            save_parsed_receipt(cheque)
+    except Exception as e:
+        print(f"Failed to fetch REGOS receipt {cheque_uuid}: {e}")
+
+def save_parsed_receipt(cheque: dict):
+    try:
+        c_uuid = cheque.get("uuid") or cheque.get("id")
+        if not c_uuid:
+            c_uuid = f"rec_{int(time.time() * 1000)}"
+            
+        c_code = cheque.get("code") or cheque.get("number") or cheque.get("receipt_no") or f"CH-{c_uuid[:8]}"
+        c_date = cheque.get("date") or cheque.get("created_at")
+        
+        c_time_str = None
+        if c_date:
+            try:
+                ts = float(c_date)
+                if ts > 1e11: # ms
+                    ts = ts / 1000.0
+                c_time_str = datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
+            except Exception:
+                c_time_str = str(c_date)
+        if not c_time_str:
+            c_time_str = datetime.now(timezone.utc).isoformat()
+            
+        cashier = cheque.get("cashier")
+        cashier_name = ""
+        if isinstance(cashier, dict):
+            cashier_name = cashier.get("name") or cashier.get("username") or ""
+        else:
+            cashier_name = cheque.get("cashier_name") or cheque.get("seller_name") or str(cashier or "")
+        if not cashier_name:
+            cashier_name = "Noma'lum kassa xodimi"
+            
+        total_amount = cheque.get("sum") or cheque.get("total_amount") or cheque.get("total") or 0.0
+        discount = cheque.get("discount") or cheque.get("discount_sum") or 0.0
+        
+        payments = cheque.get("payments") or cheque.get("payment_type") or cheque.get("pay_type") or "cash"
+        payment_type = "Naqd"
+        if isinstance(payments, list):
+            types = []
+            for p in payments:
+                if isinstance(p, dict):
+                    t = p.get("type") or p.get("name") or p.get("payment_type") or "cash"
+                    types.append(str(t))
+                else:
+                    types.append(str(p))
+            payment_type = ", ".join(types) if types else "Naqd"
+        elif isinstance(payments, dict):
+            payment_type = payments.get("type") or payments.get("name") or "Naqd"
+        else:
+            payment_type = str(payments)
+            
+        pay_lower = payment_type.lower()
+        if "cash" in pay_lower or "naqd" in pay_lower:
+            payment_type = "Naqd"
+        elif "card" in pay_lower or "karta" in pay_lower or "terminal" in pay_lower:
+            payment_type = "Karta"
+        elif "click" in pay_lower or "payme" in pay_lower or "apelsin" in pay_lower or "uzum" in pay_lower:
+            payment_type = "Elektron"
+            
+        rows = cheque.get("rows") or cheque.get("items") or cheque.get("goods") or []
+        items_list = []
+        if isinstance(rows, list):
+            for row in rows:
+                if isinstance(row, dict):
+                    row_item = row.get("item")
+                    row_name = ""
+                    row_sku = ""
+                    if isinstance(row_item, dict):
+                        row_name = row_item.get("name") or ""
+                        row_sku = row_item.get("code") or row_item.get("articul") or ""
+                    else:
+                        row_name = row.get("name") or row.get("item_name") or ""
+                        row_sku = row.get("sku") or row.get("code") or row.get("articul") or ""
+                        
+                    row_qty = row.get("quantity") or row.get("qty") or 1
+                    row_price = row.get("price") or 0
+                    row_total = row.get("sum") or row.get("total") or (row_qty * row_price)
+                    
+                    items_list.append({
+                        "name": row_name,
+                        "sku": row_sku,
+                        "quantity": int(row_qty),
+                        "price": float(row_price),
+                        "total": float(row_total)
+                    })
+                    
+        receipt_payload = {
+            "id": c_uuid,
+            "code": c_code,
+            "cashier_name": cashier_name,
+            "total_amount": float(total_amount),
+            "discount": float(discount),
+            "payment_type": payment_type,
+            "items": items_list,
+            "created_at": c_time_str
+        }
+        
+        supabase_req("POST", "receipts?on_conflict=id", json_data=receipt_payload)
+        print(f"Successfully saved receipt {c_code} (UUID: {c_uuid}) to database.")
+    except Exception as ex:
+        print(f"Error parsing/saving receipt data: {ex}")
+
+@app.get("/api/receipts")
+def get_receipts():
+    try:
+        return supabase_get_all("receipts?select=*&order=created_at.desc")
+    except Exception as e:
+        print(f"Failed to fetch receipts: {e}")
+        return []
+
+@app.delete("/api/receipts/{id}")
+def delete_receipt(id: str):
+    return supabase_req("DELETE", f"receipts?id=eq.{id}")
+
+@app.post("/api/test/simulate-receipt")
+def simulate_receipt(payload: dict):
+    try:
+        save_parsed_receipt(payload)
+        return {"status": "success", "message": "Receipt simulated successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/api/integration/regos/webhook")
 async def regos_webhook(request: Request):
     try:
@@ -1531,11 +1699,26 @@ async def regos_webhook(request: Request):
         print(f"Error reading REGOS webhook JSON: {e}")
         data = {}
         
-    # Trigger sync in background thread
+    action = data.get("action")
+    webhook_data = data.get("data") or {}
+    
+    if action == "HandleWebhook" and isinstance(webhook_data, dict):
+        action = webhook_data.get("action")
+        webhook_data = webhook_data.get("data") or {}
+        
     import threading
+    
+    if action == "DocChequeClosed" and isinstance(webhook_data, dict) and "uuid" in webhook_data:
+        cheque_uuid = webhook_data.get("uuid")
+        print(f"Webhook identified DocChequeClosed for UUID: {cheque_uuid}")
+        threading.Thread(target=fetch_and_save_regos_receipt, args=(cheque_uuid,)).start()
+    elif isinstance(data, dict) and ("items" in data or "rows" in data or "total_amount" in data):
+        print("Webhook identified direct full receipt payload")
+        threading.Thread(target=save_parsed_receipt, args=(data,)).start()
+        
     threading.Thread(target=sync_regos_inventory).start()
     
-    return {"status": "success", "message": "Sync triggered in background"}
+    return {"status": "success", "message": "Webhook processed successfully"}
 
 # Mount frontend files (HTML, CSS, JS) to run at root url (must be mounted last)
 STATIC_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))

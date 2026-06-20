@@ -86,6 +86,9 @@
                     <li class="nav-item" data-view="finance">
                         <a href="#" data-view="finance"><i class="fas fa-wallet"></i> Moliya</a>
                     </li>
+                    <li class="nav-item" data-view="receipts">
+                        <a href="#" data-view="receipts"><i class="fas fa-receipt"></i> Cheklar</a>
+                    </li>
                     <li class="nav-item" data-view="chats">
                         <a href="#" data-view="chats"><i class="fas fa-comments"></i> Xabarlar</a>
                     </li>
@@ -145,6 +148,10 @@
             <a href="#" class="bottom-nav-item" data-view="finance">
                 <i class="fas fa-wallet"></i>
                 <span>Moliya</span>
+            </a>
+            <a href="#" class="bottom-nav-item" data-view="receipts">
+                <i class="fas fa-receipt"></i>
+                <span>Cheklar</span>
             </a>
             <a href="#" class="bottom-nav-item" data-view="chats">
                 <i class="fas fa-comments"></i>
@@ -412,6 +419,27 @@
 
                 <div id="finance-content">
                     <!-- Dinamik moliya ma'lumotlari -->
+                </div>
+            </section>
+
+            <!-- CHEKLAR (POS RECEIPT HISTORIES) BO'LIMI -->
+            <section id="view-receipts" class="view-section">
+                <div class="header">
+                    <div class="header-title">
+                        <h1>Sotuv Cheklari (POS)</h1>
+                        <p>Kassada urilgan va yopilgan sotuv cheklari tarixi</p>
+                    </div>
+                </div>
+
+                <div class="filter-row card" style="padding: 16px;">
+                    <div class="search-box">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="receipts-search" class="form-control" placeholder="Chek kodi yoki kassa xodimi bo'yicha...">
+                    </div>
+                </div>
+
+                <div id="receipts-content">
+                    <!-- Dinamik cheklar ro'yxati -->
                 </div>
             </section>
 
@@ -954,6 +982,50 @@
         </div>
     </div>
 
+    <!-- 7. Chek batafsil ma'lumotlari modal oynasi -->
+    <div class="modal" id="receipt-details-modal">
+        <div class="modal-content" style="max-width: 650px;">
+            <div class="modal-header">
+                <h3>Chek Tafsilotlari</h3>
+                <button class="close-modal-btn" onclick="closeModal('receipt-details-modal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="card" style="padding: 16px; margin-bottom: 16px; background: rgba(255,255,255,0.02); display: flex; flex-direction: column; gap: 8px;">
+                    <div style="display: flex; justify-content: space-between;"><span style="color: var(--text-muted);">Chek Kodi:</span> <strong id="rec-detail-code">-</strong></div>
+                    <div style="display: flex; justify-content: space-between;"><span style="color: var(--text-muted);">Kassa xodimi:</span> <span id="rec-detail-cashier">-</span></div>
+                    <div style="display: flex; justify-content: space-between;"><span style="color: var(--text-muted);">Sana:</span> <span id="rec-detail-date">-</span></div>
+                    <div style="display: flex; justify-content: space-between;"><span style="color: var(--text-muted);">To'lov turi:</span> <span id="rec-detail-paytype" class="badge badge-primary">-</span></div>
+                </div>
+                
+                <h4 style="margin-top: 16px; margin-bottom: 8px; color: var(--text-main);">Sotilgan mahsulotlar</h4>
+                <div class="table-responsive" style="margin-top: 10px; max-height: 250px; overflow-y: auto;">
+                    <table class="custom-table">
+                        <thead>
+                            <tr>
+                                <th>Mahsulot nomi</th>
+                                <th>SKU</th>
+                                <th style="text-align: center;">Soni</th>
+                                <th style="text-align: right;">Narxi</th>
+                                <th style="text-align: right;">Jami</th>
+                            </tr>
+                        </thead>
+                        <tbody id="rec-detail-items">
+                            <!-- Dinamik mahsulotlar -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <div style="margin-top: 20px; border-top: 1px solid var(--border-color); padding-top: 16px; display: flex; flex-direction: column; align-items: flex-end; gap: 8px;">
+                    <div style="display: flex; gap: 40px; font-size: 15px;"><span style="color: var(--text-muted);">Chegirma:</span> <strong id="rec-detail-discount" style="color: var(--danger);">0 so'm</strong></div>
+                    <div style="display: flex; gap: 40px; font-size: 18px; font-weight: 700; color: var(--text-main);"><span style="color: var(--text-muted);">Jami summa:</span> <span id="rec-detail-total" style="color: var(--accent);">0 so'm</span></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('receipt-details-modal')">Yopish</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Supabase JS SDK (CDN) -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     
@@ -968,6 +1040,7 @@
     <script src="js/chats.js"></script>
     <script src="js/erp.js"></script>
     <script src="js/finance.js"></script>
+    <script src="js/receipts.js"></script>
     <script src="js/app.js"></script>
     
     <!-- Floating AI Assistant Widget -->

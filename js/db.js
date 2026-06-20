@@ -309,6 +309,34 @@ window.DB = {
             console.error("Backend-ga xabarni yuborishda xatolik:", e);
             throw e;
         }
+    },
+
+    // --- CHEKLAR (RECEIPTS) OPERATSIYALARI ---
+    getReceipts: async function() {
+        try {
+            const response = await fetch('/api/receipts');
+            if (!response.ok) throw new Error("HTTP error " + response.status);
+            const data = await response.json();
+            AppStorage.updateKey('receipts', data);
+            return data;
+        } catch (e) {
+            console.warn("Backend-dan cheklarni yuklab bo'lmadi, keshdan o'qiladi:", e);
+            return AppStorage.load().receipts || [];
+        }
+    },
+
+    deleteReceipt: async function(id) {
+        try {
+            const response = await fetch(`/api/receipts/${id}`, {
+                method: 'DELETE'
+            });
+            if (!response.ok) throw new Error("HTTP error " + response.status);
+        } catch (e) {
+            console.error("Backend-dan chekni o'chirishda xatolik:", e);
+        }
+        const data = AppStorage.load();
+        data.receipts = (data.receipts || []).filter(r => r.id !== id);
+        AppStorage.save(data);
     }
 };
 

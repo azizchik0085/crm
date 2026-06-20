@@ -47,7 +47,8 @@ const DEFAULT_DATA = {
         { id: 't5', type: 'expense', category: 'Reklama', amount: 2500000, date: '2026-06-10', description: 'Facebook va Telegram reklama kampaniyasi' },
         { id: 't6', type: 'income', category: 'Xizmat ko\'rsatish', amount: 4200000, date: '2026-06-19', description: 'Konsultatsiya va sozlash ishlari' }
     ],
-    calls: []
+    calls: [],
+    receipts: []
 };
 
 const STORAGE_KEY = 'erp_crm_system_data';
