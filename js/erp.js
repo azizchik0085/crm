@@ -112,6 +112,23 @@ window.ERP = {
         const endIdx = startIdx + this.inventoryPageSize;
         const pageItems = filtered.slice(startIdx, endIdx);
 
+        // Fetch active employee role to check permissions
+        const activeUserId = localStorage.getItem('activeUserId') || 'admin';
+        let activeRole = 'admin';
+        try {
+            if (activeUserId !== 'admin') {
+                const employees = await DB.getEmployees();
+                const currentEmp = employees.find(e => e.id === activeUserId);
+                if (currentEmp) activeRole = (currentEmp.role || '').toLowerCase();
+            }
+        } catch (e) {
+            console.error(e);
+        }
+        
+        const isSupervisor = activeRole.includes('direktor') || activeRole.includes('admin') || activeRole.includes('dasturchi') || activeRole.includes('boshliq') || activeUserId === 'admin';
+        const isWarehouse = activeRole.includes('ombor') || activeRole.includes('logist') || activeRole.includes('tovar');
+        const canWriteInventory = isSupervisor || isWarehouse;
+
         let html = `
             <div class="stats-grid" style="margin-top: 16px;">
                 <div class="card stat-card" style="padding: 16px;">
@@ -155,14 +172,14 @@ window.ERP = {
                                 <th>Narxi</th>
                                 <th>Qoldiq</th>
                                 <th>Holat</th>
-                                <th style="text-align: right;">Amallar</th>
+                                ${canWriteInventory ? '<th style="text-align: right;">Amallar</th>' : ''}
                             </tr>
                         </thead>
                         <tbody>
         `;
 
         if (pageItems.length === 0) {
-            html += `<tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 32px;">Mahsulotlar topilmadi.</td></tr>`;
+            html += `<tr><td colspan="${canWriteInventory ? 7 : 6}" style="text-align: center; color: var(--text-muted); padding: 32px;">Mahsulotlar topilmadi.</td></tr>`;
         } else {
             pageItems.forEach(p => {
                 let stockBadge = '<span class="badge badge-success">Mavjud</span>';
@@ -184,11 +201,13 @@ window.ERP = {
                         <td>${formatMoney(p.price, currency)}</td>
                         <td><strong style="color: ${stockColor}">${p.stock} ta</strong></td>
                         <td>${stockBadge}</td>
+                        ${canWriteInventory ? `
                         <td style="text-align: right; display: flex; justify-content: flex-end; gap: 8px;">
                             <button class="btn btn-secondary btn-sm" onclick="ERP.adjustStock('${p.id}', 1)"><i class="fas fa-plus"></i></button>
                             <button class="btn btn-secondary btn-sm" onclick="ERP.adjustStock('${p.id}', -1)" ${p.stock <= 0 ? 'disabled' : ''}><i class="fas fa-minus"></i></button>
                             <button class="btn btn-secondary btn-sm" onclick="ERP.deleteProduct('${p.id}')"><i class="fas fa-trash-alt" style="color: var(--danger)"></i></button>
                         </td>
+                        ` : ''}
                     </tr>
                 `;
             });
@@ -263,6 +282,23 @@ window.ERP = {
             e.role.toLowerCase().includes(searchVal)
         );
 
+        // Fetch active employee role to check permissions
+        const activeUserId = localStorage.getItem('activeUserId') || 'admin';
+        let activeRole = 'admin';
+        try {
+            if (activeUserId !== 'admin') {
+                const employeesList = await DB.getEmployees();
+                const currentEmp = employeesList.find(e => e.id === activeUserId);
+                if (currentEmp) activeRole = (currentEmp.role || '').toLowerCase();
+            }
+        } catch (e) {
+            console.error(e);
+        }
+        
+        const isSupervisor = activeRole.includes('direktor') || activeRole.includes('admin') || activeRole.includes('dasturchi') || activeRole.includes('boshliq') || activeUserId === 'admin';
+        const isHR = activeRole.includes('hr') || activeRole.includes('kadr') || activeRole.includes('recruiter');
+        const canWriteHR = isSupervisor || isHR;
+
         let html = `
             <div class="hr-grid" style="margin-top: 24px;">
         `;
@@ -310,10 +346,12 @@ window.ERP = {
                             </div>
                         </div>
 
+                        ${canWriteHR ? `
                         <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; border-top: 1px solid var(--border-color); padding-top: 12px;">
                             <button class="btn btn-secondary btn-sm" onclick="ERP.updateKPI('${e.id}')"><i class="fas fa-chart-line"></i> KPI</button>
                             <button class="btn btn-secondary btn-sm" onclick="ERP.deleteEmployee('${e.id}')"><i class="fas fa-trash-alt" style="color: var(--danger)"></i> O'chirish</button>
                         </div>
+                        ` : ''}
                     </div>
                 `;
             });
@@ -429,6 +467,11 @@ window.ERP = {
         };
 
         await DB.saveEmployee(newEmployee);
+        
+        // Refresh active user switcher dropdown in layout
+        if (window.App && typeof window.App.updateUserSwitcherOptions === 'function') {
+            await window.App.updateUserSwitcherOptions();
+        }
 
         // Formani tozalash va modal yopish
         document.getElementById('add-employee-form').reset();
@@ -460,6 +503,12 @@ window.ERP = {
         if (!confirm('Xodimni o\'chirishni tasdiqlaysizmi?')) return;
 
         await DB.deleteEmployee(id);
+        
+        // Refresh active user switcher dropdown in layout
+        if (window.App && typeof window.App.updateUserSwitcherOptions === 'function') {
+            await window.App.updateUserSwitcherOptions();
+        }
+        
         await this.render();
     },
 

@@ -33,6 +33,7 @@ window.App = {
         this.setupSettingsForm();
         this.syncSettingsToBackend();
         this.initAIAssistantWidget();
+        this.setupUserSwitcher();
         this.renderView('dashboard');
     },
 
@@ -145,6 +146,153 @@ window.App = {
         if (regosTokenInput) regosTokenInput.value = data.settings.regosToken || '';
 
         this.onAIProviderChange();
+    },
+
+    setupUserSwitcher: async function() {
+        const switcher = document.getElementById('active-user-select');
+        if (!switcher) return;
+        
+        await this.updateUserSwitcherOptions();
+        
+        const activeUserId = localStorage.getItem('activeUserId') || 'admin';
+        switcher.value = activeUserId;
+        
+        switcher.onchange = () => {
+            localStorage.setItem('activeUserId', switcher.value);
+            this.applyPermissions();
+        };
+        
+        this.applyPermissions();
+    },
+
+    updateUserSwitcherOptions: async function() {
+        const switcher = document.getElementById('active-user-select');
+        if (!switcher) return;
+        
+        const currentValue = switcher.value;
+        
+        while (switcher.options.length > 1) {
+            switcher.remove(1);
+        }
+        
+        try {
+            const employees = await DB.getEmployees();
+            employees.forEach(emp => {
+                const opt = document.createElement('option');
+                opt.value = emp.id;
+                opt.textContent = `${emp.name} (${emp.role})`;
+                switcher.appendChild(opt);
+            });
+        } catch(err) {
+            console.error("Failed to refresh employees in switcher:", err);
+        }
+        
+        switcher.value = currentValue;
+        if (switcher.value !== currentValue) {
+            switcher.value = 'admin';
+            localStorage.setItem('activeUserId', 'admin');
+            this.applyPermissions();
+        }
+    },
+
+    applyPermissions: async function() {
+        const activeUserId = localStorage.getItem('activeUserId') || 'admin';
+        
+        let activeRole = 'admin';
+        let activeUserName = 'Administrator';
+        
+        try {
+            if (activeUserId !== 'admin') {
+                const employees = await DB.getEmployees();
+                const currentEmp = employees.find(e => e.id === activeUserId);
+                if (currentEmp) {
+                    activeRole = (currentEmp.role || '').toLowerCase();
+                    activeUserName = currentEmp.name;
+                }
+            }
+        } catch (err) {
+            console.error("Failed to load active employee role:", err);
+        }
+        
+        let allowedViews = ['dashboard'];
+        
+        const isSupervisor = activeRole.includes('direktor') || activeRole.includes('admin') || activeRole.includes('dasturchi') || activeRole.includes('boshliq') || activeUserId === 'admin';
+        const isSales = activeRole.includes('sotuv') || activeRole.includes('operator') || activeRole.includes('call') || activeRole.includes('aloqa');
+        const isWarehouse = activeRole.includes('ombor') || activeRole.includes('logist') || activeRole.includes('tovar');
+        const isAccountant = activeRole.includes('buxgalter') || activeRole.includes('kassir') || activeRole.includes('moliya') || activeRole.includes('auditor');
+        const isHR = activeRole.includes('hr') || activeRole.includes('kadr') || activeRole.includes('recruiter');
+        
+        if (isSupervisor) {
+            allowedViews = ['dashboard', 'crm', 'telephony', 'erp', 'finance', 'chats', 'settings'];
+        } else if (isSales) {
+            allowedViews = ['dashboard', 'crm', 'telephony', 'chats'];
+        } else if (isWarehouse) {
+            allowedViews = ['dashboard', 'erp'];
+        } else if (isAccountant) {
+            allowedViews = ['dashboard', 'finance', 'erp'];
+        } else if (isHR) {
+            allowedViews = ['dashboard', 'erp'];
+        } else {
+            allowedViews = ['dashboard', 'chats'];
+        }
+        
+        document.querySelectorAll('.nav-item, .bottom-nav-item').forEach(item => {
+            const link = item.tagName === 'A' ? item : item.querySelector('a');
+            const targetView = item.getAttribute('data-view') || (link ? link.getAttribute('data-view') : null);
+            if (targetView) {
+                if (allowedViews.includes(targetView)) {
+                    item.style.setProperty('display', '', 'important');
+                } else {
+                    item.style.setProperty('display', 'none', 'important');
+                }
+            }
+        });
+        
+        if (!allowedViews.includes(this.currentView)) {
+            this.renderView(allowedViews[0]);
+        }
+        
+        const addProductBtn = document.getElementById('erp-add-product-btn');
+        const addEmployeeBtn = document.getElementById('erp-add-employee-btn');
+        const syncRegosBtn = document.getElementById('erp-sync-regos-btn');
+        const erpSubTabInv = document.getElementById('erp-subtab-inventory');
+        const erpSubTabHR = document.getElementById('erp-subtab-hr');
+        
+        if (isSupervisor) {
+            if (erpSubTabInv) erpSubTabInv.style.setProperty('display', '', 'important');
+            if (erpSubTabHR) erpSubTabHR.style.setProperty('display', '', 'important');
+        } else if (isWarehouse) {
+            if (erpSubTabInv) erpSubTabInv.style.setProperty('display', '', 'important');
+            if (erpSubTabHR) erpSubTabHR.style.setProperty('display', 'none', 'important');
+            if (window.ERP) window.ERP.activeSubSection = 'inventory';
+        } else if (isHR) {
+            if (erpSubTabInv) erpSubTabInv.style.setProperty('display', 'none', 'important');
+            if (erpSubTabHR) erpSubTabHR.style.setProperty('display', '', 'important');
+            if (window.ERP) window.ERP.activeSubSection = 'hr';
+        } else if (isAccountant) {
+            if (erpSubTabInv) erpSubTabInv.style.setProperty('display', '', 'important');
+            if (erpSubTabHR) erpSubTabHR.style.setProperty('display', 'none', 'important');
+            if (window.ERP) window.ERP.activeSubSection = 'inventory';
+        }
+        
+        const canAddProduct = isSupervisor || isWarehouse;
+        if (addProductBtn) addProductBtn.style.setProperty('display', canAddProduct ? '' : 'none', 'important');
+        if (syncRegosBtn) syncRegosBtn.style.setProperty('display', canAddProduct ? '' : 'none', 'important');
+        
+        const canAddEmployee = isSupervisor || isHR;
+        if (addEmployeeBtn) addEmployeeBtn.style.setProperty('display', canAddEmployee ? '' : 'none', 'important');
+        
+        const crmAddCustomerBtn = document.querySelector('#view-crm .header-actions button');
+        const canAddCustomer = isSupervisor || isSales;
+        if (crmAddCustomerBtn) crmAddCustomerBtn.style.setProperty('display', canAddCustomer ? '' : 'none', 'important');
+        
+        const financeHeaderBtn = document.querySelector('#view-finance .header-actions button');
+        const canAddTransaction = isSupervisor || isAccountant;
+        if (financeHeaderBtn) financeHeaderBtn.style.setProperty('display', canAddTransaction ? '' : 'none', 'important');
+        
+        if (this.currentView === 'erp' && window.ERP && typeof window.ERP.render === 'function') {
+            window.ERP.render();
+        }
     },
 
     setupNavigation: function() {
