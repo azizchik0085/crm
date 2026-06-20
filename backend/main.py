@@ -1825,7 +1825,7 @@ def sync_regos_receipts():
         print(f"POS connection check failed (register offline): {e_pos_check}")
         pos_online = False
         
-    saved_count = 0
+    processed_receipts = []
     for cheque in cheques_list:
         if not isinstance(cheque, dict):
             continue
@@ -1968,11 +1968,28 @@ def sync_regos_receipts():
                 "created_at": c_time_str
             }
             
-            supabase_req("POST", "receipts?on_conflict=id", json_data=receipt_payload)
-            saved_count += 1
+            processed_receipts.append(receipt_payload)
         except Exception as e_row:
             print(f"Skipping row error during sync receipts: {e_row}")
             
+    # Bulk upsert processed receipts in chunks of 500
+    saved_count = 0
+    chunk_size = 500
+    for i in range(0, len(processed_receipts), chunk_size):
+        chunk = processed_receipts[i:i + chunk_size]
+        try:
+            supabase_req("POST", "receipts?on_conflict=id", json_data=chunk)
+            saved_count += len(chunk)
+            print(f"Successfully synced receipts chunk {i // chunk_size + 1}/{len(processed_receipts) // chunk_size + 1 if len(processed_receipts) % chunk_size == 0 else len(processed_receipts) // chunk_size + 1} ({len(chunk)} items)")
+        except Exception as ex:
+            print(f"Bulk upsert failed for receipts chunk starting at index {i}: {ex}. Falling back to single inserts...")
+            for payload in chunk:
+                try:
+                    supabase_req("POST", "receipts?on_conflict=id", json_data=payload)
+                    saved_count += 1
+                except Exception as single_ex:
+                    print(f"Fallback receipt insert failed for {payload['id']}: {single_ex}")
+                    
     return {"status": "success", "count": saved_count, "message": f"{saved_count} ta yangi chek muvaffaqiyatli sinxronlashtirildi."}
 
 @app.post("/api/test/simulate-receipt")
