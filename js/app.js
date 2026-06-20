@@ -38,7 +38,7 @@ window.App = {
 
     syncSettingsToBackend: function() {
         const data = AppStorage.load();
-        if (data.settings.telegramToken || data.settings.instagramToken || data.settings.geminiApiKey || data.settings.openaiApiKey || data.settings.groqApiKey) {
+        if (data.settings.telegramToken || data.settings.instagramToken || data.settings.geminiApiKey || data.settings.openaiApiKey || data.settings.groqApiKey || data.settings.regosEndpoint || data.settings.regosToken) {
             fetch('/api/settings', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -50,7 +50,9 @@ window.App = {
                     gemini_api_key: data.settings.geminiApiKey || '',
                     openai_api_key: data.settings.openaiApiKey || '',
                     groq_api_key: data.settings.groqApiKey || '',
-                    ai_auto_reply: !!data.settings.aiAutoReply
+                    ai_auto_reply: !!data.settings.aiAutoReply,
+                    regos_endpoint: data.settings.regosEndpoint || '',
+                    regos_token: data.settings.regosToken || ''
                 })
             }).catch(err => console.error("Initial settings sync failed:", err));
         }
@@ -136,6 +138,12 @@ window.App = {
         const aiAutoReplyInput = document.getElementById('settings-ai-auto-reply');
         if (aiAutoReplyInput) aiAutoReplyInput.checked = !!data.settings.aiAutoReply;
 
+        const regosEndpointInput = document.getElementById('settings-regos-endpoint');
+        if (regosEndpointInput) regosEndpointInput.value = data.settings.regosEndpoint || '';
+
+        const regosTokenInput = document.getElementById('settings-regos-token');
+        if (regosTokenInput) regosTokenInput.value = data.settings.regosToken || '';
+
         this.onAIProviderChange();
     },
 
@@ -192,6 +200,8 @@ window.App = {
                 const openaiApiKey = document.getElementById('settings-openai-key')?.value.trim() || '';
                 const groqApiKey = document.getElementById('settings-groq-key')?.value.trim() || '';
                 const aiAutoReply = !!document.getElementById('settings-ai-auto-reply')?.checked;
+                const regosEndpoint = document.getElementById('settings-regos-endpoint')?.value.trim() || '';
+                const regosToken = document.getElementById('settings-regos-token')?.value.trim() || '';
                 
                 const data = AppStorage.load();
                 
@@ -221,6 +231,8 @@ window.App = {
                 data.settings.openaiApiKey = openaiApiKey;
                 data.settings.groqApiKey = groqApiKey;
                 data.settings.aiAutoReply = aiAutoReply;
+                data.settings.regosEndpoint = regosEndpoint;
+                data.settings.regosToken = regosToken;
                 
                 AppStorage.save(data);
 
@@ -237,7 +249,9 @@ window.App = {
                             gemini_api_key: geminiApiKey,
                             openai_api_key: openaiApiKey,
                             groq_api_key: groqApiKey,
-                            ai_auto_reply: aiAutoReply
+                            ai_auto_reply: aiAutoReply,
+                            regos_endpoint: regosEndpoint,
+                            regos_token: regosToken
                         })
                     });
                 } catch(err) {

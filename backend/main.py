@@ -436,10 +436,14 @@ def load_settings():
                     data["groq_api_key"] = ""
                 if "ai_auto_reply" not in data:
                     data["ai_auto_reply"] = False
+                if "regos_endpoint" not in data:
+                    data["regos_endpoint"] = ""
+                if "regos_token" not in data:
+                    data["regos_token"] = ""
                 return data
         except Exception:
             pass
-    return {"telegram_token": "", "instagram_token": "", "ai_provider": "local", "telephony_provider": "sarkor", "gemini_api_key": "", "openai_api_key": "", "groq_api_key": "", "ai_auto_reply": False}
+    return {"telegram_token": "", "instagram_token": "", "ai_provider": "local", "telephony_provider": "sarkor", "gemini_api_key": "", "openai_api_key": "", "groq_api_key": "", "ai_auto_reply": False, "regos_endpoint": "", "regos_token": ""}
 
 def save_settings(settings):
     try:
@@ -619,6 +623,8 @@ def update_settings(settings: dict):
     settings_state["openai_api_key"] = settings.get("openai_api_key", "")
     settings_state["groq_api_key"] = settings.get("groq_api_key", "")
     settings_state["ai_auto_reply"] = settings.get("ai_auto_reply", False)
+    settings_state["regos_endpoint"] = settings.get("regos_endpoint", "")
+    settings_state["regos_token"] = settings.get("regos_token", "")
     save_settings(settings_state)
     print("Settings updated and saved.")
     return {"status": "success", "settings": settings_state}
@@ -1305,6 +1311,138 @@ def simulate_instagram_message(payload: dict):
     except Exception as e:
         print(f"Failed to simulate Instagram message: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/integration/regos/sync")
+def sync_regos_inventory():
+    regos_endpoint = settings_state.get("regos_endpoint", "")
+    regos_token = settings_state.get("regos_token", "")
+    
+    if not regos_endpoint or not regos_token:
+        raise HTTPException(status_code=400, detail="REGOS API sozlanmagan. Iltimos, sozlamalar sahifasida Endpoint va Access Tokenni kiritib saqlang.")
+        
+    endpoint = regos_endpoint.strip().rstrip("/")
+    if not endpoint.startswith(("http://", "https://")):
+        endpoint = "https://" + endpoint
+        
+    if "/v1" not in endpoint:
+        url = f"{endpoint}/v1/item/getext"
+    else:
+        url = f"{endpoint}/item/getext"
+        
+    headers = {
+        "Authorization": f"Bearer {regos_token}",
+        "Content-Type": "application/json"
+    }
+    
+    all_items = []
+    limit = 100
+    offset = 0
+    
+    try:
+        while True:
+            payload = {"limit": limit, "offset": offset}
+            print(f"Fetching from REGOS URL: {url} with offset {offset}...")
+            response = requests.post(url, headers=headers, json=payload, timeout=20)
+            response.raise_for_status()
+            data = response.json()
+            
+            items_list = []
+            if isinstance(data, list):
+                items_list = data
+            elif isinstance(data, dict):
+                for key in ["items", "result", "data", "list"]:
+                    if key in data and isinstance(data[key], list):
+                        items_list = data[key]
+                        break
+                else:
+                    # If dict itself doesn't contain a list under common keys, maybe it contains list values
+                    for val in data.values():
+                        if isinstance(val, list):
+                            items_list = val
+                            break
+            
+            if not items_list:
+                break
+                
+            all_items.extend(items_list)
+            if len(items_list) < limit:
+                break
+            offset += limit
+            
+            if offset >= 1000:  # Safety ceiling
+                break
+    except Exception as e:
+        print(f"REGOS API connection error: {e}")
+        raise HTTPException(status_code=500, detail=f"REGOS API bilan bog'lanishda xatolik yuz berdi: {str(e)}")
+        
+    sync_count = 0
+    for item_ext in all_items:
+        if not isinstance(item_ext, dict):
+            continue
+        item = item_ext.get("item")
+        if not item or not isinstance(item, dict):
+            continue
+            
+        regos_id = item.get("id")
+        if not regos_id:
+            continue
+            
+        product_id = f"i_regos_{regos_id}"
+        name = item.get("name", "Noma'lum REGOS mahsuloti")
+        
+        sku = item.get("code") or item.get("articul") or ""
+        sku = str(sku).strip().upper()
+        if not sku:
+            sku = f"RE-{regos_id}"
+            
+        price = item_ext.get("price") or item_ext.get("last_purchase_cost") or 0
+        try:
+            price = float(price)
+        except (ValueError, TypeError):
+            price = 0.0
+            
+        quantity_obj = item_ext.get("quantity")
+        stock = 0
+        if isinstance(quantity_obj, dict):
+            stock = quantity_obj.get("common") or quantity_obj.get("allowed") or 0
+        elif isinstance(quantity_obj, (int, float)):
+            stock = quantity_obj
+        try:
+            stock = int(float(stock))
+        except (ValueError, TypeError):
+            stock = 0
+            
+        group = item.get("group")
+        category = "Barchasi"
+        if isinstance(group, dict):
+            category = group.get("name") or "Barchasi"
+        elif isinstance(group, (str, int)):
+            category = str(group)
+        elif item.get("group_name"):
+            category = item.get("group_name")
+            
+        product_payload = {
+            "id": product_id,
+            "name": name,
+            "sku": sku,
+            "price": price,
+            "stock": stock,
+            "category": category
+        }
+        
+        try:
+            supabase_req("POST", "inventory?on_conflict=id", json_data=product_payload)
+            sync_count += 1
+        except Exception as ex:
+            print(f"First upsert attempt failed for {product_id}: {ex}. Retrying with unique SKU...")
+            product_payload["sku"] = f"{sku}-{regos_id}"
+            try:
+                supabase_req("POST", "inventory?on_conflict=id", json_data=product_payload)
+                sync_count += 1
+            except Exception as retry_ex:
+                print(f"Retry failed for {product_id}: {retry_ex}")
+                
+    return {"status": "success", "count": sync_count}
 
 # Mount frontend files (HTML, CSS, JS) to run at root url (must be mounted last)
 STATIC_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))

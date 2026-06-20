@@ -63,10 +63,14 @@ window.ERP = {
 
         if (this.activeSubSection === 'inventory') {
             document.getElementById('erp-add-product-btn').style.display = 'inline-flex';
+            const regosBtn = document.getElementById('erp-sync-regos-btn');
+            if (regosBtn) regosBtn.style.display = 'inline-flex';
             document.getElementById('erp-add-employee-btn').style.display = 'none';
             await this.renderInventory(container, searchVal);
         } else {
             document.getElementById('erp-add-product-btn').style.display = 'none';
+            const regosBtn = document.getElementById('erp-sync-regos-btn');
+            if (regosBtn) regosBtn.style.display = 'none';
             document.getElementById('erp-add-employee-btn').style.display = 'inline-flex';
             await this.renderHR(container, searchVal);
         }
@@ -393,5 +397,46 @@ window.ERP = {
 
         await DB.deleteEmployee(id);
         await this.render();
+    },
+
+    syncWithRegos: async function() {
+        const settings = AppStorage.load().settings;
+        if (!settings.regosEndpoint || !settings.regosToken) {
+            alert("REGOS API sozlanmagan. Iltimos, sozlamalar sahifasida Endpoint va Access Tokenni kiriting.");
+            return;
+        }
+
+        const btn = document.getElementById('erp-sync-regos-btn');
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-sync fa-spin"></i> Sinxronizatsiya qilinmoqda...';
+        }
+
+        try {
+            const response = await fetch('/api/integration/regos/sync', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            const resData = await response.json();
+            if (response.ok && resData.status === 'success') {
+                alert(`Sinxronizatsiya muvaffaqiyatli yakunlandi! Jami ${resData.count} ta mahsulot yangilandi.`);
+            } else {
+                alert(`Xatolik yuz berdi: ${resData.detail || resData.message || "Tizim xatosi"}`);
+            }
+        } catch (err) {
+            console.error(err);
+            alert("Tarmoq xatoligi yoki backend bilan bog'lana olmadi.");
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-sync"></i> REGOS bilan sinxronizatsiya';
+            }
+            await this.render();
+            if (window.App && typeof window.App.updateDashboardStats === 'function') {
+                window.App.updateDashboardStats();
+            }
+        }
     }
 };

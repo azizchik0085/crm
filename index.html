@@ -280,6 +280,9 @@
                         <button class="btn btn-primary" id="erp-add-product-btn" onclick="showModal('product-modal')">
                             <i class="fas fa-plus"></i> Mahsulot qo'shish
                         </button>
+                        <button class="btn btn-secondary" id="erp-sync-regos-btn" onclick="ERP.syncWithRegos()">
+                            <i class="fas fa-sync"></i> REGOS bilan sinxronizatsiya
+                        </button>
                         <button class="btn btn-primary" id="erp-add-employee-btn" style="display:none;" onclick="showModal('employee-modal')">
                             <i class="fas fa-user-plus"></i> Xodim qo'shish
                         </button>
@@ -462,6 +465,18 @@
                             <label for="settings-ai-auto-reply" style="margin-bottom: 0; cursor: pointer; font-weight: 500; color: var(--text-main); user-select: none;">
                                 Telegram & Instagram xabarlariga avtomatik javob berish (AI Auto-Pilot)
                             </label>
+                        </div>
+                        <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 24px 0;">
+                        <h4 style="margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+                            <i class="fas fa-sync" style="color: #3b82f6"></i> REGOS Store Management Integratsiyasi
+                        </h4>
+                        <div class="form-group">
+                            <label for="settings-regos-endpoint">REGOS API Endpoint</label>
+                            <input type="text" id="settings-regos-endpoint" class="form-control" placeholder="Masalan: https://api.regos.uz/v1">
+                        </div>
+                        <div class="form-group">
+                            <label for="settings-regos-token">REGOS Access Token</label>
+                            <input type="password" id="settings-regos-token" class="form-control" placeholder="REGOS API tokeningiz">
                         </div>
                         <div style="margin-top: 24px; display:flex; gap:16px;">
                             <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Sozlamalarni saqlash</button>

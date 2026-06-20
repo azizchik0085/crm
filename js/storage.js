@@ -15,7 +15,9 @@ const DEFAULT_DATA = {
         geminiApiKey: '',
         openaiApiKey: '',
         groqApiKey: '',
-        aiAutoReply: false
+        aiAutoReply: false,
+        regosEndpoint: '',
+        regosToken: ''
     },
     customers: [
         { id: 'c1', name: 'Alisher Navoiy', phone: '+998 90 123 45 67', phone2: '+998 90 999 88 77', source: 'telephony', operator: 'Laylo Toirova', status: 'won', value: 15000000 },
@@ -91,6 +93,12 @@ const AppStorage = {
             // Agar foydalanuvchida telephonyProvider bo'lmasa, uni yaratamiz
             if (data && data.settings && data.settings.telephonyProvider === undefined) {
                 data.settings.telephonyProvider = 'sarkor';
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+            }
+            // Agar foydalanuvchida REGOS sozlamalari bo'lmasa, ularni yaratamiz
+            if (data && data.settings && data.settings.regosEndpoint === undefined) {
+                data.settings.regosEndpoint = '';
+                data.settings.regosToken = '';
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
             }
             // Agar yangi modullar qo'shilsa va kalitlar bo'lmasa, default ma'lumotlar bilan birlashtiramiz
