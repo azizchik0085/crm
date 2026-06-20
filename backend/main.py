@@ -1335,7 +1335,7 @@ def sync_regos_inventory():
     }
     
     all_items = []
-    limit = 100
+    limit = 1000
     offset = 0
     
     try:
