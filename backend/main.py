@@ -1369,7 +1369,7 @@ def sync_regos_inventory():
                 break
             offset += limit
             
-            if offset >= 1000:  # Safety ceiling
+            if offset >= 30000:  # Safety ceiling
                 break
     except Exception as e:
         print(f"REGOS API connection error: {e}")
