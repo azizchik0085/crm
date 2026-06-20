@@ -2,6 +2,8 @@
 
 window.ERP = {
     activeSubSection: 'inventory', // 'inventory' yoki 'hr'
+    inventoryPage: 1,
+    inventoryPageSize: 100,
 
     init: function() {
         this.render();
@@ -15,6 +17,7 @@ window.ERP = {
         if (invSubTabBtn && hrSubTabBtn) {
             invSubTabBtn.onclick = () => {
                 this.activeSubSection = 'inventory';
+                this.inventoryPage = 1;
                 invSubTabBtn.classList.add('btn-primary');
                 invSubTabBtn.classList.remove('btn-secondary');
                 hrSubTabBtn.classList.add('btn-secondary');
@@ -24,6 +27,7 @@ window.ERP = {
 
             hrSubTabBtn.onclick = () => {
                 this.activeSubSection = 'hr';
+                this.inventoryPage = 1;
                 hrSubTabBtn.classList.add('btn-primary');
                 hrSubTabBtn.classList.remove('btn-secondary');
                 invSubTabBtn.classList.add('btn-secondary');
@@ -35,7 +39,10 @@ window.ERP = {
         // Qidiruv
         const searchInput = document.getElementById('erp-search');
         if (searchInput) {
-            searchInput.oninput = () => this.render();
+            searchInput.oninput = () => {
+                this.inventoryPage = 1;
+                this.render();
+            };
         }
 
         // Formalar yuborilishi
@@ -95,6 +102,16 @@ window.ERP = {
         const lowStockCount = inventory.filter(p => p.stock > 0 && p.stock <= 3).length;
         const outOfStockCount = inventory.filter(p => p.stock === 0).length;
 
+        // Pagination calculations
+        const totalItems = filtered.length;
+        const totalPages = Math.ceil(totalItems / this.inventoryPageSize) || 1;
+        if (this.inventoryPage > totalPages) this.inventoryPage = totalPages;
+        if (this.inventoryPage < 1) this.inventoryPage = 1;
+        
+        const startIdx = (this.inventoryPage - 1) * this.inventoryPageSize;
+        const endIdx = startIdx + this.inventoryPageSize;
+        const pageItems = filtered.slice(startIdx, endIdx);
+
         let html = `
             <div class="stats-grid" style="margin-top: 16px;">
                 <div class="card stat-card" style="padding: 16px;">
@@ -144,10 +161,10 @@ window.ERP = {
                         <tbody>
         `;
 
-        if (filtered.length === 0) {
+        if (pageItems.length === 0) {
             html += `<tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 32px;">Mahsulotlar topilmadi.</td></tr>`;
         } else {
-            filtered.forEach(p => {
+            pageItems.forEach(p => {
                 let stockBadge = '<span class="badge badge-success">Mavjud</span>';
                 let stockColor = 'var(--text-main)';
                 
@@ -183,6 +200,53 @@ window.ERP = {
                 </div>
             </div>
         `;
+
+        // Generate pagination bar HTML
+        if (totalPages > 1) {
+            html += `
+                <div class="pagination-container" style="display: flex; justify-content: space-between; align-items: center; margin-top: 16px; padding: 0 8px; flex-wrap: wrap; gap: 12px;">
+                    <div class="pagination-info" style="color: var(--text-muted); font-size: 14px;">
+                        Jami ${totalItems} tadan ${startIdx + 1}-${Math.min(endIdx, totalItems)} ko'rsatilyapti
+                    </div>
+                    <div class="pagination-buttons" style="display: flex; align-items: center; gap: 4px;">
+                        <button class="btn btn-secondary btn-sm" onclick="ERP.setPage(${this.inventoryPage - 1})" ${this.inventoryPage === 1 ? 'disabled' : ''} style="padding: 6px 10px;"><i class="fas fa-chevron-left"></i></button>
+            `;
+            
+            const maxPageButtons = 5;
+            let startPage = Math.max(1, this.inventoryPage - 2);
+            let endPage = Math.min(totalPages, startPage + maxPageButtons - 1);
+            
+            if (endPage - startPage < maxPageButtons - 1) {
+                startPage = Math.max(1, endPage - maxPageButtons + 1);
+            }
+            
+            if (startPage > 1) {
+                html += `<button class="btn btn-secondary btn-sm" onclick="ERP.setPage(1)" style="padding: 6px 10px;">1</button>`;
+                if (startPage > 2) {
+                    html += `<span style="color: var(--text-muted); margin: 0 4px;">...</span>`;
+                }
+            }
+            
+            for (let i = startPage; i <= endPage; i++) {
+                const isActive = i === this.inventoryPage;
+                html += `
+                    <button class="btn ${isActive ? 'btn-primary' : 'btn-secondary'} btn-sm" onclick="ERP.setPage(${i})" style="padding: 6px 10px; min-width: 32px;">${i}</button>
+                `;
+            }
+            
+            if (endPage < totalPages) {
+                if (endPage < totalPages - 1) {
+                    html += `<span style="color: var(--text-muted); margin: 0 4px;">...</span>`;
+                }
+                html += `<button class="btn btn-secondary btn-sm" onclick="ERP.setPage(${totalPages})" style="padding: 6px 10px;">${totalPages}</button>`;
+            }
+            
+            html += `
+                        <button class="btn btn-secondary btn-sm" onclick="ERP.setPage(${this.inventoryPage + 1})" ${this.inventoryPage === totalPages ? 'disabled' : ''} style="padding: 6px 10px;"><i class="fas fa-chevron-right"></i></button>
+                    </div>
+                </div>
+            `;
+        }
 
         container.innerHTML = html;
     },
@@ -397,6 +461,11 @@ window.ERP = {
 
         await DB.deleteEmployee(id);
         await this.render();
+    },
+
+    setPage: function(pageNum) {
+        this.inventoryPage = pageNum;
+        this.render();
     },
 
     syncWithRegos: async function() {
