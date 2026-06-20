@@ -81,7 +81,9 @@ window.ERP = {
         
         const isSupervisor = activeRole.includes('direktor') || activeRole.includes('admin') || activeRole.includes('dasturchi') || activeRole.includes('boshliq') || activeUserId === 'admin';
         const isWarehouse = activeRole.includes('ombor') || activeRole.includes('logist') || activeRole.includes('tovar');
+        const isAccountant = activeRole.includes('buxgalter') || activeRole.includes('kassir') || activeRole.includes('moliya') || activeRole.includes('auditor');
         const canWriteInventory = isSupervisor || isWarehouse;
+        const canSeeValuation = isSupervisor || isWarehouse || isAccountant;
 
         let html = `
             <div class="stats-grid" style="margin-top: 16px;">
@@ -92,6 +94,7 @@ window.ERP = {
                     </div>
                     <div class="stat-icon-box info"><i class="fas fa-boxes"></i></div>
                 </div>
+                ${canSeeValuation ? `
                 <div class="card stat-card" style="padding: 16px;">
                     <div class="stat-info">
                         <h3>Ombor Qiymati</h3>
@@ -99,6 +102,7 @@ window.ERP = {
                     </div>
                     <div class="stat-icon-box income"><i class="fas fa-coins"></i></div>
                 </div>
+                ` : ''}
                 <div class="card stat-card" style="padding: 16px;">
                     <div class="stat-info">
                         <h3>Kam Qolgan</h3>
