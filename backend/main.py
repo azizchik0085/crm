@@ -1662,6 +1662,32 @@ def save_parsed_receipt(cheque: dict):
             payment_type = "Elektron"
             
         rows = cheque.get("rows") or cheque.get("items") or cheque.get("goods") or []
+        if not rows and c_uuid:
+            try:
+                regos_endpoint = settings_state.get("regos_endpoint", "")
+                regos_token = settings_state.get("regos_token", "")
+                if regos_endpoint and regos_token:
+                    endpoint = regos_endpoint.strip().rstrip("/")
+                    if not endpoint.startswith(("http://", "https://")):
+                        endpoint = "https://" + endpoint
+                    if "/v1" not in endpoint:
+                        ops_url = f"{endpoint}/v1/docchequeoperation/get"
+                    else:
+                        ops_url = f"{endpoint}/docchequeoperation/get"
+                    
+                    regos_headers = {
+                        "Authorization": f"Bearer {regos_token}",
+                        "Content-Type": "application/json"
+                    }
+                    ops_payload = {"doc_sale_uuid": c_uuid}
+                    ops_resp = requests.post(ops_url, headers=regos_headers, json=ops_payload, timeout=5)
+                    if ops_resp.status_code == 200:
+                        ops_data = ops_resp.json()
+                        ops_list = ops_data.get("result")
+                        if isinstance(ops_list, list):
+                            rows = ops_list
+            except Exception as e_ops:
+                print(f"Failed to fetch operations/items for receipt {c_uuid} in save_parsed_receipt: {e_ops}")
         items_list = []
         if isinstance(rows, list):
             for row in rows:
@@ -1963,6 +1989,21 @@ def run_sync_in_background(days: int):
                     payment_type = "Elektron"
                     
                 rows = target_cheque.get("rows") or target_cheque.get("items") or target_cheque.get("goods") or []
+                if not rows:
+                    try:
+                        if "/v1" not in endpoint:
+                            ops_url = f"{endpoint}/v1/docchequeoperation/get"
+                        else:
+                            ops_url = f"{endpoint}/docchequeoperation/get"
+                        ops_payload = {"doc_sale_uuid": c_uuid}
+                        ops_resp = requests.post(ops_url, headers=regos_headers, json=ops_payload, timeout=5)
+                        if ops_resp.status_code == 200:
+                            ops_data = ops_resp.json()
+                            ops_list = ops_data.get("result")
+                            if isinstance(ops_list, list):
+                                rows = ops_list
+                    except Exception as e_ops:
+                        print(f"Background Sync: failed to fetch operations/items for receipt {c_uuid}: {e_ops}")
                 items_list = []
                 if isinstance(rows, list):
                     for row in rows:
