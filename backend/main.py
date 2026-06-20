@@ -49,10 +49,51 @@ def supabase_req(method, path, json_data=None, params=None):
         print(f"Supabase request error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+def supabase_get_all(path, params=None):
+    all_data = []
+    limit = 1000
+    offset = 0
+    
+    # Extract base path and query parameters
+    base_path = path
+    query_params = ""
+    if "?" in path:
+        base_path, query_params = path.split("?", 1)
+        
+    while True:
+        url = f"{SUPABASE_URL}/rest/v1/{base_path}"
+        
+        req_headers = headers.copy()
+        req_headers["Range"] = f"{offset}-{offset + limit - 1}"
+        
+        req_params = params.copy() if params else {}
+        # Parse query params
+        if query_params:
+            for pair in query_params.split("&"):
+                if "=" in pair:
+                    k, v = pair.split("=", 1)
+                    req_params[k] = v
+                    
+        try:
+            response = requests.request("GET", url, headers=req_headers, params=req_params)
+            response.raise_for_status()
+            chunk = response.json() if response.text else []
+            if not chunk:
+                break
+            all_data.extend(chunk)
+            if len(chunk) < limit:
+                break
+            offset += limit
+        except Exception as e:
+            print(f"Supabase paginated GET error: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+            
+    return all_data
+
 # --- CRM / CUSTOMERS ENDPOINTS ---
 @app.get("/api/customers")
 def get_customers():
-    return supabase_req("GET", "customers?select=*")
+    return supabase_get_all("customers?select=*")
 
 @app.post("/api/customers")
 def save_customer(customer: dict):
@@ -65,7 +106,7 @@ def delete_customer(id: str):
 # --- INVENTORY ENDPOINTS ---
 @app.get("/api/inventory")
 def get_inventory():
-    return supabase_req("GET", "inventory?select=*")
+    return supabase_get_all("inventory?select=*")
 
 @app.post("/api/inventory")
 def save_product(product: dict):
@@ -78,7 +119,7 @@ def delete_product(id: str):
 # --- EMPLOYEES ENDPOINTS ---
 @app.get("/api/employees")
 def get_employees():
-    return supabase_req("GET", "employees?select=*")
+    return supabase_get_all("employees?select=*")
 
 @app.post("/api/employees")
 def save_employee(employee: dict):
@@ -91,7 +132,7 @@ def delete_employee(id: str):
 # --- TRANSACTIONS ENDPOINTS ---
 @app.get("/api/transactions")
 def get_transactions():
-    return supabase_req("GET", "transactions?select=*")
+    return supabase_get_all("transactions?select=*")
 
 @app.post("/api/transactions")
 def save_transaction(tx: dict):
@@ -110,7 +151,7 @@ def get_calls(status: str = None, duration: int = None):
     # We build the query parameters dynamically for calls poller
     if status and duration is not None:
         select_query = f"calls?select=*&status=in.({status})&duration=eq.{duration}"
-    return supabase_req("GET", select_query)
+    return supabase_get_all(select_query)
 
 @app.post("/api/calls")
 def save_call(call: dict):
