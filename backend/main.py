@@ -1688,6 +1688,176 @@ def get_receipts():
 def delete_receipt(id: str):
     return supabase_req("DELETE", f"receipts?id=eq.{id}")
 
+@app.post("/api/integration/regos/sync-receipts")
+def sync_regos_receipts():
+    regos_endpoint = settings_state.get("regos_endpoint", "")
+    regos_token = settings_state.get("regos_token", "")
+    
+    if not regos_endpoint or not regos_token:
+        raise HTTPException(status_code=400, detail="REGOS API sozlanmagan. Iltimos, sozlamalar sahifasida Endpoint va Access Tokenni kiritib saqlang.")
+        
+    endpoint = regos_endpoint.strip().rstrip("/")
+    if not endpoint.startswith(("http://", "https://")):
+        endpoint = "https://" + endpoint
+        
+    if "/v1" not in endpoint:
+        url = f"{endpoint}/v1/pos/doccheque/get"
+    else:
+        url = f"{endpoint}/pos/doccheque/get"
+        
+    headers = {
+        "Authorization": f"Bearer {regos_token}",
+        "Content-Type": "application/json"
+    }
+    
+    now_ts = int(time.time())
+    start_ts = now_ts - (30 * 24 * 3600) # 30 days ago
+    
+    payload = {
+        "start_date": start_ts,
+        "end_date": now_ts,
+        "statuses": ["Closed"]
+    }
+    
+    try:
+        print(f"Syncing receipts from REGOS API: {url}...")
+        response = requests.post(url, headers=headers, json=payload, timeout=25)
+        
+        if response.status_code != 200:
+            print("Failed with date filters, retrying with simple payload...")
+            payload = {"statuses": ["Closed"]}
+            response = requests.post(url, headers=headers, json=payload, timeout=25)
+            
+        response.raise_for_status()
+        resp_data = response.json()
+        
+        cheques_list = []
+        if isinstance(resp_data, list):
+            cheques_list = resp_data
+        elif isinstance(resp_data, dict):
+            for key in ["result", "cheques", "data", "list"]:
+                if key in resp_data and isinstance(resp_data[key], list):
+                    cheques_list = resp_data[key]
+                    break
+            else:
+                for val in resp_data.values():
+                    if isinstance(val, list):
+                        cheques_list = val
+                        break
+                        
+        if not cheques_list:
+            return {"status": "success", "count": 0, "message": "Yangi cheklar topilmadi."}
+            
+        print(f"Found {len(cheques_list)} receipts in REGOS API. Saving to Supabase...")
+        
+        saved_count = 0
+        for cheque in cheques_list:
+            if not isinstance(cheque, dict):
+                continue
+            try:
+                c_uuid = cheque.get("uuid") or cheque.get("id")
+                if not c_uuid:
+                    continue
+                    
+                c_code = cheque.get("code") or cheque.get("number") or cheque.get("receipt_no") or f"CH-{c_uuid[:8]}"
+                c_date = cheque.get("date") or cheque.get("created_at")
+                
+                c_time_str = None
+                if c_date:
+                    try:
+                        ts = float(c_date)
+                        if ts > 1e11: # ms
+                            ts = ts / 1000.0
+                        c_time_str = datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
+                    except Exception:
+                        c_time_str = str(c_date)
+                if not c_time_str:
+                    c_time_str = datetime.now(timezone.utc).isoformat()
+                    
+                cashier = cheque.get("cashier")
+                cashier_name = ""
+                if isinstance(cashier, dict):
+                    cashier_name = cashier.get("name") or cashier.get("username") or ""
+                else:
+                    cashier_name = cheque.get("cashier_name") or cheque.get("seller_name") or str(cashier or "")
+                if not cashier_name:
+                    cashier_name = "smena2"
+                    
+                total_amount = cheque.get("sum") or cheque.get("total_amount") or cheque.get("total") or 0.0
+                discount = cheque.get("discount") or cheque.get("discount_sum") or 0.0
+                
+                payments = cheque.get("payments") or cheque.get("payment_type") or cheque.get("pay_type") or "cash"
+                payment_type = "Naqd"
+                if isinstance(payments, list):
+                    types = []
+                    for p in payments:
+                        if isinstance(p, dict):
+                            t = p.get("type") or p.get("name") or p.get("payment_type") or "cash"
+                            types.append(str(t))
+                        else:
+                            types.append(str(p))
+                    payment_type = ", ".join(types) if types else "Naqd"
+                elif isinstance(payments, dict):
+                    payment_type = payments.get("type") or payments.get("name") or "Naqd"
+                else:
+                    payment_type = str(payments)
+                    
+                pay_lower = payment_type.lower()
+                if "cash" in pay_lower or "naqd" in pay_lower:
+                    payment_type = "Naqd"
+                elif "card" in pay_lower or "karta" in pay_lower or "terminal" in pay_lower:
+                    payment_type = "Karta"
+                elif "click" in pay_lower or "payme" in pay_lower or "apelsin" in pay_lower or "uzum" in pay_lower:
+                    payment_type = "Elektron"
+                    
+                rows = cheque.get("rows") or cheque.get("items") or cheque.get("goods") or []
+                items_list = []
+                if isinstance(rows, list):
+                    for row in rows:
+                        if isinstance(row, dict):
+                            row_item = row.get("item")
+                            row_name = ""
+                            row_sku = ""
+                            if isinstance(row_item, dict):
+                                row_name = row_item.get("name") or ""
+                                row_sku = row_item.get("code") or row_item.get("articul") or ""
+                            else:
+                                row_name = row.get("name") or row.get("item_name") or ""
+                                row_sku = row.get("sku") or row.get("code") or row.get("articul") or ""
+                                
+                            row_qty = row.get("quantity") or row.get("qty") or 1
+                            row_price = row.get("price") or 0
+                            row_total = row.get("sum") or row.get("total") or (row_qty * row_price)
+                            
+                            items_list.append({
+                                "name": row_name,
+                                "sku": row_sku,
+                                "quantity": int(row_qty),
+                                "price": float(row_price),
+                                "total": float(row_total)
+                            })
+                            
+                receipt_payload = {
+                    "id": c_uuid,
+                    "code": c_code,
+                    "cashier_name": cashier_name,
+                    "total_amount": float(total_amount),
+                    "discount": float(discount),
+                    "payment_type": payment_type,
+                    "items": items_list,
+                    "created_at": c_time_str
+                }
+                
+                supabase_req("POST", "receipts?on_conflict=id", json_data=receipt_payload)
+                saved_count += 1
+            except Exception as e_row:
+                print(f"Skipping row error during sync receipts: {e_row}")
+                
+        return {"status": "success", "count": saved_count, "message": f"{saved_count} ta chek muvaffaqiyatli sinxronlashtirildi."}
+    except Exception as e:
+        print(f"REGOS receipts sync error: {e}")
+        raise HTTPException(status_code=500, detail=f"REGOS API-dan cheklarni olishda xatolik: {str(e)}")
+
 @app.post("/api/test/simulate-receipt")
 def simulate_receipt(payload: dict):
     try:
