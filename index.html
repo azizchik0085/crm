@@ -80,6 +80,9 @@
                     <li class="nav-item" data-view="erp">
                         <a href="#" data-view="erp"><i class="fas fa-warehouse"></i> ERP Tizimi</a>
                     </li>
+                    <li class="nav-item" data-view="hr">
+                        <a href="#" data-view="hr"><i class="fas fa-users"></i> Xodimlar (HR)</a>
+                    </li>
                     <li class="nav-item" data-view="finance">
                         <a href="#" data-view="finance"><i class="fas fa-wallet"></i> Moliya</a>
                     </li>
@@ -134,6 +137,10 @@
             <a href="#" class="bottom-nav-item" data-view="erp">
                 <i class="fas fa-warehouse"></i>
                 <span>ERP</span>
+            </a>
+            <a href="#" class="bottom-nav-item" data-view="hr">
+                <i class="fas fa-users"></i>
+                <span>HR</span>
             </a>
             <a href="#" class="bottom-nav-item" data-view="finance">
                 <i class="fas fa-wallet"></i>
@@ -327,7 +334,7 @@
                 <div class="header">
                     <div class="header-title">
                         <h1>Korxona Resurslari (ERP)</h1>
-                        <p>Ombor mahsulotlari va xodimlar boshqaruvi</p>
+                        <p>Ombor mahsulotlari boshqaruvi</p>
                     </div>
                     <div class="header-actions">
                         <button class="btn btn-primary" id="erp-add-product-btn" onclick="showModal('product-modal')">
@@ -335,9 +342,6 @@
                         </button>
                         <button class="btn btn-secondary" id="erp-sync-regos-btn" onclick="ERP.syncWithRegos()">
                             <i class="fas fa-sync"></i> REGOS bilan sinxronizatsiya
-                        </button>
-                        <button class="btn btn-primary" id="erp-add-employee-btn" style="display:none;" onclick="showModal('employee-modal')">
-                            <i class="fas fa-user-plus"></i> Xodim qo'shish
                         </button>
                     </div>
                 </div>
@@ -347,14 +351,36 @@
                         <i class="fas fa-search"></i>
                         <input type="text" id="erp-search" class="form-control" placeholder="Qidirish...">
                     </div>
-                    <div class="filter-group">
-                        <button class="btn btn-primary" id="erp-subtab-inventory"><i class="fas fa-boxes"></i> Omborxona</button>
-                        <button class="btn btn-secondary" id="erp-subtab-hr"><i class="fas fa-users"></i> Xodimlar (HR)</button>
-                    </div>
                 </div>
 
                 <div id="erp-content">
-                    <!-- Dinamik Ombor yoki HR ko'rinishi -->
+                    <!-- Dinamik Ombor ko'rinishi -->
+                </div>
+            </section>
+
+            <!-- 3.5. XODIMLAR (HR) BO'LIMI -->
+            <section id="view-hr" class="view-section">
+                <div class="header">
+                    <div class="header-title">
+                        <h1>Xodimlar boshqaruvi (HR)</h1>
+                        <p>Kompaniya xodimlari va kadrlar tahlili</p>
+                    </div>
+                    <div class="header-actions">
+                        <button class="btn btn-primary" id="hr-add-employee-btn" onclick="showModal('employee-modal')">
+                            <i class="fas fa-user-plus"></i> Xodim qo'shish
+                        </button>
+                    </div>
+                </div>
+
+                <div class="filter-row card" style="padding: 16px;">
+                    <div class="search-box">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="hr-search" class="form-control" placeholder="Xodim ismi yoki lavozimi bo'yicha qidirish...">
+                    </div>
+                </div>
+
+                <div id="hr-content">
+                    <!-- Dinamik Xodimlar ko'rinishi -->
                 </div>
             </section>
 

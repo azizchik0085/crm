@@ -1,41 +1,15 @@
-// ERP & CRM Tizimi - ERP Moduli (Omborxona va HR) - SUPABASE ULANISHI BILAN
+// ERP & CRM Tizimi - ERP Moduli (Omborxona) va HR Moduli (Xodimlar) - SUPABASE ULANISHI BILAN
 
 window.ERP = {
-    activeSubSection: 'inventory', // 'inventory' yoki 'hr'
     inventoryPage: 1,
     inventoryPageSize: 100,
 
     init: function() {
-        this.render();
         this.setupEventListeners();
+        this.render();
     },
 
     setupEventListeners: function() {
-        const invSubTabBtn = document.getElementById('erp-subtab-inventory');
-        const hrSubTabBtn = document.getElementById('erp-subtab-hr');
-
-        if (invSubTabBtn && hrSubTabBtn) {
-            invSubTabBtn.onclick = () => {
-                this.activeSubSection = 'inventory';
-                this.inventoryPage = 1;
-                invSubTabBtn.classList.add('btn-primary');
-                invSubTabBtn.classList.remove('btn-secondary');
-                hrSubTabBtn.classList.add('btn-secondary');
-                hrSubTabBtn.classList.remove('btn-primary');
-                this.render();
-            };
-
-            hrSubTabBtn.onclick = () => {
-                this.activeSubSection = 'hr';
-                this.inventoryPage = 1;
-                hrSubTabBtn.classList.add('btn-primary');
-                hrSubTabBtn.classList.remove('btn-secondary');
-                invSubTabBtn.classList.add('btn-secondary');
-                invSubTabBtn.classList.remove('btn-primary');
-                this.render();
-            };
-        }
-
         // Qidiruv
         const searchInput = document.getElementById('erp-search');
         if (searchInput) {
@@ -53,14 +27,6 @@ window.ERP = {
                 this.addProduct();
             };
         }
-
-        const hrForm = document.getElementById('add-employee-form');
-        if (hrForm) {
-            hrForm.onsubmit = (e) => {
-                e.preventDefault();
-                this.addEmployee();
-            };
-        }
     },
 
     render: async function() {
@@ -68,19 +34,7 @@ window.ERP = {
         const container = document.getElementById('erp-content');
         if (!container) return;
 
-        if (this.activeSubSection === 'inventory') {
-            document.getElementById('erp-add-product-btn').style.display = 'inline-flex';
-            const regosBtn = document.getElementById('erp-sync-regos-btn');
-            if (regosBtn) regosBtn.style.display = 'inline-flex';
-            document.getElementById('erp-add-employee-btn').style.display = 'none';
-            await this.renderInventory(container, searchVal);
-        } else {
-            document.getElementById('erp-add-product-btn').style.display = 'none';
-            const regosBtn = document.getElementById('erp-sync-regos-btn');
-            if (regosBtn) regosBtn.style.display = 'none';
-            document.getElementById('erp-add-employee-btn').style.display = 'inline-flex';
-            await this.renderHR(container, searchVal);
-        }
+        await this.renderInventory(container, searchVal);
     },
 
     renderInventory: async function(container, searchVal) {
@@ -270,100 +224,6 @@ window.ERP = {
         container.innerHTML = html;
     },
 
-    renderHR: async function(container, searchVal) {
-        // Supabase yoki keshdan xodimlarni yuklash
-        const employees = await DB.getEmployees();
-        
-        const settings = AppStorage.load().settings;
-        const currency = settings.currency;
-
-        const filtered = employees.filter(e => 
-            e.name.toLowerCase().includes(searchVal) || 
-            e.role.toLowerCase().includes(searchVal)
-        );
-
-        // Fetch active employee role to check permissions
-        const activeUserId = localStorage.getItem('activeUserId') || 'admin';
-        let activeRole = 'admin';
-        try {
-            if (activeUserId !== 'admin') {
-                const employeesList = await DB.getEmployees();
-                const currentEmp = employeesList.find(e => e.id === activeUserId);
-                if (currentEmp) activeRole = (currentEmp.role || '').toLowerCase();
-            }
-        } catch (e) {
-            console.error(e);
-        }
-        
-        const isSupervisor = activeRole.includes('direktor') || activeRole.includes('admin') || activeRole.includes('dasturchi') || activeRole.includes('boshliq') || activeUserId === 'admin';
-        const isHR = activeRole.includes('hr') || activeRole.includes('kadr') || activeRole.includes('recruiter');
-        const canWriteHR = isSupervisor || isHR;
-
-        let html = `
-            <div class="hr-grid" style="margin-top: 24px;">
-        `;
-
-        if (filtered.length === 0) {
-            html += `<div class="card" style="grid-column: 1/-1; text-align: center; color: var(--text-muted); padding: 32px;">Xodimlar topilmadi.</div>`;
-        } else {
-            filtered.forEach(e => {
-                // Name initials
-                const initials = e.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
-                
-                // KPI bar rangini hisoblash
-                let kpiColor = 'var(--accent-gradient)';
-                if (e.kpi < 50) kpiColor = 'linear-gradient(135deg, #EF4444 0%, #F59E0B 100%)';
-                else if (e.kpi >= 90) kpiColor = 'linear-gradient(135deg, #10B981 0%, #06B6D4 100%)';
-
-                html += `
-                    <div class="card employee-card">
-                        <div class="employee-header">
-                            <div class="employee-avatar">${initials}</div>
-                            <div class="employee-title">
-                                <h4>${e.name}</h4>
-                                <p>${e.role}</p>
-                            </div>
-                        </div>
-                        
-                        <div class="kpi-container">
-                            <div style="display: flex; justify-content: space-between; font-size: 13px; font-weight: 500;">
-                                <span style="color: var(--text-muted);">Samaradorlik (KPI)</span>
-                                <span style="color: var(--text-main); font-family: 'JetBrains Mono';">${e.kpi}%</span>
-                            </div>
-                            <div class="kpi-bar-bg">
-                                <div class="kpi-bar-fill" style="width: ${e.kpi}%; background: ${kpiColor}"></div>
-                            </div>
-                        </div>
-
-                        <div class="employee-stats">
-                            <div>
-                                <span style="display:block; font-size:11px; color: var(--text-muted)">Maosh</span>
-                                <strong style="color: var(--text-main)">${formatMoney(e.salary, currency)}</strong>
-                            </div>
-                            <div style="text-align: right;">
-                                <span style="display:block; font-size:11px; color: var(--text-muted)">Holati</span>
-                                <span class="badge badge-success">Faol</span>
-                            </div>
-                        </div>
-
-                        ${canWriteHR ? `
-                        <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; border-top: 1px solid var(--border-color); padding-top: 12px;">
-                            <button class="btn btn-secondary btn-sm" onclick="ERP.updateKPI('${e.id}')"><i class="fas fa-chart-line"></i> KPI</button>
-                            <button class="btn btn-secondary btn-sm" onclick="ERP.deleteEmployee('${e.id}')"><i class="fas fa-trash-alt" style="color: var(--danger)"></i> O'chirish</button>
-                        </div>
-                        ` : ''}
-                    </div>
-                `;
-            });
-        }
-
-        html += `
-            </div>
-        `;
-
-        container.innerHTML = html;
-    },
-
     addProduct: async function() {
         const name = document.getElementById('prod-name').value;
         const sku = document.getElementById('prod-sku').value;
@@ -444,6 +304,174 @@ window.ERP = {
         if (window.App && typeof window.App.updateDashboardStats === 'function') {
             window.App.updateDashboardStats();
         }
+    },
+
+    setPage: function(pageNum) {
+        this.inventoryPage = pageNum;
+        this.render();
+    },
+
+    syncWithRegos: async function() {
+        const settings = AppStorage.load().settings;
+        if (!settings.regosEndpoint || !settings.regosToken) {
+            alert("REGOS API sozlanmagan. Iltimos, sozlamalar sahifasida Endpoint va Access Tokenni kiriting.");
+            return;
+        }
+
+        const btn = document.getElementById('erp-sync-regos-btn');
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-sync fa-spin"></i> Sinxronizatsiya qilinmoqda...';
+        }
+
+        try {
+            const response = await fetch('/api/integration/regos/sync', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            const resData = await response.json();
+            if (response.ok && resData.status === 'success') {
+                alert(`Sinxronizatsiya muvaffaqiyatli yakunlandi! Jami ${resData.count} ta mahsulot yangilandi.`);
+            } else {
+                alert(`Xatolik yuz berdi: ${resData.detail || resData.message || "Tizim xatosi"}`);
+            }
+        } catch (err) {
+            console.error(err);
+            alert("Tarmoq xatoligi yoki backend bilan bog'lana olmadi.");
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-sync"></i> REGOS bilan sinxronizatsiya';
+            }
+            await this.render();
+            if (window.App && typeof window.App.updateDashboardStats === 'function') {
+                window.App.updateDashboardStats();
+            }
+        }
+    }
+};
+
+window.HR = {
+    init: function() {
+        this.setupEventListeners();
+        this.render();
+    },
+
+    setupEventListeners: function() {
+        const searchInput = document.getElementById('hr-search');
+        if (searchInput) {
+            searchInput.oninput = () => {
+                this.render();
+            };
+        }
+
+        const hrForm = document.getElementById('add-employee-form');
+        if (hrForm) {
+            hrForm.onsubmit = (e) => {
+                e.preventDefault();
+                this.addEmployee();
+            };
+        }
+    },
+
+    render: async function() {
+        const searchVal = document.getElementById('hr-search')?.value.toLowerCase() || '';
+        const container = document.getElementById('hr-content');
+        if (!container) return;
+
+        // Supabase yoki keshdan xodimlarni yuklash
+        const employees = await DB.getEmployees();
+        
+        const settings = AppStorage.load().settings;
+        const currency = settings.currency;
+
+        const filtered = employees.filter(e => 
+            e.name.toLowerCase().includes(searchVal) || 
+            e.role.toLowerCase().includes(searchVal)
+        );
+
+        // Fetch active employee role to check permissions
+        const activeUserId = localStorage.getItem('activeUserId') || 'admin';
+        let activeRole = 'admin';
+        try {
+            if (activeUserId !== 'admin') {
+                const employeesList = await DB.getEmployees();
+                const currentEmp = employeesList.find(e => e.id === activeUserId);
+                if (currentEmp) activeRole = (currentEmp.role || '').toLowerCase();
+            }
+        } catch (e) {
+            console.error(e);
+        }
+        
+        const isSupervisor = activeRole.includes('direktor') || activeRole.includes('admin') || activeRole.includes('dasturchi') || activeRole.includes('boshliq') || activeUserId === 'admin';
+        const isHR = activeRole.includes('hr') || activeRole.includes('kadr') || activeRole.includes('recruiter');
+        const canWriteHR = isSupervisor || isHR;
+
+        let html = `
+            <div class="hr-grid" style="margin-top: 24px;">
+        `;
+
+        if (filtered.length === 0) {
+            html += `<div class="card" style="grid-column: 1/-1; text-align: center; color: var(--text-muted); padding: 32px;">Xodimlar topilmadi.</div>`;
+        } else {
+            filtered.forEach(e => {
+                // Name initials
+                const initials = e.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+                
+                // KPI bar rangini hisoblash
+                let kpiColor = 'var(--accent-gradient)';
+                if (e.kpi < 50) kpiColor = 'linear-gradient(135deg, #EF4444 0%, #F59E0B 100%)';
+                else if (e.kpi >= 90) kpiColor = 'linear-gradient(135deg, #10B981 0%, #06B6D4 100%)';
+
+                html += `
+                    <div class="card employee-card">
+                        <div class="employee-header">
+                            <div class="employee-avatar">${initials}</div>
+                            <div class="employee-title">
+                                <h4>${e.name}</h4>
+                                <p>${e.role}</p>
+                            </div>
+                        </div>
+                        
+                        <div class="kpi-container">
+                            <div style="display: flex; justify-content: space-between; font-size: 13px; font-weight: 500;">
+                                <span style="color: var(--text-muted);">Samaradorlik (KPI)</span>
+                                <span style="color: var(--text-main); font-family: 'JetBrains Mono';">${e.kpi}%</span>
+                            </div>
+                            <div class="kpi-bar-bg">
+                                <div class="kpi-bar-fill" style="width: ${e.kpi}%; background: ${kpiColor}"></div>
+                            </div>
+                        </div>
+
+                        <div class="employee-stats">
+                            <div>
+                                <span style="display:block; font-size:11px; color: var(--text-muted)">Maosh</span>
+                                <strong style="color: var(--text-main)">${formatMoney(e.salary, currency)}</strong>
+                            </div>
+                            <div style="text-align: right;">
+                                <span style="display:block; font-size:11px; color: var(--text-muted)">Holati</span>
+                                <span class="badge badge-success">Faol</span>
+                            </div>
+                        </div>
+
+                        ${canWriteHR ? `
+                        <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; border-top: 1px solid var(--border-color); padding-top: 12px;">
+                            <button class="btn btn-secondary btn-sm" onclick="HR.updateKPI('${e.id}')"><i class="fas fa-chart-line"></i> KPI</button>
+                            <button class="btn btn-secondary btn-sm" onclick="HR.deleteEmployee('${e.id}')"><i class="fas fa-trash-alt" style="color: var(--danger)"></i> O'chirish</button>
+                        </div>
+                        ` : ''}
+                    </div>
+                `;
+            });
+        }
+
+        html += `
+            </div>
+        `;
+
+        container.innerHTML = html;
     },
 
     addEmployee: async function() {
@@ -530,52 +558,6 @@ window.ERP = {
         } catch (err) {
             console.error("Xodimni o'chirishda xatolik:", err);
             alert("Xodimni o'chirishda xatolik yuz berdi: " + err.message);
-        }
-    },
-
-    setPage: function(pageNum) {
-        this.inventoryPage = pageNum;
-        this.render();
-    },
-
-    syncWithRegos: async function() {
-        const settings = AppStorage.load().settings;
-        if (!settings.regosEndpoint || !settings.regosToken) {
-            alert("REGOS API sozlanmagan. Iltimos, sozlamalar sahifasida Endpoint va Access Tokenni kiriting.");
-            return;
-        }
-
-        const btn = document.getElementById('erp-sync-regos-btn');
-        if (btn) {
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-sync fa-spin"></i> Sinxronizatsiya qilinmoqda...';
-        }
-
-        try {
-            const response = await fetch('/api/integration/regos/sync', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                }
-            });
-            const resData = await response.json();
-            if (response.ok && resData.status === 'success') {
-                alert(`Sinxronizatsiya muvaffaqiyatli yakunlandi! Jami ${resData.count} ta mahsulot yangilandi.`);
-            } else {
-                alert(`Xatolik yuz berdi: ${resData.detail || resData.message || "Tizim xatosi"}`);
-            }
-        } catch (err) {
-            console.error(err);
-            alert("Tarmoq xatoligi yoki backend bilan bog'lana olmadi.");
-        } finally {
-            if (btn) {
-                btn.disabled = false;
-                btn.innerHTML = '<i class="fas fa-sync"></i> REGOS bilan sinxronizatsiya';
-            }
-            await this.render();
-            if (window.App && typeof window.App.updateDashboardStats === 'function') {
-                window.App.updateDashboardStats();
-            }
         }
     }
 };

@@ -279,7 +279,7 @@ window.App = {
         const isHR = activeRole.includes('hr') || activeRole.includes('kadr') || activeRole.includes('recruiter');
         
         if (isSupervisor) {
-            allowedViews = ['dashboard', 'crm', 'telephony', 'erp', 'finance', 'chats', 'settings'];
+            allowedViews = ['dashboard', 'crm', 'telephony', 'erp', 'finance', 'chats', 'hr', 'settings'];
         } else if (isSales) {
             allowedViews = ['dashboard', 'crm', 'telephony', 'chats'];
         } else if (isWarehouse) {
@@ -287,7 +287,7 @@ window.App = {
         } else if (isAccountant) {
             allowedViews = ['dashboard', 'finance', 'erp'];
         } else if (isHR) {
-            allowedViews = ['dashboard', 'erp'];
+            allowedViews = ['dashboard', 'hr'];
         } else {
             allowedViews = ['dashboard', 'chats'];
         }
@@ -309,27 +309,8 @@ window.App = {
         }
         
         const addProductBtn = document.getElementById('erp-add-product-btn');
-        const addEmployeeBtn = document.getElementById('erp-add-employee-btn');
+        const addEmployeeBtn = document.getElementById('hr-add-employee-btn');
         const syncRegosBtn = document.getElementById('erp-sync-regos-btn');
-        const erpSubTabInv = document.getElementById('erp-subtab-inventory');
-        const erpSubTabHR = document.getElementById('erp-subtab-hr');
-        
-        if (isSupervisor) {
-            if (erpSubTabInv) erpSubTabInv.style.setProperty('display', '', 'important');
-            if (erpSubTabHR) erpSubTabHR.style.setProperty('display', '', 'important');
-        } else if (isWarehouse) {
-            if (erpSubTabInv) erpSubTabInv.style.setProperty('display', '', 'important');
-            if (erpSubTabHR) erpSubTabHR.style.setProperty('display', 'none', 'important');
-            if (window.ERP) window.ERP.activeSubSection = 'inventory';
-        } else if (isHR) {
-            if (erpSubTabInv) erpSubTabInv.style.setProperty('display', 'none', 'important');
-            if (erpSubTabHR) erpSubTabHR.style.setProperty('display', '', 'important');
-            if (window.ERP) window.ERP.activeSubSection = 'hr';
-        } else if (isAccountant) {
-            if (erpSubTabInv) erpSubTabInv.style.setProperty('display', '', 'important');
-            if (erpSubTabHR) erpSubTabHR.style.setProperty('display', 'none', 'important');
-            if (window.ERP) window.ERP.activeSubSection = 'inventory';
-        }
         
         const canAddProduct = isSupervisor || isWarehouse;
         if (addProductBtn) addProductBtn.style.setProperty('display', canAddProduct ? '' : 'none', 'important');
@@ -348,6 +329,8 @@ window.App = {
         
         if (this.currentView === 'erp' && window.ERP && typeof window.ERP.render === 'function') {
             window.ERP.render();
+        } else if (this.currentView === 'hr' && window.HR && typeof window.HR.render === 'function') {
+            window.HR.render();
         }
     },
 
@@ -563,6 +546,8 @@ window.App = {
             if (window.Chats) window.Chats.init();
         } else if (viewName === 'erp') {
             window.ERP.init();
+        } else if (viewName === 'hr') {
+            if (window.HR) window.HR.init();
         } else if (viewName === 'finance') {
             window.Finance.init();
         }
