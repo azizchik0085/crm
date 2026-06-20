@@ -1375,7 +1375,24 @@ def sync_regos_inventory():
         print(f"REGOS API connection error: {e}")
         raise HTTPException(status_code=500, detail=f"REGOS API bilan bog'lanishda xatolik yuz berdi: {str(e)}")
         
-    sync_count = 0
+    # 1. Fetch existing products from Supabase to check for SKU conflicts
+    existing_products = []
+    try:
+        existing_products = supabase_req("GET", "inventory?select=id,sku")
+    except Exception as e:
+        print(f"Failed to fetch existing products for SKU checks: {e}")
+        
+    sku_to_id = {}
+    for p in existing_products:
+        p_sku = p.get("sku")
+        p_id = p.get("id")
+        if p_sku:
+            sku_to_id[p_sku.upper()] = p_id
+
+    # 2. Iterate through all_items and build processed_products list
+    processed_products = []
+    seen_skus_in_payload = set()
+
     for item_ext in all_items:
         if not isinstance(item_ext, dict):
             continue
@@ -1421,26 +1438,46 @@ def sync_regos_inventory():
         elif item.get("group_name"):
             category = item.get("group_name")
             
+        # Resolve SKU conflicts locally
+        final_sku = sku
+        sku_upper = final_sku.upper()
+        if (sku_upper in sku_to_id and sku_to_id[sku_upper] != product_id) or (sku_upper in seen_skus_in_payload):
+            final_sku = f"{sku}-{regos_id}"
+            sku_upper = final_sku.upper()
+            if (sku_upper in sku_to_id and sku_to_id[sku_upper] != product_id) or (sku_upper in seen_skus_in_payload):
+                final_sku = f"{sku}-dup-{regos_id}"
+                sku_upper = final_sku.upper()
+                
+        seen_skus_in_payload.add(sku_upper)
+        sku_to_id[sku_upper] = product_id
+        
         product_payload = {
             "id": product_id,
             "name": name,
-            "sku": sku,
+            "sku": final_sku,
             "price": price,
             "stock": stock,
             "category": category
         }
+        processed_products.append(product_payload)
         
+    # 3. Bulk upsert in chunks of 500
+    sync_count = 0
+    chunk_size = 500
+    for i in range(0, len(processed_products), chunk_size):
+        chunk = processed_products[i:i + chunk_size]
         try:
-            supabase_req("POST", "inventory?on_conflict=id", json_data=product_payload)
-            sync_count += 1
+            supabase_req("POST", "inventory?on_conflict=id", json_data=chunk)
+            sync_count += len(chunk)
+            print(f"Successfully synced chunk {i // chunk_size + 1}/{len(processed_products) // chunk_size + 1 if len(processed_products) % chunk_size == 0 else len(processed_products) // chunk_size + 1} ({len(chunk)} items)")
         except Exception as ex:
-            print(f"First upsert attempt failed for {product_id}: {ex}. Retrying with unique SKU...")
-            product_payload["sku"] = f"{sku}-{regos_id}"
-            try:
-                supabase_req("POST", "inventory?on_conflict=id", json_data=product_payload)
-                sync_count += 1
-            except Exception as retry_ex:
-                print(f"Retry failed for {product_id}: {retry_ex}")
+            print(f"Bulk upsert failed for chunk starting at index {i}: {ex}. Falling back to single inserts...")
+            for product_payload in chunk:
+                try:
+                    supabase_req("POST", "inventory?on_conflict=id", json_data=product_payload)
+                    sync_count += 1
+                except Exception as single_ex:
+                    print(f"Fallback insert failed for {product_payload['id']}: {single_ex}")
                 
     return {"status": "success", "count": sync_count}
 
