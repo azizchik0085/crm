@@ -1884,7 +1884,7 @@ def run_sync_in_background(days: int):
                     if isinstance(r, dict) and "id" in r:
                         items_val = r.get("items")
                         is_new = False
-                        if isinstance(items_val, dict) and "products" in items_val:
+                        if isinstance(items_val, dict) and "products" in items_val and "seller_name" in items_val:
                             is_new = True
                         existing_receipts[r["id"]] = is_new
                 if len(chunk) < limit:
