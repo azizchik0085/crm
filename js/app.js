@@ -574,6 +574,8 @@ window.App = {
         const customers = await DB.getCustomers();
         const inventory = await DB.getInventory();
         const calls = await DB.getCalls();
+        const receipts = await DB.getReceipts();
+        const employees = await DB.getEmployees();
 
         // Hisob-kitoblar
         const totalIncome = transactions
@@ -587,11 +589,56 @@ window.App = {
         const activeClients = customers.filter(c => c.status !== 'lost').length;
         const inventoryAlerts = inventory.filter(p => p.stock <= 3).length;
 
+        // Calculate today's sales and profit
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = now.getMonth();
+        const day = now.getDate();
+
+        let todaySales = 0;
+        const employeeSalesMap = {};
+
+        // Initialize with synced employees only (those whose role is сотувчилар or contains sotuv/сотув)
+        employees.forEach(e => {
+            const roleLower = (e.role || "").toLowerCase();
+            if (roleLower.includes("sotuv") || roleLower.includes("сотув")) {
+                employeeSalesMap[e.name] = 0;
+            }
+        });
+
+        receipts.forEach(r => {
+            const rDate = new Date(r.created_at);
+            const isToday = rDate.getFullYear() === year && rDate.getMonth() === month && rDate.getDate() === day;
+            if (isToday) {
+                const total = parseFloat(r.total_amount) || 0;
+                todaySales += total;
+
+                // Match with employee/seller name
+                let itemsObj = r.items;
+                if (typeof itemsObj === 'string') {
+                    try { itemsObj = JSON.parse(itemsObj); } catch (e) { itemsObj = null; }
+                }
+                const sellerName = (itemsObj && itemsObj.seller_name) || '';
+                if (sellerName) {
+                    const matchedEmp = employees.find(e => e.name.trim().toLowerCase() === sellerName.trim().toLowerCase());
+                    const displayName = matchedEmp ? matchedEmp.name : sellerName;
+                    employeeSalesMap[displayName] = (employeeSalesMap[displayName] || 0) + total;
+                }
+            }
+        });
+
+        const todayProfit = todaySales * 0.25; // 25% profit margin
+
         // Dashboard DOM elementlarini yangilash
         document.getElementById('dash-income').textContent = '+' + formatMoney(totalIncome, currency);
         document.getElementById('dash-expense').textContent = '-' + formatMoney(totalExpense, currency);
         document.getElementById('dash-clients').textContent = activeClients + ' faol';
         document.getElementById('dash-alerts').textContent = inventoryAlerts + ' ta mahsulot';
+
+        const todaySalesEl = document.getElementById('dash-today-sales');
+        const todayProfitEl = document.getElementById('dash-today-profit');
+        if (todaySalesEl) todaySalesEl.textContent = formatMoney(todaySales, currency);
+        if (todayProfitEl) todayProfitEl.textContent = formatMoney(todayProfit, currency);
 
         // Oxirgi tranzaksiyalar jadvalini yuklash (5 ta)
         const recentTxContainer = document.getElementById('dash-recent-transactions');
@@ -680,6 +727,7 @@ window.App = {
 
         // Grafik chizish
         this.renderCharts(transactions);
+        this.renderSalesCharts(todaySales, todayProfit, employeeSalesMap);
     },
 
     renderCharts: function(transactions) {
@@ -773,6 +821,128 @@ window.App = {
                 }
             }
         });
+    },
+
+    renderSalesCharts: function(todaySales, todayProfit, employeeSalesMap) {
+        const isLightTheme = document.body.classList.contains('light-theme');
+        const textColor = isLightTheme ? '#64748B' : '#9CA3AF';
+        const gridColor = isLightTheme ? 'rgba(0,0,0,0.04)' : 'rgba(255, 255, 255, 0.05)';
+
+        // 1. Today's Sales vs Profit Bar Chart
+        const ctxSalesProfit = document.getElementById('todaySalesProfitChart')?.getContext('2d');
+        if (ctxSalesProfit) {
+            if (this.salesProfitChartInstance) {
+                this.salesProfitChartInstance.destroy();
+            }
+            this.salesProfitChartInstance = new Chart(ctxSalesProfit, {
+                type: 'bar',
+                data: {
+                    labels: ['Bugungi Savdo', 'Bugungi Foyda'],
+                    datasets: [{
+                        label: 'Summa',
+                        data: [todaySales, todayProfit],
+                        backgroundColor: [
+                            'rgba(16, 185, 129, 0.75)', // Green
+                            'rgba(6, 182, 212, 0.75)'   // Cyan
+                        ],
+                        borderColor: [
+                            '#10B981',
+                            '#06B6D4'
+                        ],
+                        borderWidth: 1.5,
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: textColor, font: { family: 'Outfit' } }
+                        },
+                        y: {
+                            grid: { color: gridColor },
+                            ticks: {
+                                color: textColor,
+                                font: { family: 'Outfit' },
+                                callback: function(value) {
+                                    if (value >= 1000000) return (value / 1000000).toFixed(1) + 'M';
+                                    if (value >= 1000) return (value / 1000).toFixed(0) + 'K';
+                                    return value;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // 2. Sales by Employee Doughnut Chart
+        const ctxEmpSales = document.getElementById('employeeSalesChart')?.getContext('2d');
+        if (ctxEmpSales) {
+            if (this.empSalesChartInstance) {
+                this.empSalesChartInstance.destroy();
+            }
+
+            const labels = Object.keys(employeeSalesMap);
+            const data = Object.values(employeeSalesMap);
+
+            const bgColors = [
+                'rgba(59, 130, 246, 0.7)',
+                'rgba(139, 92, 246, 0.7)',
+                'rgba(236, 72, 153, 0.7)',
+                'rgba(245, 158, 11, 0.7)',
+                'rgba(16, 185, 129, 0.7)',
+                'rgba(6, 182, 212, 0.7)'
+            ];
+            const borderColors = [
+                '#3B82F6',
+                '#8B5CF6',
+                '#EC4899',
+                '#F59E0B',
+                '#10B981',
+                '#06B6D4'
+            ];
+
+            const selectedBg = labels.map((_, i) => bgColors[i % bgColors.length]);
+            const selectedBorder = labels.map((_, i) => borderColors[i % borderColors.length]);
+
+            const hasSales = data.some(val => val > 0);
+
+            this.empSalesChartInstance = new Chart(ctxEmpSales, {
+                type: hasSales ? 'doughnut' : 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: selectedBg,
+                        borderColor: selectedBorder,
+                        borderWidth: 1.5
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            labels: {
+                                color: textColor,
+                                font: { family: 'Outfit', size: 11 }
+                            }
+                        }
+                    },
+                    scales: hasSales ? {} : {
+                        x: { grid: { display: false }, ticks: { color: textColor } },
+                        y: { grid: { color: gridColor }, ticks: { color: textColor } }
+                    }
+                }
+            });
+        }
     },
 
     toggleAdvancedSettings: function() {
