@@ -117,14 +117,14 @@ window.Kassa = {
                     customer_name: "",
                     customer_phone: "",
                     products: Array.isArray(itemsObj) ? itemsObj : [],
-                    delivery: { status: "pending" }
+                    delivery: { status: "" }
                 };
             }
             if (!itemsObj.delivery) {
-                itemsObj.delivery = { status: "pending" };
+                itemsObj.delivery = { status: "" };
             }
             if (!itemsObj.delivery.status) {
-                itemsObj.delivery.status = "pending";
+                itemsObj.delivery.status = "";
             }
             return itemsObj;
         };
@@ -206,7 +206,7 @@ window.Kassa = {
 
             // Determine badge style
             let badgeClass = 'badge-secondary';
-            let badgeText = 'Kutilyapti';
+            let badgeText = 'Do\'konda';
             if (r.deliveryStatus === 'pending') {
                 badgeClass = 'badge-warning';
                 badgeText = 'Kutilyapti';
@@ -330,7 +330,13 @@ window.Kassa = {
 
             // Action buttons based on status
             let actionsHtml = '';
-            if (r.deliveryStatus === 'pending') {
+            if (!r.deliveryStatus) {
+                actionsHtml = `
+                    <button class="btn btn-primary" onclick="window.Kassa.addToDelivery('${r.id}')" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 13px; font-weight: 600; height: 38px; background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); border: none;">
+                        <i class="fas fa-plus"></i> Dastavkaga qo'shish
+                    </button>
+                `;
+            } else if (r.deliveryStatus === 'pending') {
                 actionsHtml = `
                     <button class="btn btn-primary" onclick="window.Kassa.startPreparation('${r.id}')" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 13px; font-weight: 600; height: 38px;">
                         <i class="fas fa-box-open"></i> Tayyorlashni boshlash
@@ -441,6 +447,50 @@ window.Kassa = {
         } catch(e) {
             console.error("Failed to start preparation:", e);
             alert("Tayyorlashni boshlashda xatolik: " + e.message);
+        }
+    },
+
+    addToDelivery: async function(receiptId) {
+        const receipt = this.receiptsList.find(r => r.id === receiptId);
+        if (!receipt) return;
+
+        let itemsObj = receipt.items;
+        if (typeof itemsObj === 'string') {
+            try {
+                itemsObj = JSON.parse(itemsObj);
+            } catch(e) {
+                itemsObj = {};
+            }
+        }
+        if (!itemsObj || Array.isArray(itemsObj) || typeof itemsObj !== 'object') {
+            itemsObj = {
+                customer_name: "",
+                customer_phone: "",
+                products: Array.isArray(itemsObj) ? itemsObj : []
+            };
+        }
+
+        // Initialize delivery and status as pending
+        itemsObj.delivery = {
+            status: "pending",
+            address: itemsObj.delivery?.address || "",
+            courier_name: "",
+            courier_phone: "",
+            fee: 15000,
+            prepared_products: []
+        };
+
+        const updatedReceipt = {
+            ...receipt,
+            items: itemsObj
+        };
+
+        try {
+            await DB.saveReceipt(updatedReceipt);
+            await this.render();
+        } catch(e) {
+            console.error("Failed to add receipt to delivery:", e);
+            alert("Dastavkaga qo'shishda xatolik: " + e.message);
         }
     },
 
