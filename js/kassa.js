@@ -316,6 +316,14 @@ window.Kassa = {
                             <span style="color: var(--text-muted); width: 80px; flex-shrink: 0;"><i class="fas fa-money-bill-wave" style="width: 14px;"></i> To'lov:</span>
                             <strong style="color: var(--accent); font-family: 'JetBrains Mono';">${formatMoney(dev.fee || 0, currency)}</strong>
                         </div>
+                        ${dev.collect_required ? `
+                        <div style="margin-top: 8px; padding: 6px 10px; background: rgba(239, 68, 68, 0.05); border: 1px dashed rgba(239, 68, 68, 0.2); border-radius: 6px; display: flex; justify-content: space-between; align-items: center; font-size: 13px;">
+                            <span style="color: var(--danger); font-weight: 500;"><i class="fas fa-coins" style="margin-right: 4px;"></i> Mijozdan olinadi:</span>
+                            <strong style="color: var(--danger); font-family: 'JetBrains Mono'; font-weight: 700;">${formatMoney(dev.collect_amount || 0, currency)}</strong>
+                        </div>` : `
+                        <div style="margin-top: 8px; font-size: 12px; color: var(--text-muted);">
+                            <i class="fas fa-info-circle"></i> Mijozdan pul olish shart emas
+                        </div>`}
                     </div>
                 `;
             }
@@ -504,6 +512,26 @@ window.Kassa = {
         const manualInput = document.getElementById('kassa-courier-name-manual');
         if (manualInput) manualInput.value = "";
 
+        // Fill collect details
+        const collectCheckbox = document.getElementById('kassa-collect-required');
+        const collectInput = document.getElementById('kassa-collect-amount');
+        if (collectCheckbox) {
+            const hasSavedCollect = itemsObj?.delivery?.collect_required !== undefined;
+            if (hasSavedCollect) {
+                collectCheckbox.checked = !!itemsObj.delivery.collect_required;
+            } else {
+                // Default to true if payment type is Naqd (Cash)
+                const payType = receipt.payment_type || 'Naqd';
+                collectCheckbox.checked = (payType === 'Naqd');
+            }
+        }
+        if (collectInput) {
+            collectInput.value = itemsObj?.delivery?.collect_amount !== undefined 
+                ? itemsObj.delivery.collect_amount 
+                : (receipt.total_amount || 0);
+        }
+        this.toggleCollectAmountInput();
+
         // Fill courier dropdown with employees
         const courierSelect = document.getElementById('kassa-courier-name');
         if (courierSelect) {
@@ -527,6 +555,14 @@ window.Kassa = {
         // Open modal
         if (window.showModal) showModal('kassa-courier-modal');
         else alert("showModal is not defined. Modal cannot be opened.");
+    },
+
+    toggleCollectAmountInput: function() {
+        const checkbox = document.getElementById('kassa-collect-required');
+        const container = document.getElementById('kassa-collect-amount-container');
+        if (checkbox && container) {
+            container.style.display = checkbox.checked ? 'block' : 'none';
+        }
     },
 
     saveCourierDetails: async function() {
@@ -569,6 +605,11 @@ window.Kassa = {
         itemsObj.delivery.courier_phone = phoneInput ? phoneInput.value.trim() : '';
         itemsObj.delivery.address = addressInput ? addressInput.value.trim() : '';
         itemsObj.delivery.fee = feeInput ? (parseInt(feeInput.value) || 0) : 15000;
+
+        const collectCheckbox = document.getElementById('kassa-collect-required');
+        const collectInput = document.getElementById('kassa-collect-amount');
+        itemsObj.delivery.collect_required = collectCheckbox ? collectCheckbox.checked : false;
+        itemsObj.delivery.collect_amount = itemsObj.delivery.collect_required && collectInput ? (parseInt(collectInput.value) || 0) : 0;
 
         const updatedReceipt = {
             ...receipt,
