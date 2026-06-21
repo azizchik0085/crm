@@ -144,7 +144,16 @@ def sync_regos_employees():
         if not isinstance(users_list, list):
             return {"status": "success", "message": "Foydalanuvchilar topilmadi", "synced_count": 0}
             
+        # Fetch existing employees to preserve custom data (salary, kpi, role plan)
+        try:
+            existing_employees = supabase_get_all("employees?select=*")
+            existing_map = {e["id"]: e for e in existing_employees}
+        except Exception as e_get:
+            print(f"Failed to fetch existing employees: {e_get}")
+            existing_map = {}
+
         synced_employees = []
+        synced_ids = set()
         for u in users_list:
             if not isinstance(u, dict):
                 continue
@@ -158,28 +167,42 @@ def sync_regos_employees():
                 continue
             
             u_id = f"regos_{u.get('id')}"
+            synced_ids.add(u_id)
             full_name = u.get("full_name") or u.get("first_name") or u.get("login") or f"Xodim #{u.get('id')}"
             full_name = full_name.strip()
             
             role = group_name
             status = "active" if u.get("active") else "inactive"
             
+            # Default values
+            salary = 0
+            kpi = 100
+            
+            # If already exists in DB, preserve customized fields
+            if u_id in existing_map:
+                existing = existing_map[u_id]
+                salary = existing.get("salary", 0)
+                kpi = existing.get("kpi", 100)
+                role = existing.get("role", role)
+            
             employee = {
                 "id": u_id,
                 "name": full_name,
                 "role": role,
-                "salary": 0,
-                "kpi": 100,
+                "salary": salary,
+                "kpi": kpi,
                 "status": status,
                 "login": u.get("login")
             }
             synced_employees.append(employee)
             
-        # Clean up previously synced REGOS employees to avoid orphans
-        try:
-            supabase_req("DELETE", "employees?id=like.regos_%")
-        except Exception as e_del:
-            print(f"Failed to clear old REGOS employees: {e_del}")
+        # Clean up only the orphaned REGOS employees (not all of them)
+        for old_id in list(existing_map.keys()):
+            if old_id.startswith("regos_") and old_id not in synced_ids:
+                try:
+                    supabase_req("DELETE", f"employees?id=eq.{old_id}")
+                except Exception as e_del:
+                    print(f"Failed to delete orphaned employee {old_id}: {e_del}")
             
         if synced_employees:
             supabase_req("POST", "employees?on_conflict=id", json_data=synced_employees)
