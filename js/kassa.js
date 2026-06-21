@@ -1180,8 +1180,8 @@ window.Kassa = {
         btn.innerHTML = `<i class="fas fa-sync fa-spin"></i> Sinxronizatsiya boshlanmoqda...`;
 
         try {
-            // Sync the last 3 days of receipts by default (can be adjusted)
-            const response = await fetch(`/api/integration/regos/sync-receipts?days=3`, {
+            // Sync only today's receipts (1 day) for fast updates
+            const response = await fetch(`/api/integration/regos/sync-receipts?days=1`, {
                 method: 'POST'
             });
             
