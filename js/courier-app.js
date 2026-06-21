@@ -12,6 +12,8 @@ window.CourierApp = {
     activeTab: 'active', // 'active', 'history'
     courierUser: null,
     receiptsList: [],
+    knownActiveIds: new Set(),
+    pollInterval: null,
 
     init: function() {
         this.setupEventListeners();
@@ -100,6 +102,11 @@ window.CourierApp = {
 
     logout: function() {
         if (confirm('Tizimdan chiqishni xohlaysizmi?')) {
+            if (this.pollInterval) {
+                clearInterval(this.pollInterval);
+                this.pollInterval = null;
+            }
+            this.knownActiveIds.clear();
             localStorage.removeItem('activeCourier');
             this.showLogin();
         }
@@ -114,7 +121,21 @@ window.CourierApp = {
                 avatarLabel.textContent = this.courierUser.name.charAt(0).toUpperCase();
             }
         }
-        this.loadData();
+        this.loadData().then(() => {
+            if (this.receiptsList && this.receiptsList.length > 0) {
+                this.receiptsList.forEach(r => {
+                    let items = r.items;
+                    if (typeof items === 'string') {
+                        try { items = JSON.parse(items); } catch(e) { items = {}; }
+                    }
+                    const status = items?.delivery?.status || '';
+                    if (status === 'shipped') {
+                        this.knownActiveIds.add(r.id);
+                    }
+                });
+            }
+            this.startPolling();
+        });
     },
 
     loadData: async function() {
@@ -394,6 +415,150 @@ window.CourierApp = {
             console.error('Failed to update receipt delivery status:', e);
             alert('Xatolik yuz berdi: statusni yangilab bo\'lmadi.');
         }
+    },
+
+    playNotificationSound: function() {
+        try {
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const playBeep = (freq, duration, delay) => {
+                setTimeout(() => {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.type = 'sine';
+                    osc.frequency.value = freq;
+                    gain.gain.setValueAtTime(0, audioCtx.currentTime);
+                    gain.gain.linearRampToValueAtTime(0.3, audioCtx.currentTime + 0.05);
+                    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+                    osc.start(audioCtx.currentTime);
+                    osc.stop(audioCtx.currentTime + duration);
+                }, delay);
+            };
+            playBeep(880, 0.15, 0);       // First beep
+            playBeep(1100, 0.25, 180);    // Second beep
+        } catch (e) {
+            console.error("Audio playback failed:", e);
+        }
+    },
+
+    showToast: function(message) {
+        const toast = document.createElement('div');
+        toast.className = 'courier-toast-notification';
+        toast.style.position = 'fixed';
+        toast.style.top = '24px';
+        toast.style.left = '24px';
+        toast.style.right = '24px';
+        toast.style.backgroundColor = 'var(--primary, #6366f1)';
+        toast.style.color = '#ffffff';
+        toast.style.padding = '14px 18px';
+        toast.style.borderRadius = '12px';
+        toast.style.boxShadow = '0 10px 25px rgba(0, 0, 0, 0.4)';
+        toast.style.zIndex = '999999';
+        toast.style.fontFamily = 'Outfit, sans-serif';
+        toast.style.fontSize = '14px';
+        toast.style.fontWeight = '600';
+        toast.style.display = 'flex';
+        toast.style.alignItems = 'center';
+        toast.style.gap = '10px';
+        toast.style.border = '1px solid rgba(255, 255, 255, 0.15)';
+        toast.style.transition = 'all 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+        toast.style.transform = 'translateY(-30px)';
+        toast.style.opacity = '0';
+        
+        toast.innerHTML = `<i class="fas fa-bell" style="font-size: 16px; animation: ring 1.5s ease infinite;"></i> <span>${message}</span>`;
+        document.body.appendChild(toast);
+        
+        if (!document.getElementById('courier-toast-ring-style')) {
+            const style = document.createElement('style');
+            style.id = 'courier-toast-ring-style';
+            style.textContent = `
+                @keyframes ring {
+                    0% { transform: rotate(0); }
+                    10% { transform: rotate(15deg); }
+                    20% { transform: rotate(-10deg); }
+                    30% { transform: rotate(10deg); }
+                    40% { transform: rotate(-5deg); }
+                    50% { transform: rotate(5deg); }
+                    60% { transform: rotate(0); }
+                    100% { transform: rotate(0); }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+
+        setTimeout(() => {
+            toast.style.transform = 'translateY(0)';
+            toast.style.opacity = '1';
+        }, 50);
+        
+        setTimeout(() => {
+            toast.style.transform = 'translateY(-30px)';
+            toast.style.opacity = '0';
+            setTimeout(() => {
+                toast.remove();
+            }, 350);
+        }, 5000);
+    },
+
+    startPolling: function() {
+        if (this.pollInterval) return;
+
+        this.pollInterval = setInterval(async () => {
+            if (!this.courierUser) return;
+            try {
+                const res = await fetch(`/api/courier/receipts?courier_name=${encodeURIComponent(this.courierUser.name)}`);
+                if (!res.ok) throw new Error('Failed to load receipts in poll');
+                
+                const currentReceipts = await res.json();
+                if (!Array.isArray(currentReceipts)) return;
+
+                let hasNewActive = false;
+                let lastNewCode = '';
+
+                // Populate initial active set if it was empty (e.g. login transition)
+                if (this.knownActiveIds.size === 0 && currentReceipts.length > 0) {
+                    currentReceipts.forEach(r => {
+                        let items = r.items;
+                        if (typeof items === 'string') {
+                            try { items = JSON.parse(items); } catch(e) { items = {}; }
+                        }
+                        const status = items?.delivery?.status || '';
+                        if (status === 'shipped') {
+                            this.knownActiveIds.add(r.id);
+                        }
+                    });
+                    this.receiptsList = currentReceipts;
+                    this.calculateBalance();
+                    this.render();
+                    return;
+                }
+
+                currentReceipts.forEach(r => {
+                    let items = r.items;
+                    if (typeof items === 'string') {
+                        try { items = JSON.parse(items); } catch(e) { items = {}; }
+                    }
+                    const status = items?.delivery?.status || '';
+                    if (status === 'shipped' && !this.knownActiveIds.has(r.id)) {
+                        this.knownActiveIds.add(r.id);
+                        hasNewActive = true;
+                        lastNewCode = r.code || 'CH-' + r.id.substring(0, 8);
+                    }
+                });
+
+                if (hasNewActive) {
+                    this.playNotificationSound();
+                    this.showToast(`Sizga yangi buyurtma biriktirildi: ${lastNewCode}`);
+                    
+                    this.receiptsList = currentReceipts;
+                    this.calculateBalance();
+                    this.render();
+                }
+            } catch (e) {
+                console.error("Courier polling error:", e);
+            }
+        }, 8000);
     }
 };
 
