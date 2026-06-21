@@ -1458,3 +1458,484 @@ body.light-theme .ai-widget-footer input {
     from { opacity: 0; transform: translateY(20px); }
     to { opacity: 1; transform: translateY(0); }
 }
+
+/* ==========================================================================
+   SENIKLAR (PRICE TAGS PRINTING) BO'LIMI STILLARI
+   ========================================================================== */
+
+.seniklar-layout {
+    display: flex;
+    gap: 24px;
+    align-items: flex-start;
+    margin-top: 16px;
+}
+
+@media (max-width: 1023.98px) {
+    .seniklar-layout {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .seniklar-sidebar {
+        width: 100% !important;
+    }
+}
+
+.seniklar-sidebar {
+    width: 350px;
+    flex-shrink: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.seniklar-product-list {
+    max-height: 600px;
+    overflow-y: auto;
+}
+
+.seniklar-product-item:hover {
+    background-color: rgba(255, 255, 255, 0.03);
+}
+
+.seniklar-product-item.active {
+    background-color: rgba(99, 102, 241, 0.06);
+    border-left: 3px solid var(--accent);
+}
+
+body.light-theme .seniklar-product-item.active {
+    background-color: rgba(99, 102, 241, 0.04);
+}
+
+.seniklar-preview-area {
+    flex-grow: 1;
+}
+
+/* Seniklar print preview container grids */
+.seniklar-print-container {
+    display: grid;
+    gap: 16px;
+    justify-content: center;
+    box-sizing: border-box;
+}
+
+.seniklar-print-container.a4-3x8 {
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+}
+
+.seniklar-print-container.a4-4x10 {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+}
+
+.seniklar-print-container.barcode-label {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+}
+
+/* Beautiful Senik Card design (screen view) */
+.senik-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 16px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(10px);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    transition: var(--transition);
+    box-sizing: border-box;
+    overflow: hidden;
+    position: relative;
+}
+
+body.light-theme .senik-card {
+    background: #FFFFFF;
+    border-color: #E2E8F0;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.senik-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--accent);
+    box-shadow: 0 8px 25px rgba(99, 102, 241, 0.15);
+}
+
+/* Preset proportions for screen preview */
+.a4-3x8 .senik-card {
+    aspect-ratio: 2 / 1;
+    min-height: 120px;
+    padding: 12px;
+}
+
+.a4-4x10 .senik-card {
+    aspect-ratio: 1.8 / 1;
+    min-height: 100px;
+    padding: 10px;
+}
+
+.barcode-label .senik-card {
+    width: 260px;
+    height: 180px;
+    padding: 16px;
+    border-radius: 6px;
+}
+
+/* Tag elements styling */
+.senik-header {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--accent);
+    border-bottom: 1px dashed var(--border-color);
+    padding-bottom: 4px;
+    margin-bottom: 6px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: center;
+}
+
+body.light-theme .senik-header {
+    color: #4f46e5;
+}
+
+.senik-body {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 4px;
+    text-align: center;
+}
+
+.senik-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-main);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    line-height: 1.3;
+}
+
+body.light-theme .senik-title {
+    color: #1A202C;
+}
+
+.senik-price-section {
+    margin-top: 4px;
+}
+
+.senik-price-val {
+    font-size: 16px;
+    font-weight: 800;
+    color: var(--success);
+    font-family: 'JetBrains Mono', monospace;
+}
+
+body.light-theme .senik-price-val {
+    color: #10B981;
+}
+
+/* Footer & barcode styling */
+.senik-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-top: 8px;
+    border-top: 1px dashed var(--border-color);
+    padding-top: 6px;
+}
+
+.senik-sku-only {
+    font-size: 10px;
+    color: var(--text-muted);
+    font-family: 'JetBrains Mono', monospace;
+    flex-grow: 1;
+    text-align: left;
+}
+
+.senik-date {
+    font-size: 9px;
+    color: var(--text-muted);
+    font-family: 'JetBrains Mono', monospace;
+    text-align: right;
+    white-space: nowrap;
+}
+
+.senik-barcode-area {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    background: #FFFFFF;
+    padding: 4px 6px;
+    border-radius: 4px;
+    flex-grow: 1;
+    max-width: 70%;
+    box-sizing: border-box;
+}
+
+.senik-barcode-lines {
+    width: 100%;
+    height: 20px;
+    background: repeating-linear-gradient(
+        90deg,
+        #000000,
+        #000000 1px,
+        #ffffff 1px,
+        #ffffff 3px,
+        #000000 3px,
+        #000000 4px,
+        #ffffff 4px,
+        #ffffff 6px,
+        #000000 6px,
+        #000000 8px,
+        #ffffff 8px,
+        #ffffff 9px,
+        #000000 9px,
+        #000000 10px,
+        #ffffff 10px,
+        #ffffff 12px
+    );
+}
+
+.senik-sku {
+    font-size: 8px;
+    color: #000000;
+    font-family: 'JetBrains Mono', monospace;
+    margin-top: 1px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
+    text-align: center;
+}
+
+/* ==========================================================================
+   PRINT MEDIA DIRECTIVES
+   ========================================================================== */
+
+@media print {
+    /* Hide screen UI layout */
+    body {
+        background: #FFFFFF !important;
+        color: #000000 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+    }
+
+    .sidebar,
+    .bottom-nav,
+    .main-content .header,
+    .seniklar-sidebar,
+    .seniklar-preview-area > .card:first-child,
+    .preview-banner,
+    #ai-assistant-widget,
+    .theme-toggle-btn,
+    .modal {
+        display: none !important;
+    }
+
+    .app-container {
+        display: block !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #FFFFFF !important;
+    }
+
+    .main-content {
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #FFFFFF !important;
+        width: 100% !important;
+    }
+
+    .view-section {
+        display: none !important;
+    }
+
+    #view-seniklar {
+        display: block !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    .seniklar-layout {
+        display: block !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+    }
+
+    .seniklar-preview-area {
+        display: block !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+    }
+
+    /* Remove outer cards shadow/border */
+    .seniklar-preview-area > .card {
+        border: none !important;
+        background: transparent !important;
+        box-shadow: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        max-height: none !important;
+        overflow: visible !important;
+    }
+
+    /* Print Grid Formatting */
+    .seniklar-print-container {
+        display: grid !important;
+        background: #FFFFFF !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        box-sizing: border-box !important;
+        page-break-after: avoid !important;
+    }
+
+    /* A4 Grid 3x8 (24 tags) */
+    .seniklar-print-container.a4-3x8 {
+        width: 210mm !important;
+        grid-template-columns: repeat(3, 1fr) !important;
+        gap: 1.5mm !important;
+        padding: 5mm !important;
+    }
+
+    /* A4 Grid 4x10 (40 tags) */
+    .seniklar-print-container.a4-4x10 {
+        width: 210mm !important;
+        grid-template-columns: repeat(4, 1fr) !important;
+        gap: 1mm !important;
+        padding: 4mm !important;
+    }
+
+    /* Barcode Rolling Label format */
+    .seniklar-print-container.barcode-label {
+        display: block !important;
+        width: auto !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
+    /* Price tag card printing formatting */
+    .senik-card {
+        background: #FFFFFF !important;
+        color: #000000 !important;
+        border: 1px solid #000000 !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+        box-sizing: border-box !important;
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: space-between !important;
+        backdrop-filter: none !important;
+        transform: none !important;
+        transition: none !important;
+        margin: 0 !important;
+    }
+
+    /* Sizing tags for print exactly */
+    .a4-3x8 .senik-card {
+        height: 34mm !important;
+        padding: 3mm !important;
+    }
+
+    .a4-4x10 .senik-card {
+        height: 27mm !important;
+        padding: 2mm !important;
+    }
+
+    .barcode-label .senik-card {
+        width: 58mm !important;
+        height: 40mm !important;
+        margin: 0 auto !important;
+        padding: 3mm !important;
+        border: 1px solid #000000 !important;
+        page-break-after: always !important;
+        break-after: page !important;
+    }
+
+    /* Card inner elements for print */
+    .senik-header {
+        color: #000000 !important;
+        border-bottom: 1px solid #000000 !important;
+        font-size: 8pt !important;
+        padding-bottom: 2px !important;
+        margin-bottom: 3px !important;
+    }
+
+    .senik-title {
+        color: #000000 !important;
+        font-size: 9pt !important;
+        line-height: 1.2 !important;
+        font-weight: bold !important;
+    }
+
+    .senik-price-val {
+        color: #000000 !important;
+        font-size: 13pt !important;
+        font-weight: bold !important;
+    }
+
+    .senik-footer {
+        border-top: 1px dashed #000000 !important;
+        padding-top: 3px !important;
+        margin-top: 3px !important;
+    }
+
+    .senik-sku-only {
+        color: #000000 !important;
+        font-size: 7pt !important;
+    }
+
+    .senik-sku {
+        color: #000000 !important;
+        font-size: 6pt !important;
+    }
+
+    .senik-date {
+        color: #000000 !important;
+        font-size: 7pt !important;
+    }
+
+    .senik-barcode-area {
+        border: 1px solid #000000 !important;
+        background: #FFFFFF !important;
+        padding: 2px !important;
+    }
+
+    .senik-barcode-lines {
+        height: 15px !important;
+        background: repeating-linear-gradient(
+            90deg,
+            #000000,
+            #000000 1px,
+            #ffffff 1px,
+            #ffffff 3px,
+            #000000 3px,
+            #000000 4px,
+            #ffffff 4px,
+            #ffffff 6px,
+            #000000 6px,
+            #000000 8px,
+            #ffffff 8px,
+            #ffffff 9px,
+            #000000 9px,
+            #000000 10px,
+            #ffffff 10px,
+            #ffffff 12px
+        ) !important;
+    }
+}
+

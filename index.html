@@ -89,6 +89,9 @@
                     <li class="nav-item" data-view="receipts">
                         <a href="#" data-view="receipts"><i class="fas fa-receipt"></i> Cheklar</a>
                     </li>
+                    <li class="nav-item" data-view="seniklar">
+                        <a href="#" data-view="seniklar"><i class="fas fa-tags"></i> Seniklar</a>
+                    </li>
                     <li class="nav-item" data-view="chats">
                         <a href="#" data-view="chats"><i class="fas fa-comments"></i> Xabarlar</a>
                     </li>
@@ -152,6 +155,10 @@
             <a href="#" class="bottom-nav-item" data-view="receipts">
                 <i class="fas fa-receipt"></i>
                 <span>Cheklar</span>
+            </a>
+            <a href="#" class="bottom-nav-item" data-view="seniklar">
+                <i class="fas fa-tags"></i>
+                <span>Seniklar</span>
             </a>
             <a href="#" class="bottom-nav-item" data-view="chats">
                 <i class="fas fa-comments"></i>
@@ -445,6 +452,82 @@
 
                 <div id="receipts-content">
                     <!-- Dinamik cheklar ro'yxati -->
+                </div>
+            </section>
+
+            <!-- 4.5. SENIKLAR (PRICE TAGS PRINTING) BO'LIMI -->
+            <section id="view-seniklar" class="view-section">
+                <div class="header">
+                    <div class="header-title">
+                        <h1>Seniklar (Narxnomalar)</h1>
+                        <p>Mahsulotlar narxi yozilgan etiketkalar va seniklarni chop etish</p>
+                    </div>
+                    <div class="header-actions">
+                        <button class="btn btn-primary" onclick="window.Seniklar.print()">
+                            <i class="fas fa-print"></i> Chop etish
+                        </button>
+                    </div>
+                </div>
+
+                <div class="seniklar-layout">
+                    <!-- Chap panel - Mahsulotlarni tanlash -->
+                    <div class="seniklar-sidebar card">
+                        <div style="padding: 16px; border-bottom: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 12px;">
+                            <div class="search-box" style="width: 100%; margin: 0;">
+                                <i class="fas fa-search"></i>
+                                <input type="text" id="seniklar-search" class="form-control" placeholder="Mahsulot nomi yoki SKU...">
+                            </div>
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; color: var(--text-main); margin: 0; user-select: none;">
+                                    <input type="checkbox" id="seniklar-select-all" style="width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer;">
+                                    Barchasini tanlash
+                                </label>
+                                <span id="seniklar-selected-count" style="font-size: 12px; color: var(--text-muted);">0 ta tanlandi</span>
+                            </div>
+                        </div>
+                        <div id="seniklar-product-list" class="seniklar-product-list">
+                            <!-- Mahsulotlar ro'yxati shu yerda yuklanadi -->
+                        </div>
+                    </div>
+
+                    <!-- O'ng panel - Chop etish sozlamalari va Ko'rinish -->
+                    <div class="seniklar-preview-area">
+                        <!-- Sozlamalar paneli -->
+                        <div class="card" style="padding: 16px; margin-bottom: 16px; display: flex; flex-wrap: wrap; gap: 16px; align-items: center;">
+                            <div class="form-group" style="margin: 0; flex: 1; min-width: 180px;">
+                                <label for="seniklar-template-size" style="font-size: 12px; font-weight: 500; color: var(--text-muted); margin-bottom: 4px; display: block;">Shablon o'lchami</label>
+                                <select id="seniklar-template-size" class="form-control" style="height: 38px;" onchange="window.Seniklar.updatePreview()">
+                                    <option value="a4-3x8">Katta Senik (A4 grid 3x8 - 7.0 x 3.5 sm)</option>
+                                    <option value="a4-4x10">O'rtacha Senik (A4 grid 4x10 - 5.0 x 2.8 sm)</option>
+                                    <option value="barcode-label">Etiketka (Yakka - 4.0 x 3.0 sm)</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="margin: 0; flex: 1; min-width: 180px;">
+                                <label for="seniklar-store-name" style="font-size: 12px; font-weight: 500; color: var(--text-muted); margin-bottom: 4px; display: block;">Do'kon nomi</label>
+                                <input type="text" id="seniklar-store-name" class="form-control" style="height: 38px;" placeholder="Do'kon nomi" oninput="window.Seniklar.updatePreview()">
+                            </div>
+                            <div class="form-group" style="margin: 0; display: flex; gap: 16px; align-items: center; padding-top: 20px;">
+                                <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; color: var(--text-main); user-select: none;">
+                                    <input type="checkbox" id="seniklar-show-barcode" checked onchange="window.Seniklar.updatePreview()" style="width: 16px; height: 16px; accent-color: var(--accent);">
+                                    Shtrix-kodni ko'rsatish
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; color: var(--text-main); user-select: none;">
+                                    <input type="checkbox" id="seniklar-show-date" checked onchange="window.Seniklar.updatePreview()" style="width: 16px; height: 16px; accent-color: var(--accent);">
+                                    Sanani ko'rsatish
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Canvasi yoki Print Preview qismi -->
+                        <div class="card" style="padding: 24px; overflow-y: auto; max-height: calc(100vh - 280px); background: rgba(0, 0, 0, 0.2); border: 1px dashed var(--border-color); border-radius: 12px;">
+                            <div class="preview-banner" style="text-align: center; margin-bottom: 16px; color: var(--text-muted); font-size: 12px; border-bottom: 1px dashed rgba(255,255,255,0.05); padding-bottom: 8px;">
+                                <i class="fas fa-eye" style="margin-right: 4px;"></i> Chop etish ko'rinishi (Print Preview)
+                            </div>
+                            <div id="seniklar-print-container" class="seniklar-print-container a4-3x8">
+                                <!-- Generatsiya qilingan seniklar shu yerga chiqadi -->
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </section>
 
@@ -1127,7 +1210,8 @@
     <script src="js/erp.js?v=4"></script>
     <script src="js/finance.js?v=4"></script>
     <script src="js/receipts.js?v=5"></script>
-    <script src="js/app.js?v=5"></script>
+    <script src="js/seniklar.js?v=6"></script>
+    <script src="js/app.js?v=6"></script>
     
     <!-- Floating AI Assistant Widget -->
     <div id="ai-assistant-widget" class="ai-widget-closed">
