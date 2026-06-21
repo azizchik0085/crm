@@ -216,6 +216,39 @@ def sync_regos_employees():
         print(f"Failed to sync employees from REGOS: {e}")
         raise HTTPException(status_code=500, detail=f"REGOS'dan xodimlarni yuklashda xatolik: {str(e)}")
 
+CACHE_FILE = "sales_report_cache.json"
+
+def load_sales_report_cache():
+    import os
+    import json
+    if os.path.exists(CACHE_FILE):
+        try:
+            with open(CACHE_FILE, "r", encoding="utf-8") as f:
+                raw_cache = json.load(f)
+                cache = {}
+                for k, v in raw_cache.items():
+                    try:
+                        parts = k.split(",")
+                        tuple_key = (int(parts[0]), int(parts[1]))
+                        cache[tuple_key] = v
+                    except Exception:
+                        pass
+                return cache
+        except Exception as e:
+            print(f"Failed to load sales report cache: {e}")
+    return {}
+
+def save_sales_report_cache(cache):
+    import json
+    try:
+        serializable = {f"{k[0]},{k[1]}": v for k, v in cache.items()}
+        with open(CACHE_FILE, "w", encoding="utf-8") as f:
+            json.dump(serializable, f, indent=4, ensure_ascii=False)
+    except Exception as e:
+        print(f"Failed to save sales report cache: {e}")
+
+sales_report_cache = load_sales_report_cache()
+
 @app.get("/api/integration/regos/sales-report")
 def get_regos_sales_report(start_date: int = None, end_date: int = None):
     import base64
@@ -241,6 +274,15 @@ def get_regos_sales_report(start_date: int = None, end_date: int = None):
         start_date = int(start_of_day.timestamp())
         end_date = int(end_of_day.timestamp())
         
+    # Check cache
+    cache_key = (start_date, end_date)
+    now_time = time.time()
+    if cache_key in sales_report_cache:
+        cached_entry = sales_report_cache[cache_key]
+        if now_time - cached_entry["timestamp"] < 300: # 5 minutes cache
+            print(f"Returning cached sales report for key {cache_key}")
+            return cached_entry["data"]
+
     headers = {
         "Authorization": f"Bearer {regos_token}",
         "Content-Type": "application/json"
@@ -264,11 +306,11 @@ def get_regos_sales_report(start_date: int = None, end_date: int = None):
         res_data = res.json()
         if not res_data.get("ok"):
             error_desc = res_data.get("result", {}).get("description", "Noma'lum xatolik")
-            raise HTTPException(status_code=500, detail=f"REGOS hisoboti navbatga qo'shilmadi: {error_desc}")
+            raise Exception(f"REGOS hisoboti navbatga qo'shilmadi: {error_desc}")
             
         uuid = res_data.get("result", {}).get("new_uuid")
         if not uuid:
-            raise HTTPException(status_code=500, detail="Qaytgan javobda UUID topilmadi.")
+            raise Exception("Qaytgan javobda UUID topilmadi.")
             
         status_url = f"{endpoint}/v1/report/getrequest" if "/v1" not in endpoint else f"{endpoint}/report/getrequest"
         prep_url = f"{endpoint}/v1/report/getprepared" if "/v1" not in endpoint else f"{endpoint}/report/getprepared"
@@ -302,12 +344,12 @@ def get_regos_sales_report(start_date: int = None, end_date: int = None):
                         break
                     elif status == 2:
                         warnings = matched.get("warnings", "Hisobot xatolik bilan yakunlandi.")
-                        raise HTTPException(status_code=500, detail=f"Hisobot xatosi: {warnings}")
+                        raise Exception(f"Hisobot xatosi: {warnings}")
             else:
                 print(f"Status check failed on attempt {attempt+1}: {status_res.text}")
                 
         if not ready:
-            raise HTTPException(status_code=504, detail="Hisobot tayyor bo'lishi kutilgan vaqtdan oshib ketdi.")
+            raise Exception("Hisobot tayyor bo'lishi kutilgan vaqtdan oshib ketdi.")
             
         prep_payload = {
             "request_uuid": uuid,
@@ -319,12 +361,12 @@ def get_regos_sales_report(start_date: int = None, end_date: int = None):
         
         results = prep_data.get("result", [])
         if not results:
-            raise HTTPException(status_code=500, detail="Hisobot natijasi bo'sh.")
+            raise Exception("Hisobot natijasi bo'sh.")
             
         first_res = results[0]
         data_b64 = first_res.get("data")
         if not data_b64:
-            raise HTTPException(status_code=500, detail="Hisobot ma'lumotlari mavjud emas.")
+            raise Exception("Hisobot ma'lumotlari mavjud emas.")
             
         decoded_bytes = base64.b64decode(data_b64)
         if decoded_bytes.startswith(b'\x1f\x8b'):
@@ -380,15 +422,27 @@ def get_regos_sales_report(start_date: int = None, end_date: int = None):
             total_sales = sum(emp["sales"] for emp in employee_sales.values())
             total_profit = sum(emp["profit"] for emp in employee_sales.values())
             
-        return {
+        result_data = {
             "status": "success",
             "total_sales": total_sales,
             "total_profit": total_profit,
             "employee_sales": employee_sales
         }
         
+        # Save to cache
+        sales_report_cache[cache_key] = {
+            "timestamp": now_time,
+            "data": result_data
+        }
+        save_sales_report_cache(sales_report_cache)
+        return result_data
+        
     except Exception as e:
         print(f"Sales report generation error: {e}")
+        # Fallback to expired cache if available
+        if cache_key in sales_report_cache:
+            print(f"Failed to fetch report, returning expired cache fallback for key {cache_key}")
+            return sales_report_cache[cache_key]["data"]
         raise HTTPException(status_code=500, detail=f"REGOS hisobotini olishda xatolik: {str(e)}")
 
 @app.get("/api/employees")

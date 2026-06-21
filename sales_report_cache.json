@@ -1,0 +1,52 @@
+{
+    "1781982000,1782068399": {
+        "timestamp": 2000000000,
+        "data": {
+            "status": "success",
+            "total_sales": 140299801.04,
+            "total_profit": 62718507.61,
+            "employee_sales": {
+                "smena1": {
+                    "login": "smena1",
+                    "name": "smena1",
+                    "sales": 139608801.04,
+                    "profit": 62584551.99
+                },
+                "Ortiq": {
+                    "login": "Ortiq",
+                    "name": "Ortiq",
+                    "sales": 691000.0,
+                    "profit": 133955.62
+                }
+            }
+        }
+    },
+    "1780254000,1782068399": {
+        "timestamp": 2000000000,
+        "data": {
+            "status": "success",
+            "total_sales": 2342858320.3,
+            "total_profit": 2264195193.83,
+            "employee_sales": {
+                "smena1": {
+                    "login": "smena1",
+                    "name": "smena1",
+                    "sales": 2184737131.3,
+                    "profit": 2106631049.21
+                },
+                "smena2": {
+                    "login": "smena2",
+                    "name": "smena2",
+                    "sales": 157430189.0,
+                    "profit": 157430189.0
+                },
+                "Ortiq": {
+                    "login": "Ortiq",
+                    "name": "Ortiq",
+                    "sales": 691000.0,
+                    "profit": 133955.62
+                }
+            }
+        }
+    }
+}

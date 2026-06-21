@@ -446,7 +446,7 @@ window.HR = {
         const now = new Date();
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
         const startTimestamp = Math.floor(startOfMonth.getTime() / 1000);
-        const endTimestamp = Math.floor(now.getTime() / 1000);
+        const endTimestamp = Math.floor(new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59).getTime() / 1000);
 
         let reportData = null;
         try {
