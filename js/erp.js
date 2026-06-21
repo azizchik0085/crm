@@ -415,6 +415,42 @@ window.HR = {
         // Supabase yoki keshdan xodimlarni yuklash
         const employees = await DB.getEmployees();
         
+        // Fetch receipts to calculate daily sales
+        let receipts = [];
+        try {
+            receipts = await DB.getReceipts();
+        } catch (e) {
+            console.error("Failed to fetch receipts in HR:", e);
+        }
+
+        // Calculate today's sales for each seller
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = now.getMonth();
+        const day = now.getDate();
+
+        const todaySalesBySeller = {};
+        receipts.forEach(r => {
+            const rDate = new Date(r.created_at);
+            const isToday = rDate.getFullYear() === year && rDate.getMonth() === month && rDate.getDate() === day;
+            if (isToday) {
+                let itemsObj = r.items;
+                if (typeof itemsObj === 'string') {
+                    try {
+                        itemsObj = JSON.parse(itemsObj);
+                    } catch (err) {
+                        itemsObj = null;
+                    }
+                }
+                const sellerName = (itemsObj && itemsObj.seller_name) || '';
+                if (sellerName) {
+                    const total = parseFloat(r.total_amount) || 0;
+                    const key = sellerName.trim().toLowerCase();
+                    todaySalesBySeller[key] = (todaySalesBySeller[key] || 0) + total;
+                }
+            }
+        });
+
         const settings = AppStorage.load().settings;
         const currency = settings.currency;
 
@@ -456,6 +492,10 @@ window.HR = {
                 if (e.kpi < 50) kpiColor = 'linear-gradient(135deg, #EF4444 0%, #F59E0B 100%)';
                 else if (e.kpi >= 90) kpiColor = 'linear-gradient(135deg, #10B981 0%, #06B6D4 100%)';
 
+                // Calculate daily sales for this employee
+                const empKey = e.name.trim().toLowerCase();
+                const dailySales = todaySalesBySeller[empKey] || 0;
+
                 html += `
                     <div class="card employee-card">
                         <div class="employee-header">
@@ -476,7 +516,7 @@ window.HR = {
                             </div>
                         </div>
 
-                        <div class="employee-stats">
+                        <div class="employee-stats" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border-color);">
                             <div>
                                 <span style="display:block; font-size:11px; color: var(--text-muted)">Maosh</span>
                                 <strong style="color: var(--text-main)">${formatMoney(e.salary, currency)}</strong>
@@ -484,6 +524,10 @@ window.HR = {
                             <div style="text-align: right;">
                                 <span style="display:block; font-size:11px; color: var(--text-muted)">Holati</span>
                                 <span class="badge badge-success">Faol</span>
+                            </div>
+                            <div style="grid-column: span 2; border-top: 1px dashed var(--border-color); padding-top: 8px; margin-top: 4px; display: flex; justify-content: space-between; align-items: center;">
+                                <span style="font-size:12px; color: var(--text-muted)">Kunlik savdo:</span>
+                                <strong style="color: var(--accent); font-family: 'JetBrains Mono'; font-size: 14px;">${formatMoney(dailySales, currency)}</strong>
                             </div>
                         </div>
 
