@@ -1723,9 +1723,19 @@ def save_parsed_receipt(cheque: dict):
                 cust_name = (customer.get("full_name") or "").strip()
                 cust_phone = (customer.get("main_phone") or "").strip()
 
+        seller = cheque.get("seller")
+        seller_name = ""
+        if isinstance(seller, dict):
+            seller_name = seller.get("full_name") or seller.get("name") or seller.get("username") or ""
+        elif isinstance(seller, str):
+            seller_name = seller
+        if not seller_name:
+            seller_name = cheque.get("seller_name") or ""
+
         items_payload = {
             "customer_name": cust_name,
             "customer_phone": cust_phone,
+            "seller_name": seller_name,
             "products": items_list
         }
 
@@ -2059,9 +2069,19 @@ def run_sync_in_background(days: int):
                         cust_name = (customer.get("full_name") or "").strip()
                         cust_phone = (customer.get("main_phone") or "").strip()
 
+                seller = target_cheque.get("seller")
+                seller_name = ""
+                if isinstance(seller, dict):
+                    seller_name = seller.get("full_name") or seller.get("name") or seller.get("username") or ""
+                elif isinstance(seller, str):
+                    seller_name = seller
+                if not seller_name:
+                    seller_name = target_cheque.get("seller_name") or ""
+
                 items_payload = {
                     "customer_name": cust_name,
                     "customer_phone": cust_phone,
+                    "seller_name": seller_name,
                     "products": items_list
                 }
 

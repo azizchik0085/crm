@@ -88,6 +88,7 @@ window.Receipts = {
                             <tr>
                                 <th>Chek kodi</th>
                                 <th>Kassa xodimi</th>
+                                <th>Sotuvchi</th>
                                 <th>Mijoz</th>
                                 <th>To'lov turi</th>
                                 <th>Sana</th>
@@ -100,7 +101,7 @@ window.Receipts = {
         `;
 
         if (filtered.length === 0) {
-            html += `<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 32px;">Cheklar topilmadi.</td></tr>`;
+            html += `<tr><td colspan="9" style="text-align: center; color: var(--text-muted); padding: 32px;">Cheklar topilmadi.</td></tr>`;
         } else {
             filtered.forEach(r => {
                 const dateObj = new Date(r.created_at);
@@ -113,6 +114,7 @@ window.Receipts = {
                     : (r.payment_type === 'Elektron' ? 'badge-success' : 'badge-secondary');
 
                 let customerInfo = '-';
+                let sellerName = '-';
                 let itemsObj = r.items;
                 if (typeof itemsObj === 'string') {
                     try {
@@ -127,12 +129,14 @@ window.Receipts = {
                     if (cName || cPhone) {
                         customerInfo = `<strong>${cName || 'Mijoz'}</strong><br><span style="font-size: 11px; color: var(--text-muted); font-family: 'JetBrains Mono';">${cPhone || ''}</span>`;
                     }
+                    sellerName = itemsObj.seller_name || '-';
                 }
 
                 html += `
                     <tr>
                         <td><strong>${r.code || 'CH-' + r.id.substring(0, 8)}</strong></td>
                         <td>${r.cashier_name || 'Noma\'lum'}</td>
+                        <td>${sellerName}</td>
                         <td>${customerInfo}</td>
                         <td><span class="badge ${badgeClass}">${r.payment_type || 'Naqd'}</span></td>
                         <td><span style="font-family: 'JetBrains Mono'; font-size: 13px;">${formattedDate}</span></td>
@@ -210,11 +214,13 @@ window.Receipts = {
 
             let customerName = '';
             let customerPhone = '';
+            let sellerName = '';
             let products = [];
 
             if (items && !Array.isArray(items) && typeof items === 'object') {
                 customerName = items.customer_name || '';
                 customerPhone = items.customer_phone || '';
+                sellerName = items.seller_name || '';
                 products = items.products || [];
             } else if (Array.isArray(items)) {
                 products = items;
@@ -225,6 +231,8 @@ window.Receipts = {
             const phoneRowEl = document.getElementById('rec-detail-phone-row');
             const customerNameEl = document.getElementById('rec-detail-customer');
             const customerPhoneEl = document.getElementById('rec-detail-phone');
+            const sellerRowEl = document.getElementById('rec-detail-seller-row');
+            const sellerEl = document.getElementById('rec-detail-seller');
 
             if (customerName) {
                 if (customerNameEl) customerNameEl.textContent = customerName;
@@ -238,6 +246,13 @@ window.Receipts = {
                 if (phoneRowEl) phoneRowEl.style.display = 'flex';
             } else {
                 if (phoneRowEl) phoneRowEl.style.display = 'none';
+            }
+
+            if (sellerName) {
+                if (sellerEl) sellerEl.textContent = sellerName;
+                if (sellerRowEl) sellerRowEl.style.display = 'flex';
+            } else {
+                if (sellerRowEl) sellerRowEl.style.display = 'none';
             }
 
             if (itemsEl) {
