@@ -182,6 +182,19 @@ window.Seniklar = {
         // Update template size class on container
         previewContainer.className = `seniklar-print-container ${templateSize}`;
 
+        // Inject dynamic @page size rules for browser print engine to prevent scaling blur
+        let pageStyle = document.getElementById('seniklar-page-style');
+        if (!pageStyle) {
+            pageStyle = document.createElement('style');
+            pageStyle.id = 'seniklar-page-style';
+            document.head.appendChild(pageStyle);
+        }
+        if (templateSize === 'barcode-label') {
+            pageStyle.innerHTML = `@media print { @page { size: 60mm 40mm; margin: 0; } body { margin: 0; } }`;
+        } else {
+            pageStyle.innerHTML = `@media print { @page { size: A4; margin: 0; } body { margin: 0; } }`;
+        }
+
         const settings = AppStorage.load().settings;
         const currency = settings.currency;
         const today = new Date().toLocaleDateString('uz-UZ');
