@@ -1527,6 +1527,10 @@ body.light-theme .seniklar-product-item.active {
     grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
 }
 
+.seniklar-print-container.a4-3x7 {
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+}
+
 .seniklar-print-container.barcode-label {
     display: flex;
     flex-direction: column;
@@ -1574,6 +1578,12 @@ body.light-theme .senik-card {
     aspect-ratio: 1.8 / 1;
     min-height: 100px;
     padding: 10px;
+}
+
+.a4-3x7 .senik-card {
+    aspect-ratio: 1.5 / 1;
+    min-height: 120px;
+    padding: 12px;
 }
 
 .barcode-label .senik-card {
@@ -1818,6 +1828,14 @@ body.light-theme .senik-price-val {
         padding: 4mm !important;
     }
 
+    /* A4 Grid 3x7 (21 tags - 60x40mm) */
+    .seniklar-print-container.a4-3x7 {
+        width: 210mm !important;
+        grid-template-columns: repeat(3, 1fr) !important;
+        gap: 1.5mm !important;
+        padding: 5mm !important;
+    }
+
     /* Barcode Rolling Label format */
     .seniklar-print-container.barcode-label {
         display: block !important;
@@ -1856,8 +1874,13 @@ body.light-theme .senik-price-val {
         padding: 2mm !important;
     }
 
+    .a4-3x7 .senik-card {
+        height: 40mm !important;
+        padding: 3mm !important;
+    }
+
     .barcode-label .senik-card {
-        width: 58mm !important;
+        width: 60mm !important;
         height: 40mm !important;
         margin: 0 auto !important;
         padding: 3mm !important;
