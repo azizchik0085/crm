@@ -193,7 +193,10 @@ window.Seniklar = {
             const state = this.selected[p.id];
             if (state && state.checked && state.qty > 0) {
                 hasItems = true;
-                const formattedPrice = formatMoney(p.price, currency);
+                const formattedPrice = Math.round(p.price).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+                const now = new Date();
+                const todayDate = now.toLocaleDateString('uz-UZ');
+                const todayTime = now.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit', hour12: false });
 
                 // Generate specified quantity of cards
                 for (let i = 0; i < state.qty; i++) {
@@ -203,20 +206,22 @@ window.Seniklar = {
                             <div class="senik-body">
                                 <div class="senik-title" title="${p.name}">${p.name}</div>
                                 <div class="senik-price-section">
-                                    <span class="senik-price-val">${formattedPrice}</span>
+                                    <span class="senik-price-val">${formattedPrice} So'm</span>
                                 </div>
-                            </div>
-                            <div class="senik-footer">
                                 ${showBarcode ? `
                                     <div class="senik-barcode-area">
                                         <div class="senik-barcode-lines"></div>
-                                        <div class="senik-sku">SKU: ${p.sku}</div>
+                                        <div class="senik-sku">${p.sku}</div>
                                     </div>
                                 ` : `
-                                    <div class="senik-sku-only">SKU: ${p.sku}</div>
+                                    <div class="senik-sku-only">${p.sku}</div>
                                 `}
-                                ${showDate ? `<div class="senik-date">${today}</div>` : ''}
                             </div>
+                            ${showDate ? `
+                                <div class="senik-footer">
+                                    <div class="senik-date">${todayDate} ${todayTime}</div>
+                                </div>
+                            ` : ''}
                         </div>
                     `;
                 }
