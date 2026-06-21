@@ -363,6 +363,25 @@ window.HR = {
         this.render();
     },
 
+    parseRoleAndPlan: function(roleStr) {
+        if (!roleStr) return { role: '', plan: 0 };
+        const parts = roleStr.split(';');
+        const roleName = parts[0].trim();
+        let plan = 0;
+        for (let i = 1; i < parts.length; i++) {
+            const p = parts[i].trim();
+            if (p.startsWith('plan=')) {
+                plan = parseFloat(p.substring(5)) || 0;
+            }
+        }
+        return { role: roleName, plan: plan };
+    },
+
+    serializeRoleAndPlan: function(roleName, plan) {
+        const cleanRole = (roleName || '').replace(/;/g, ' ').trim();
+        return `${cleanRole};plan=${plan || 0}`;
+    },
+
     syncWithRegos: async function() {
         const btn = document.getElementById('hr-sync-btn');
         if (!btn) return;
@@ -405,6 +424,14 @@ window.HR = {
                 this.addEmployee();
             };
         }
+
+        const editForm = document.getElementById('edit-employee-form');
+        if (editForm) {
+            editForm.onsubmit = (e) => {
+                e.preventDefault();
+                this.saveEditedEmployee();
+            };
+        }
     },
 
     render: async function() {
@@ -415,49 +442,26 @@ window.HR = {
         // Supabase yoki keshdan xodimlarni yuklash
         const employees = await DB.getEmployees();
         
-        // Fetch receipts to calculate daily sales
-        let receipts = [];
+        // Fetch REGOS report for real-time sales & profit
+        let reportData = null;
         try {
-            receipts = await DB.getReceipts();
-        } catch (e) {
-            console.error("Failed to fetch receipts in HR:", e);
-        }
-
-        // Calculate today's sales for each seller
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = now.getMonth();
-        const day = now.getDate();
-
-        const todaySalesBySeller = {};
-        receipts.forEach(r => {
-            const rDate = new Date(r.created_at);
-            const isToday = rDate.getFullYear() === year && rDate.getMonth() === month && rDate.getDate() === day;
-            if (isToday) {
-                let itemsObj = r.items;
-                if (typeof itemsObj === 'string') {
-                    try {
-                        itemsObj = JSON.parse(itemsObj);
-                    } catch (err) {
-                        itemsObj = null;
-                    }
-                }
-                const sellerName = (itemsObj && itemsObj.seller_name) || '';
-                if (sellerName) {
-                    const total = parseFloat(r.total_amount) || 0;
-                    const key = sellerName.trim().toLowerCase();
-                    todaySalesBySeller[key] = (todaySalesBySeller[key] || 0) + total;
-                }
+            const response = await fetch('/api/integration/regos/sales-report');
+            if (response.ok) {
+                reportData = await response.json();
             }
-        });
+        } catch (e) {
+            console.error("Failed to fetch REGOS sales report in HR:", e);
+        }
+        const employeeSalesMap = (reportData && reportData.employee_sales) || {};
 
         const settings = AppStorage.load().settings;
         const currency = settings.currency;
 
-        const filtered = employees.filter(e => 
-            e.name.toLowerCase().includes(searchVal) || 
-            e.role.toLowerCase().includes(searchVal)
-        );
+        const filtered = employees.filter(e => {
+            const parsed = this.parseRoleAndPlan(e.role);
+            return e.name.toLowerCase().includes(searchVal) || 
+                   parsed.role.toLowerCase().includes(searchVal);
+        });
 
         // Fetch active employee role to check permissions
         const activeUserId = localStorage.getItem('activeUserId') || 'admin';
@@ -487,14 +491,54 @@ window.HR = {
                 // Name initials
                 const initials = e.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
                 
-                // KPI bar rangini hisoblash
-                let kpiColor = 'var(--accent-gradient)';
-                if (e.kpi < 50) kpiColor = 'linear-gradient(135deg, #EF4444 0%, #F59E0B 100%)';
-                else if (e.kpi >= 90) kpiColor = 'linear-gradient(135deg, #10B981 0%, #06B6D4 100%)';
+                // Parse role name and plan
+                const parsed = this.parseRoleAndPlan(e.role);
+                const roleName = parsed.role;
+                const plan = parsed.plan;
 
-                // Calculate daily sales for this employee
-                const empKey = e.name.trim().toLowerCase();
-                const dailySales = todaySalesBySeller[empKey] || 0;
+                // Match with REGOS daily sales & profit
+                let empSales = 0;
+                let empProfit = 0;
+                let foundData = null;
+                const salesList = Object.values(employeeSalesMap);
+                
+                if (e.login) {
+                    foundData = salesList.find(s => (s.login || '').trim().toLowerCase() === e.login.trim().toLowerCase());
+                }
+                if (!foundData) {
+                    foundData = salesList.find(s => (s.name || '').trim().toLowerCase() === e.name.trim().toLowerCase());
+                }
+                if (foundData) {
+                    empSales = foundData.sales || 0;
+                    empProfit = foundData.profit || 0;
+                }
+
+                // Plan achievement progress (KPI bar)
+                const progress = plan > 0 ? Math.min(100, Math.round((empSales / plan) * 100)) : 0;
+                
+                // KPI bar color
+                let kpiColor = 'var(--accent-gradient)';
+                if (progress < 50) kpiColor = 'linear-gradient(135deg, #EF4444 0%, #F59E0B 100%)';
+                else if (progress >= 100) kpiColor = 'linear-gradient(135deg, #10B981 0%, #06B6D4 100%)';
+
+                // KPI Bonus and total salary calculations
+                const kpiPercent = e.kpi || 0;
+                let kpiBonus = 0;
+                if (plan > 0 && empSales >= plan) {
+                    kpiBonus = Math.round(empProfit * (kpiPercent / 100));
+                }
+                const totalSalary = (e.salary || 0) + kpiBonus;
+
+                let progressBadge = '';
+                if (plan > 0) {
+                    if (empSales >= plan) {
+                        progressBadge = `<span class="badge badge-success" style="font-size: 10px; font-weight: 600;">Reja bajarildi</span>`;
+                    } else {
+                        progressBadge = `<span class="badge badge-warning" style="font-size: 10px; font-weight: 600;">${progress}% bajarildi</span>`;
+                    }
+                } else {
+                    progressBadge = `<span class="badge badge-secondary" style="font-size: 10px; font-weight: 600;">Reja yo'q</span>`;
+                }
 
                 html += `
                     <div class="card employee-card">
@@ -502,17 +546,17 @@ window.HR = {
                             <div class="employee-avatar">${initials}</div>
                             <div class="employee-title">
                                 <h4>${e.name}</h4>
-                                <p>${e.role}</p>
+                                <p>${roleName}</p>
                             </div>
                         </div>
                         
                         <div class="kpi-container">
-                            <div style="display: flex; justify-content: space-between; font-size: 13px; font-weight: 500;">
-                                <span style="color: var(--text-muted);">Samaradorlik (KPI)</span>
-                                <span style="color: var(--text-main); font-family: 'JetBrains Mono';">${e.kpi}%</span>
+                            <div style="display: flex; justify-content: space-between; font-size: 13px; font-weight: 500; align-items: center; margin-bottom: 4px;">
+                                <span style="color: var(--text-muted);">Kunlik plan bajarilishi</span>
+                                ${progressBadge}
                             </div>
                             <div class="kpi-bar-bg">
-                                <div class="kpi-bar-fill" style="width: ${e.kpi}%; background: ${kpiColor}"></div>
+                                <div class="kpi-bar-fill" style="width: ${progress}%; background: ${kpiColor}"></div>
                             </div>
                         </div>
 
@@ -522,18 +566,33 @@ window.HR = {
                                 <strong style="color: var(--text-main)">${formatMoney(e.salary, currency)}</strong>
                             </div>
                             <div style="text-align: right;">
-                                <span style="display:block; font-size:11px; color: var(--text-muted)">Holati</span>
-                                <span class="badge badge-success">Faol</span>
+                                <span style="display:block; font-size:11px; color: var(--text-muted)">Kunlik reja</span>
+                                <strong style="color: var(--text-main)">${formatMoney(plan, currency)}</strong>
                             </div>
+                            
+                            <div>
+                                <span style="display:block; font-size:11px; color: var(--text-muted)">Kunlik savdo:</span>
+                                <strong style="color: var(--text-main); font-family: 'JetBrains Mono';">${formatMoney(empSales, currency)}</strong>
+                            </div>
+                            <div style="text-align: right;">
+                                <span style="display:block; font-size:11px; color: var(--text-muted)">Kunlik sof foyda:</span>
+                                <strong style="color: var(--success); font-family: 'JetBrains Mono';">${formatMoney(empProfit, currency)}</strong>
+                            </div>
+
                             <div style="grid-column: span 2; border-top: 1px dashed var(--border-color); padding-top: 8px; margin-top: 4px; display: flex; justify-content: space-between; align-items: center;">
-                                <span style="font-size:12px; color: var(--text-muted)">Kunlik savdo:</span>
-                                <strong style="color: var(--accent); font-family: 'JetBrains Mono'; font-size: 14px;">${formatMoney(dailySales, currency)}</strong>
+                                <span style="font-size:12px; color: var(--text-muted)">KPI Bonus (${kpiPercent}%):</span>
+                                <strong style="color: ${kpiBonus > 0 ? 'var(--success)' : 'var(--text-muted)'}; font-family: 'JetBrains Mono'; font-size: 14px;">${formatMoney(kpiBonus, currency)}</strong>
+                            </div>
+                            
+                            <div style="grid-column: span 2; border-top: 1px solid var(--border-color); padding-top: 8px; margin-top: 4px; display: flex; justify-content: space-between; align-items: center;">
+                                <span style="font-size:13px; font-weight: bold; color: var(--text-main)">Jami hisoblangan:</span>
+                                <strong style="color: var(--accent); font-family: 'JetBrains Mono'; font-size: 16px;">${formatMoney(totalSalary, currency)}</strong>
                             </div>
                         </div>
 
                         ${canWriteHR ? `
                         <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; border-top: 1px solid var(--border-color); padding-top: 12px;">
-                            <button class="btn btn-secondary btn-sm" onclick="HR.updateKPI('${e.id}')"><i class="fas fa-chart-line"></i> KPI</button>
+                            <button class="btn btn-secondary btn-sm" onclick="HR.openEditModal('${e.id}')"><i class="fas fa-cog"></i> Sozlash</button>
                             <button class="btn btn-secondary btn-sm" onclick="HR.deleteEmployee('${e.id}')"><i class="fas fa-trash-alt" style="color: var(--danger)"></i> O'chirish</button>
                         </div>
                         ` : ''}
@@ -551,21 +610,24 @@ window.HR = {
 
     addEmployee: async function() {
         const name = document.getElementById('emp-name').value;
-        const role = document.getElementById('emp-role').value;
+        const roleVal = document.getElementById('emp-role').value;
         const salary = parseFloat(document.getElementById('emp-salary').value) || 0;
-        const kpi = parseInt(document.getElementById('emp-kpi').value) || 100;
+        const plan = parseFloat(document.getElementById('emp-sales-plan').value) || 0;
+        const kpi = parseInt(document.getElementById('emp-kpi').value) || 0;
         const loginVal = document.getElementById('emp-login').value.trim();
         const passwordVal = document.getElementById('emp-password').value.trim();
 
-        if (!name || !role || salary <= 0) {
+        if (!name || !roleVal || salary <= 0) {
             alert('Iltimos, ism, lavozim va maoshni to\'liq kiriting!');
             return;
         }
 
+        const serializedRole = this.serializeRoleAndPlan(roleVal, plan);
+
         const newEmployee = {
             id: 'e_' + Date.now(),
             name,
-            role,
+            role: serializedRole,
             salary,
             kpi: Math.min(100, Math.max(0, kpi)),
             status: 'active',
@@ -592,27 +654,69 @@ window.HR = {
         }
     },
 
-    updateKPI: async function(id) {
-        const newKpiStr = prompt('Yangi KPI qiymatini kiriting (0 - 100):');
-        if (newKpiStr === null) return;
+    openEditModal: async function(id) {
+        try {
+            const employees = await DB.getEmployees();
+            const e = employees.find(emp => emp.id === id);
+            if (!e) {
+                alert('Xodim topilmadi!');
+                return;
+            }
 
-        const newKpi = parseInt(newKpiStr);
-        if (isNaN(newKpi) || newKpi < 0 || newKpi > 100) {
-            alert('Noto\'g\'ri KPI kiritildi. Qiymat 0 va 100 orasida bo\'lishi shart.');
+            const parsed = this.parseRoleAndPlan(e.role);
+
+            document.getElementById('edit-emp-id').value = e.id;
+            document.getElementById('edit-emp-name').value = e.name;
+            document.getElementById('edit-emp-role').value = parsed.role;
+            document.getElementById('edit-emp-salary').value = e.salary;
+            document.getElementById('edit-emp-sales-plan').value = parsed.plan;
+            document.getElementById('edit-emp-kpi').value = e.kpi;
+            document.getElementById('edit-emp-login').value = e.login || '';
+            document.getElementById('edit-emp-password').value = e.password || '';
+
+            showModal('edit-employee-modal');
+        } catch (err) {
+            console.error("Xodim tahrirlash oynasini ochishda xatolik:", err);
+            alert("Xatolik yuz berdi: " + err.message);
+        }
+    },
+
+    saveEditedEmployee: async function() {
+        const id = document.getElementById('edit-emp-id').value;
+        const name = document.getElementById('edit-emp-name').value;
+        const roleVal = document.getElementById('edit-emp-role').value;
+        const salary = parseFloat(document.getElementById('edit-emp-salary').value) || 0;
+        const plan = parseFloat(document.getElementById('edit-emp-sales-plan').value) || 0;
+        const kpi = parseInt(document.getElementById('edit-emp-kpi').value) || 0;
+        const loginVal = document.getElementById('edit-emp-login').value.trim();
+        const passwordVal = document.getElementById('edit-emp-password').value.trim();
+
+        if (!name || !roleVal || salary <= 0) {
+            alert('Iltimos, ism, lavozim va maoshni to\'liq kiriting!');
             return;
         }
 
+        const serializedRole = this.serializeRoleAndPlan(roleVal, plan);
+
+        const updatedEmployee = {
+            id,
+            name,
+            role: serializedRole,
+            salary,
+            kpi: Math.min(100, Math.max(0, kpi)),
+            status: 'active',
+            login: loginVal || null,
+            password: passwordVal || null
+        };
+
         try {
-            const employees = await DB.getEmployees();
-            const employee = employees.find(e => e.id === id);
-            if (employee) {
-                employee.kpi = newKpi;
-                await DB.saveEmployee(employee);
-                await this.render();
-            }
+            await DB.saveEmployee(updatedEmployee);
+            document.getElementById('edit-employee-form').reset();
+            closeModal('edit-employee-modal');
+            await this.render();
         } catch (err) {
-            console.error("KPI yangilashda xatolik:", err);
-            alert("KPI qiymatini saqlashda xatolik yuz berdi: " + err.message);
+            console.error("Xodimni saqlashda xatolik:", err);
+            alert("Xodimni saqlashda xatolik yuz berdi: " + err.message);
         }
     },
 

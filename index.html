@@ -909,22 +909,19 @@
                     </div>
                     <div class="form-group">
                         <label for="emp-role">Lavozimi <span style="color:var(--danger)">*</span></label>
-                        <select id="emp-role" class="form-control" required>
-                            <option value="" disabled selected>Lavozimni tanlang...</option>
-                            <option value="Direktor">Direktor (Tizim boshqaruvchisi)</option>
-                            <option value="Sotuv menejeri">Sotuv menejeri (CRM, Telefoniya, Chats)</option>
-                            <option value="Omborchi">Omborchi (Omborxona)</option>
-                            <option value="Buxgalter">Buxgalter (Moliya, Omborxona)</option>
-                            <option value="HR menejeri">HR menejeri (Xodimlar boshqaruvi)</option>
-                        </select>
+                        <input type="text" id="emp-role" class="form-control" required placeholder="Masalan: Sotuvchi, Omborchi, Buxgalter">
                     </div>
                     <div class="form-group">
-                        <label for="emp-salary">Oylik maoshi</label>
+                        <label for="emp-salary">Oylik maoshi (Base Salary, UZS)</label>
                         <input type="number" id="emp-salary" class="form-control" min="0" value="0">
                     </div>
                     <div class="form-group">
-                        <label for="emp-kpi">Samaradorlik ko'rsatkichi (KPI, %)</label>
-                        <input type="number" id="emp-kpi" class="form-control" min="0" max="100" value="100">
+                        <label for="emp-sales-plan">Kunlik savdo rejasi (Plan, UZS)</label>
+                        <input type="number" id="emp-sales-plan" class="form-control" min="0" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="emp-kpi">KPI bonusi foizi (% - reja bajarilgandan so'ng sof foydadan ulush)</label>
+                        <input type="number" id="emp-kpi" class="form-control" min="0" max="100" value="10">
                     </div>
                     <div class="form-group">
                         <label for="emp-login">Tizimga kirish logini (Login)</label>
@@ -938,6 +935,53 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" onclick="closeModal('employee-modal')">Bekor qilish</button>
                     <button type="submit" class="btn btn-primary">Xodimni qo'shish</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 4. ERP Xodim tahrirlash modal oynasi -->
+    <div class="modal" id="edit-employee-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Xodim ma'lumotlarini tahrirlash</h3>
+                <button class="close-modal-btn" onclick="closeModal('edit-employee-modal')">&times;</button>
+            </div>
+            <form id="edit-employee-form">
+                <input type="hidden" id="edit-emp-id">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="edit-emp-name">Ismi va Familiyasi <span style="color:var(--danger)">*</span></label>
+                        <input type="text" id="edit-emp-name" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-emp-role">Lavozimi <span style="color:var(--danger)">*</span></label>
+                        <input type="text" id="edit-emp-role" class="form-control" required placeholder="Masalan: Sotuvchi, Omborchi, Buxgalter">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-emp-salary">Oylik maoshi (Base Salary, UZS)</label>
+                        <input type="number" id="edit-emp-salary" class="form-control" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-emp-sales-plan">Kunlik savdo rejasi (Plan, UZS)</label>
+                        <input type="number" id="edit-emp-sales-plan" class="form-control" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-emp-kpi">KPI bonusi foizi (% - reja bajarilgandan so'ng sof foydadan ulush)</label>
+                        <input type="number" id="edit-emp-kpi" class="form-control" min="0" max="100">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-emp-login">Tizimga kirish logini (Login)</label>
+                        <input type="text" id="edit-emp-login" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-emp-password">Tizimga kirish paroli (Parol)</label>
+                        <input type="password" id="edit-emp-password" class="form-control">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('edit-employee-modal')">Bekor qilish</button>
+                    <button type="submit" class="btn btn-primary">Saqlash</button>
                 </div>
             </form>
         </div>
