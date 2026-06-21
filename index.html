@@ -90,6 +90,9 @@
                     <li class="nav-item" data-view="receipts">
                         <a href="#" data-view="receipts"><i class="fas fa-receipt"></i> Cheklar</a>
                     </li>
+                    <li class="nav-item" data-view="kassa">
+                        <a href="#" data-view="kassa"><i class="fas fa-shipping-fast"></i> Kassa</a>
+                    </li>
                     <li class="nav-item" data-view="seniklar">
                         <a href="#" data-view="seniklar"><i class="fas fa-tags"></i> Seniklar</a>
                     </li>
@@ -156,6 +159,10 @@
             <a href="#" class="bottom-nav-item" data-view="receipts">
                 <i class="fas fa-receipt"></i>
                 <span>Cheklar</span>
+            </a>
+            <a href="#" class="bottom-nav-item" data-view="kassa">
+                <i class="fas fa-shipping-fast"></i>
+                <span>Kassa</span>
             </a>
             <a href="#" class="bottom-nav-item" data-view="seniklar">
                 <i class="fas fa-tags"></i>
@@ -492,6 +499,38 @@
                 </div>
 
                 <div id="receipts-content">
+                    <!-- Dinamik cheklar ro'yxati -->
+                </div>
+            </section>
+
+            <!-- KASSA & DASTAVKA BO'LIMI -->
+            <section id="view-kassa" class="view-section">
+                <div class="header">
+                    <div class="header-title">
+                        <h1>Kassa & Dastavka boshqaruvi</h1>
+                        <p>Kelib tushgan savdo cheklarini yetkazib berishga tayyorlash va kuryerlarni boshqarish</p>
+                    </div>
+                </div>
+
+                <div class="filter-row card" style="padding: 16px; display: flex; flex-direction: column; gap: 16px;">
+                    <div style="display: flex; gap: 16px; width: 100%; flex-wrap: wrap;">
+                        <div class="search-box" style="flex: 1; min-width: 250px; margin: 0;">
+                            <i class="fas fa-search"></i>
+                            <input type="text" id="kassa-search" class="form-control" placeholder="Chek kodi, xaridor yoki kassa xodimi bo'yicha...">
+                        </div>
+                    </div>
+                    
+                    <div class="kassa-tabs" style="display: flex; gap: 8px; flex-wrap: wrap; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
+                        <button class="btn btn-primary kassa-tab-btn" data-status="all">Barchasi</button>
+                        <button class="btn btn-secondary kassa-tab-btn" data-status="pending">Kutilyapti <span class="badge badge-warning" id="kassa-count-pending" style="margin-left:4px; display:none;">0</span></button>
+                        <button class="btn btn-secondary kassa-tab-btn" data-status="preparing">Tayyorlanmoqda <span class="badge badge-info" id="kassa-count-preparing" style="margin-left:4px; display:none;">0</span></button>
+                        <button class="btn btn-secondary kassa-tab-btn" data-status="shipped">Yo'lda <span class="badge badge-primary" id="kassa-count-shipped" style="margin-left:4px; display:none;">0</span></button>
+                        <button class="btn btn-secondary kassa-tab-btn" data-status="delivered">Yetkazildi</button>
+                        <button class="btn btn-secondary kassa-tab-btn" data-status="cancelled">Bekor qilindi</button>
+                    </div>
+                </div>
+
+                <div id="kassa-content" class="kassa-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; margin-top: 20px;">
                     <!-- Dinamik cheklar ro'yxati -->
                 </div>
             </section>
@@ -1271,6 +1310,46 @@
         </div>
     </div>
 
+    <!-- 8. Kassa Kuryer biriktirish modal oynasi -->
+    <div class="modal" id="kassa-courier-modal">
+        <div class="modal-content" style="max-width: 450px;">
+            <div class="modal-header">
+                <h3>Kuryerni biriktirish va yetkazish</h3>
+                <button class="close-modal-btn" onclick="closeModal('kassa-courier-modal')">&times;</button>
+            </div>
+            <form id="kassa-courier-form">
+                <input type="hidden" id="kassa-courier-receipt-id">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="kassa-courier-name">Kuryer (Ismi va Familiyasi) <span style="color:var(--danger)">*</span></label>
+                        <select id="kassa-courier-name" class="form-control" required>
+                            <!-- Dinamik to'ldiriladi -->
+                        </select>
+                        <div style="margin-top: 6px;">
+                            <input type="text" id="kassa-courier-name-manual" class="form-control" placeholder="Yoki yangi kuryer ismini yozing...">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="kassa-courier-phone">Kuryer telefoni <span style="color:var(--danger)">*</span></label>
+                        <input type="text" id="kassa-courier-phone" class="form-control" required placeholder="+998 90 123 45 67">
+                    </div>
+                    <div class="form-group">
+                        <label for="kassa-delivery-address">Yetkazib berish manzili <span style="color:var(--danger)">*</span></label>
+                        <input type="text" id="kassa-delivery-address" class="form-control" required placeholder="Masalan: Toshkent sh., Chilonzor 4-daha, 12-uy, 45-xonadon">
+                    </div>
+                    <div class="form-group">
+                        <label for="kassa-delivery-fee">Yetkazib berish to'lovi (Dastavka summasi, UZS)</label>
+                        <input type="number" id="kassa-delivery-fee" class="form-control" min="0" value="15000" placeholder="15000">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('kassa-courier-modal')">Bekor qilish</button>
+                    <button type="submit" class="btn btn-primary">Saqlash va Yo'lga chiqarish</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <style>
         .sync-option-label:hover {
             background: rgba(255, 255, 255, 0.03);
@@ -1297,6 +1376,7 @@
     <script src="js/erp.js?v=7"></script>
     <script src="js/finance.js?v=4"></script>
     <script src="js/receipts.js?v=5"></script>
+    <script src="js/kassa.js?v=1"></script>
     <!-- JsBarcode Library -->
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
     <script src="js/seniklar.js?v=6"></script>

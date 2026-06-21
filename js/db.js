@@ -331,6 +331,25 @@ window.DB = {
         }
     },
 
+    saveReceipt: async function(receipt) {
+        try {
+            const response = await fetch('/api/receipts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(receipt)
+            });
+            if (!response.ok) throw new Error("HTTP error " + response.status);
+        } catch (e) {
+            console.error("Backend-ga chekni saqlashda xatolik:", e);
+        }
+        const data = AppStorage.load();
+        data.receipts = data.receipts || [];
+        const index = data.receipts.findIndex(r => r.id === receipt.id);
+        if (index > -1) data.receipts[index] = receipt;
+        else data.receipts.push(receipt);
+        AppStorage.save(data);
+    },
+
     deleteReceipt: async function(id) {
         try {
             const response = await fetch(`/api/receipts/${id}`, {

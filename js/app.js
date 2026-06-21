@@ -279,13 +279,13 @@ window.App = {
         const isHR = activeRole.includes('hr') || activeRole.includes('kadr') || activeRole.includes('recruiter');
         
         if (isSupervisor) {
-            allowedViews = ['dashboard', 'crm', 'telephony', 'erp', 'finance', 'chats', 'hr', 'settings', 'receipts', 'seniklar'];
+            allowedViews = ['dashboard', 'crm', 'telephony', 'erp', 'finance', 'chats', 'hr', 'settings', 'receipts', 'seniklar', 'kassa'];
         } else if (isSales) {
-            allowedViews = ['dashboard', 'crm', 'telephony', 'chats', 'erp', 'receipts', 'seniklar'];
+            allowedViews = ['dashboard', 'crm', 'telephony', 'chats', 'erp', 'receipts', 'seniklar', 'kassa'];
         } else if (isWarehouse) {
-            allowedViews = ['dashboard', 'erp', 'receipts', 'seniklar'];
+            allowedViews = ['dashboard', 'erp', 'receipts', 'seniklar', 'kassa'];
         } else if (isAccountant) {
-            allowedViews = ['dashboard', 'finance', 'erp', 'receipts', 'seniklar'];
+            allowedViews = ['dashboard', 'finance', 'erp', 'receipts', 'seniklar', 'kassa'];
         } else if (isHR) {
             allowedViews = ['dashboard', 'hr'];
         } else {
@@ -333,6 +333,8 @@ window.App = {
             window.HR.render();
         } else if (this.currentView === 'receipts' && window.Receipts && typeof window.Receipts.render === 'function') {
             window.Receipts.render();
+        } else if (this.currentView === 'kassa' && window.Kassa && typeof window.Kassa.render === 'function') {
+            window.Kassa.render();
         }
     },
 
@@ -556,6 +558,8 @@ window.App = {
             if (window.Receipts) window.Receipts.init();
         } else if (viewName === 'seniklar') {
             if (window.Seniklar) window.Seniklar.init();
+        } else if (viewName === 'kassa') {
+            if (window.Kassa) window.Kassa.init();
         }
     },
 

@@ -2492,6 +2492,10 @@ def get_receipts(search: str = None):
             }
         return []
 
+@app.post("/api/receipts")
+def save_receipt(receipt: dict):
+    return supabase_req("POST", "receipts?on_conflict=id", json_data=receipt)
+
 @app.delete("/api/receipts/{id}")
 def delete_receipt(id: str):
     return supabase_req("DELETE", f"receipts?id=eq.{id}")
