@@ -442,10 +442,15 @@ window.HR = {
         // Supabase yoki keshdan xodimlarni yuklash
         const employees = await DB.getEmployees();
         
-        // Fetch REGOS report for real-time sales & profit
+        // Fetch REGOS report for real-time sales & profit (current month cumulative)
+        const now = new Date();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
+        const startTimestamp = Math.floor(startOfMonth.getTime() / 1000);
+        const endTimestamp = Math.floor(now.getTime() / 1000);
+
         let reportData = null;
         try {
-            const response = await fetch('/api/integration/regos/sales-report');
+            const response = await fetch(`/api/integration/regos/sales-report?start_date=${startTimestamp}&end_date=${endTimestamp}`);
             if (response.ok) {
                 reportData = await response.json();
             }
@@ -521,11 +526,14 @@ window.HR = {
                 if (progress < 50) kpiColor = 'linear-gradient(135deg, #EF4444 0%, #F59E0B 100%)';
                 else if (progress >= 100) kpiColor = 'linear-gradient(135deg, #10B981 0%, #06B6D4 100%)';
 
-                // KPI Bonus and total salary calculations
+                // KPI Bonus and total salary calculations based on surplus sales profit
                 const kpiPercent = e.kpi || 0;
                 let kpiBonus = 0;
                 if (plan > 0 && empSales >= plan) {
-                    kpiBonus = Math.round(empProfit * (kpiPercent / 100));
+                    const surplusSales = empSales - plan;
+                    const profitMargin = empSales > 0 ? (empProfit / empSales) : 0;
+                    const surplusProfit = surplusSales * profitMargin;
+                    kpiBonus = Math.round(surplusProfit * (kpiPercent / 100));
                 }
                 const totalSalary = (e.salary || 0) + kpiBonus;
 
@@ -552,7 +560,7 @@ window.HR = {
                         
                         <div class="kpi-container">
                             <div style="display: flex; justify-content: space-between; font-size: 13px; font-weight: 500; align-items: center; margin-bottom: 4px;">
-                                <span style="color: var(--text-muted);">Kunlik plan bajarilishi</span>
+                                <span style="color: var(--text-muted);">Oylik plan bajarilishi</span>
                                 ${progressBadge}
                             </div>
                             <div class="kpi-bar-bg">
@@ -566,16 +574,16 @@ window.HR = {
                                 <strong style="color: var(--text-main)">${formatMoney(e.salary, currency)}</strong>
                             </div>
                             <div style="text-align: right;">
-                                <span style="display:block; font-size:11px; color: var(--text-muted)">Kunlik reja</span>
+                                <span style="display:block; font-size:11px; color: var(--text-muted)">Oylik reja</span>
                                 <strong style="color: var(--text-main)">${formatMoney(plan, currency)}</strong>
                             </div>
                             
                             <div>
-                                <span style="display:block; font-size:11px; color: var(--text-muted)">Kunlik savdo:</span>
+                                <span style="display:block; font-size:11px; color: var(--text-muted)">Oylik savdo:</span>
                                 <strong style="color: var(--text-main); font-family: 'JetBrains Mono';">${formatMoney(empSales, currency)}</strong>
                             </div>
                             <div style="text-align: right;">
-                                <span style="display:block; font-size:11px; color: var(--text-muted)">Kunlik sof foyda:</span>
+                                <span style="display:block; font-size:11px; color: var(--text-muted)">Oylik sof foyda:</span>
                                 <strong style="color: var(--success); font-family: 'JetBrains Mono';">${formatMoney(empProfit, currency)}</strong>
                             </div>
 
