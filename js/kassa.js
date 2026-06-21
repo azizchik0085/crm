@@ -1171,5 +1171,55 @@ window.Kassa = {
         });
 
         container.innerHTML = html;
+    },
+
+    syncWithRegos: async function(btn) {
+        if (!btn) return;
+        const originalText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = `<i class="fas fa-sync fa-spin"></i> Sinxronizatsiya boshlanmoqda...`;
+
+        try {
+            // Sync the last 3 days of receipts by default (can be adjusted)
+            const response = await fetch(`/api/integration/regos/sync-receipts?days=3`, {
+                method: 'POST'
+            });
+            
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.detail || "Sinxronizatsiya boshlashda xatolik yuz berdi.");
+            }
+            
+            this.pollSyncStatus(btn, originalText);
+        } catch (e) {
+            console.error("REGOS sync receipts failed:", e);
+            alert("Xatolik: " + e.message);
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
+    },
+
+    pollSyncStatus: function(btn, originalText) {
+        const interval = setInterval(async () => {
+            try {
+                const res = await fetch('/api/integration/regos/sync-status');
+                if (!res.ok) return;
+                const status = await res.json();
+                
+                if (status.running) {
+                    btn.innerHTML = `<i class="fas fa-sync fa-spin"></i> ${status.processed}/${status.total || '?'} chek...`;
+                } else {
+                    clearInterval(interval);
+                    btn.disabled = false;
+                    btn.innerHTML = originalText;
+                    this.showToast(status.message || "Sinxronizatsiya yakunlandi.");
+                    // Re-render Kassa view
+                    await this.loadReceipts();
+                    await this.render();
+                }
+            } catch (e) {
+                console.error("Error polling sync status:", e);
+            }
+        }, 1500);
     }
 };
