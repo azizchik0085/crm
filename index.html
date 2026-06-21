@@ -1034,6 +1034,84 @@
         </div>
     </div>
 
+    <!-- 7.5. REGOS Sinxronizatsiya sozlamalari modal oynasi -->
+    <div class="modal" id="receipts-sync-modal">
+        <div class="modal-content" style="max-width: 420px; border-radius: 16px; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);">
+            <div class="modal-header" style="border-bottom: 1px solid var(--border-color); padding-bottom: 14px;">
+                <h3 style="display: flex; align-items: center; gap: 10px; margin: 0; font-size: 18px; color: var(--text-main);">
+                    <i class="fas fa-sync-alt" style="color: var(--accent); font-size: 20px;"></i> REGOS Sinxronizatsiyasi
+                </h3>
+                <button class="close-modal-btn" onclick="closeModal('receipts-sync-modal')" style="background: none; border: none; font-size: 20px; color: var(--text-muted); cursor: pointer;">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 20px 0; display: flex; flex-direction: column; gap: 16px;">
+                <p style="font-size: 13px; color: var(--text-muted); margin: 0; line-height: 1.4;">
+                    REGOS Cloud tizimidan sotuv cheklarini yuklab olish uchun vaqt oralig'ini tanlang.
+                </p>
+                
+                <div class="form-group" style="display: flex; flex-direction: column; gap: 10px;">
+                    <label style="font-size: 13px; font-weight: 600; color: var(--text-main);">Sinxronizatsiya oralig'i:</label>
+                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                        <label class="sync-option-label" style="display: flex; align-items: center; gap: 12px; padding: 12px; border: 1px solid var(--border-color); border-radius: 8px; cursor: pointer; transition: all 0.2s;">
+                            <input type="radio" name="sync-days-option" value="1" checked onchange="Receipts.toggleCustomDaysInput()" style="cursor: pointer; width: 18px; height: 18px; accent-color: var(--accent);">
+                            <div style="display: flex; flex-direction: column;">
+                                <span style="font-size: 13px; font-weight: 600; color: var(--text-main);">Bugungi cheklar</span>
+                                <span style="font-size: 11px; color: var(--text-muted);">1 kunlik tezkor sinxronizatsiya</span>
+                            </div>
+                        </label>
+                        <label class="sync-option-label" style="display: flex; align-items: center; gap: 12px; padding: 12px; border: 1px solid var(--border-color); border-radius: 8px; cursor: pointer; transition: all 0.2s;">
+                            <input type="radio" name="sync-days-option" value="3" onchange="Receipts.toggleCustomDaysInput()" style="cursor: pointer; width: 18px; height: 18px; accent-color: var(--accent);">
+                            <div style="display: flex; flex-direction: column;">
+                                <span style="font-size: 13px; font-weight: 600; color: var(--text-main);">Oxirgi 3 kunlik</span>
+                                <span style="font-size: 11px; color: var(--text-muted);">Tavsiya etiladi (Kundalik yangilash)</span>
+                            </div>
+                        </label>
+                        <label class="sync-option-label" style="display: flex; align-items: center; gap: 12px; padding: 12px; border: 1px solid var(--border-color); border-radius: 8px; cursor: pointer; transition: all 0.2s;">
+                            <input type="radio" name="sync-days-option" value="30" onchange="Receipts.toggleCustomDaysInput()" style="cursor: pointer; width: 18px; height: 18px; accent-color: var(--accent);">
+                            <div style="display: flex; flex-direction: column;">
+                                <span style="font-size: 13px; font-weight: 600; color: var(--text-main);">Oxirgi 1 oylik</span>
+                                <span style="font-size: 11px; color: var(--text-muted);">Oylik hisobotlar va cheklar tahlili</span>
+                            </div>
+                        </label>
+                        <label class="sync-option-label" style="display: flex; align-items: center; gap: 12px; padding: 12px; border: 1px solid var(--border-color); border-radius: 8px; cursor: pointer; transition: all 0.2s;">
+                            <input type="radio" name="sync-days-option" value="360" onchange="Receipts.toggleCustomDaysInput()" style="cursor: pointer; width: 18px; height: 18px; accent-color: var(--accent);">
+                            <div style="display: flex; flex-direction: column;">
+                                <span style="font-size: 13px; font-weight: 600; color: var(--text-main);">Oxirgi 1 yillik</span>
+                                <span style="font-size: 11px; color: var(--text-muted);">Barcha tarixiy cheklar (Ko'p vaqt oladi)</span>
+                            </div>
+                        </label>
+                        <label class="sync-option-label" style="display: flex; align-items: center; gap: 12px; padding: 12px; border: 1px solid var(--border-color); border-radius: 8px; cursor: pointer; transition: all 0.2s;">
+                            <input type="radio" name="sync-days-option" value="custom" onchange="Receipts.toggleCustomDaysInput()" style="cursor: pointer; width: 18px; height: 18px; accent-color: var(--accent);">
+                            <div style="display: flex; flex-direction: column; width: 100%;">
+                                <span style="font-size: 13px; font-weight: 600; color: var(--text-main);">Maxsus kunlar soni</span>
+                                <span style="font-size: 11px; color: var(--text-muted);">O'zingiz istagan kunlar sonini kiritish</span>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+                
+                <div id="sync-custom-days-container" style="display: none; flex-direction: column; gap: 6px;">
+                    <label for="sync-custom-days-input" style="font-size: 12px; font-weight: 500; color: var(--text-main);">Kunlar sonini kiriting:</label>
+                    <input type="number" id="sync-custom-days-input" class="form-control" min="1" max="365" value="7" style="height: 38px; font-family: 'JetBrains Mono';">
+                </div>
+            </div>
+            <div class="modal-footer" style="border-top: 1px solid var(--border-color); padding-top: 14px; display: flex; gap: 12px; justify-content: flex-end;">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('receipts-sync-modal')" style="height: 38px;">Bekor qilish</button>
+                <button type="button" class="btn btn-primary" onclick="Receipts.startSyncFromModal()" style="height: 38px; background: var(--accent-gradient); box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);"><i class="fas fa-play"></i> Boshlash</button>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .sync-option-label:hover {
+            background: rgba(255, 255, 255, 0.03);
+            border-color: var(--accent) !important;
+        }
+        .sync-option-label:has(input:checked) {
+            border-color: var(--accent) !important;
+            background: rgba(99, 102, 241, 0.05);
+        }
+    </style>
+
     <!-- Supabase JS SDK (CDN) -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     
@@ -1048,8 +1126,8 @@
     <script src="js/chats.js?v=4"></script>
     <script src="js/erp.js?v=4"></script>
     <script src="js/finance.js?v=4"></script>
-    <script src="js/receipts.js?v=4"></script>
-    <script src="js/app.js?v=4"></script>
+    <script src="js/receipts.js?v=5"></script>
+    <script src="js/app.js?v=5"></script>
     
     <!-- Floating AI Assistant Widget -->
     <div id="ai-assistant-widget" class="ai-widget-closed">

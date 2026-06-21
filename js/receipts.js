@@ -285,14 +285,45 @@ window.Receipts = {
         this.render();
     },
 
-    syncWithRegos: async function() {
+    syncWithRegos: function() {
+        if (window.showModal) {
+            window.showModal('receipts-sync-modal');
+        } else if (typeof showModal === 'function') {
+            showModal('receipts-sync-modal');
+        } else {
+            console.error("showModal funksiyasi topilmadi!");
+        }
+    },
+
+    toggleCustomDaysInput: function() {
+        const customOption = document.querySelector('input[name="sync-days-option"][value="custom"]');
+        const container = document.getElementById('sync-custom-days-container');
+        if (container && customOption) {
+            container.style.display = customOption.checked ? 'flex' : 'none';
+        }
+    },
+
+    startSyncFromModal: async function() {
+        const selectedOption = document.querySelector('input[name="sync-days-option"]:checked');
+        if (!selectedOption) return;
+
+        let days = 1;
+        if (selectedOption.value === 'custom') {
+            const input = document.getElementById('sync-custom-days-input');
+            days = parseInt(input ? input.value : 7) || 7;
+        } else {
+            days = parseInt(selectedOption.value) || 1;
+        }
+
+        // Close the modal
+        if (window.closeModal) {
+            window.closeModal('receipts-sync-modal');
+        } else if (typeof closeModal === 'function') {
+            closeModal('receipts-sync-modal');
+        }
+
         const btn = document.getElementById('receipts-sync-btn');
         if (!btn) return;
-
-        let days = 3;
-        if (confirm("Barcha (1 yillik) tarixiy cheklarni sinxronlashtirmoqchimisiz?\n(Bekor qilish bosilsa, faqat oxirgi 3 kunlik yangi cheklar tezkor sinxronlanadi)")) {
-            days = 360;
-        }
 
         const originalText = btn.innerHTML;
         btn.disabled = true;
