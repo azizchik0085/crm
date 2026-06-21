@@ -149,13 +149,19 @@ def sync_regos_employees():
             if not isinstance(u, dict):
                 continue
             
+            group_name = u.get("user_group", {}).get("name") if isinstance(u.get("user_group"), dict) else ""
+            if not group_name:
+                continue
+                
+            group_lower = group_name.lower()
+            if "sotuv" not in group_lower and "сотув" not in group_lower:
+                continue
+            
             u_id = f"regos_{u.get('id')}"
             full_name = u.get("full_name") or u.get("first_name") or u.get("login") or f"Xodim #{u.get('id')}"
             full_name = full_name.strip()
             
-            group_name = u.get("user_group", {}).get("name") if isinstance(u.get("user_group"), dict) else None
-            role = group_name or "Xodim"
-            
+            role = group_name
             status = "active" if u.get("active") else "inactive"
             
             employee = {
@@ -168,6 +174,12 @@ def sync_regos_employees():
                 "login": u.get("login")
             }
             synced_employees.append(employee)
+            
+        # Clean up previously synced REGOS employees to avoid orphans
+        try:
+            supabase_req("DELETE", "employees?id=like.regos_%")
+        except Exception as e_del:
+            print(f"Failed to clear old REGOS employees: {e_del}")
             
         if synced_employees:
             supabase_req("POST", "employees?on_conflict=id", json_data=synced_employees)
