@@ -2556,6 +2556,57 @@ async def regos_webhook(request: Request):
     
     return {"status": "success", "message": "Webhook processed successfully"}
 
+@app.post("/api/courier/login")
+def courier_login(payload: dict):
+    login = payload.get("login")
+    password = payload.get("password")
+    if not login or not password:
+        raise HTTPException(status_code=400, detail="Login va parol kiritilishi shart.")
+    
+    try:
+        emps = supabase_req("GET", "employees")
+        if not isinstance(emps, list):
+            emps = []
+        
+        found = None
+        for e in emps:
+            if e.get("login") == login and e.get("password") == password:
+                found = e
+                break
+        
+        if found:
+            return {
+                "status": "success",
+                "employee": {
+                    "id": found.get("id"),
+                    "name": found.get("name"),
+                    "role": found.get("role"),
+                    "phone": found.get("phone")
+                }
+            }
+        else:
+            raise HTTPException(status_code=401, detail="Noto'g'ri login yoki parol.")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/courier/receipts")
+def get_courier_receipts(courier_name: str):
+    try:
+        receipts = supabase_req("GET", "receipts?order=created_at.desc&limit=500")
+        if not isinstance(receipts, list):
+            return []
+        
+        filtered = []
+        for r in receipts:
+            items = r.get("items")
+            if isinstance(items, dict) and "delivery" in items:
+                dev = items["delivery"]
+                if dev.get("courier_name") == courier_name:
+                    filtered.append(r)
+        return filtered
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 # Mount frontend files (HTML, CSS, JS) to run at root url (must be mounted last)
 STATIC_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if os.path.exists(STATIC_DIR):

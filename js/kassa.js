@@ -133,6 +133,7 @@ window.Kassa = {
         let pendingCount = 0;
         let preparingCount = 0;
         let shippedCount = 0;
+        let waitingCount = 0;
 
         const processedList = this.receiptsList.map(r => {
             const parsedItems = parseItems(r);
@@ -141,6 +142,7 @@ window.Kassa = {
             if (status === 'pending') pendingCount++;
             else if (status === 'preparing') preparingCount++;
             else if (status === 'shipped') shippedCount++;
+            else if (status === 'waiting_cash_confirm') waitingCount++;
 
             return {
                 ...r,
@@ -153,6 +155,7 @@ window.Kassa = {
         const pendingBadge = document.getElementById('kassa-count-pending');
         const preparingBadge = document.getElementById('kassa-count-preparing');
         const shippedBadge = document.getElementById('kassa-count-shipped');
+        const waitingBadge = document.getElementById('kassa-count-waiting');
 
         if (pendingBadge) {
             pendingBadge.textContent = pendingCount;
@@ -165,6 +168,10 @@ window.Kassa = {
         if (shippedBadge) {
             shippedBadge.textContent = shippedCount;
             shippedBadge.style.display = shippedCount > 0 ? 'inline-block' : 'none';
+        }
+        if (waitingBadge) {
+            waitingBadge.textContent = waitingCount;
+            waitingBadge.style.display = waitingCount > 0 ? 'inline-block' : 'none';
         }
 
         // Apply filters
@@ -216,6 +223,9 @@ window.Kassa = {
             } else if (r.deliveryStatus === 'shipped') {
                 badgeClass = 'badge-primary';
                 badgeText = 'Yo\'lda';
+            } else if (r.deliveryStatus === 'waiting_cash_confirm') {
+                badgeClass = 'badge-danger';
+                badgeText = 'Pul kutilmoqda';
             } else if (r.deliveryStatus === 'delivered') {
                 badgeClass = 'badge-success';
                 badgeText = 'Yetkazildi';
@@ -356,6 +366,17 @@ window.Kassa = {
                     <div style="display: flex; gap: 8px;">
                         <button class="btn btn-primary" onclick="window.Kassa.completeDelivery('${r.id}', true)" style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 4px; font-size: 12px; font-weight: 600; height: 36px; background-color: var(--success); border-color: var(--success);">
                             <i class="fas fa-check-circle"></i> Yetkazildi
+                        </button>
+                        <button class="btn btn-secondary" onclick="window.Kassa.completeDelivery('${r.id}', false)" style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 4px; font-size: 12px; font-weight: 600; height: 36px;">
+                            <i class="fas fa-times-circle" style="color: var(--danger);"></i> Bekor qilish
+                        </button>
+                    </div>
+                `;
+            } else if (r.deliveryStatus === 'waiting_cash_confirm') {
+                actionsHtml = `
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn btn-primary" onclick="window.Kassa.confirmCashReceived('${r.id}')" style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 12px; font-weight: 600; height: 36px; background-color: var(--success); border-color: var(--success);">
+                            <i class="fas fa-coins"></i> Pulni qabul qildim
                         </button>
                         <button class="btn btn-secondary" onclick="window.Kassa.completeDelivery('${r.id}', false)" style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 4px; font-size: 12px; font-weight: 600; height: 36px;">
                             <i class="fas fa-times-circle" style="color: var(--danger);"></i> Bekor qilish
@@ -713,6 +734,42 @@ window.Kassa = {
             }
         } catch(e) {
             console.error("Failed to complete delivery status transition:", e);
+            alert("Xatolik: " + e.message);
+        }
+    },
+
+    confirmCashReceived: async function(receiptId) {
+        if (!confirm("Kuryer olib kelgan naqd pulni qabul qilganingizni va buyurtmani yopishni tasdiqlaysizmi?")) return;
+
+        const receipt = this.receiptsList.find(r => r.id === receiptId);
+        if (!receipt) return;
+
+        let itemsObj = receipt.items;
+        if (typeof itemsObj === 'string') {
+            try {
+                itemsObj = JSON.parse(itemsObj);
+            } catch(e) {
+                itemsObj = {};
+            }
+        }
+        if (!itemsObj || typeof itemsObj !== 'object') return;
+        if (!itemsObj.delivery) itemsObj.delivery = {};
+
+        itemsObj.delivery.status = "delivered";
+
+        const updatedReceipt = {
+            ...receipt,
+            items: itemsObj
+        };
+
+        try {
+            await DB.saveReceipt(updatedReceipt);
+            await this.render();
+            if (window.App && typeof window.App.updateDashboardStats === 'function') {
+                window.App.updateDashboardStats();
+            }
+        } catch(e) {
+            console.error("Failed to confirm cash receipt:", e);
             alert("Xatolik: " + e.message);
         }
     }

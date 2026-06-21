@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>SmartCore Kuryer Ilovasi</title>
+    
+    <!-- PWA settings -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#6366f1">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="assets/icon-192.png">
+    
+    <!-- Fonts & Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/courier-style.css">
+</head>
+<body>
+
+    <!-- 1. Kirish oynasi (Login Screen) -->
+    <div id="login-view" class="view-container active-view">
+        <div class="login-card">
+            <div class="login-header">
+                <div class="logo">
+                    <i class="fas fa-shipping-fast"></i> Courier
+                </div>
+                <h2>Kuryer Tizimiga Kirish</h2>
+                <p>Buyurtmalarni yetkazishni boshlash uchun login va parolingizni kiriting</p>
+            </div>
+            
+            <form id="login-form">
+                <div class="form-group">
+                    <label for="login-username">Foydalanuvchi logini</label>
+                    <div class="input-wrapper">
+                        <i class="fas fa-user input-icon"></i>
+                        <input type="text" id="login-username" required placeholder="Login kiriting">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="login-password">Parol</label>
+                    <div class="input-wrapper">
+                        <i class="fas fa-lock input-icon"></i>
+                        <input type="password" id="login-password" required placeholder="Parol kiriting">
+                    </div>
+                </div>
+                
+                <div id="login-error" class="error-banner" style="display: none;">
+                    Noto'g'ri login yoki parol!
+                </div>
+                
+                <button type="submit" class="btn btn-primary btn-block">
+                    <i class="fas fa-sign-in-alt"></i> Kirish
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- 2. Asosiy ilova oynasi (App Screen) -->
+    <div id="app-view" class="view-container" style="display: none;">
+        <!-- Top bar -->
+        <header class="app-header">
+            <div class="user-info">
+                <div class="avatar" id="courier-avatar">K</div>
+                <div class="name-role">
+                    <h3 id="courier-name">Kuryer</h3>
+                    <span>Yetkazib beruvchi</span>
+                </div>
+            </div>
+            <button class="logout-btn" onclick="CourierApp.logout()" title="Chiqish">
+                <i class="fas fa-sign-out-alt"></i>
+            </button>
+        </header>
+
+        <!-- Balance / Stat card -->
+        <div class="balance-card">
+            <div class="balance-label">Bugungi dastavka daromadi</div>
+            <div class="balance-value" id="courier-balance">0 so'm</div>
+            <div class="balance-footer">
+                <span id="courier-delivered-count">0 ta buyurtma</span> yetkazildi bugun
+            </div>
+        </div>
+
+        <!-- Tabs navigation -->
+        <nav class="tabs-nav">
+            <button class="tab-btn active" data-tab="active" onclick="CourierApp.switchTab('active')">
+                <i class="fas fa-truck-loading"></i> Yo'lda <span class="badge" id="count-active" style="display: none;">0</span>
+            </button>
+            <button class="tab-btn" data-tab="history" onclick="CourierApp.switchTab('history')">
+                <i class="fas fa-history"></i> Tarix
+            </button>
+        </nav>
+
+        <!-- Main content list -->
+        <main class="app-main">
+            <div id="deliveries-list" class="deliveries-list">
+                <!-- Dinamik buyurtmalar chiqadi -->
+            </div>
+        </main>
+    </div>
+
+    <!-- PWA Service Worker Registration -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(reg => console.log('Service Worker registered successfully!', reg.scope))
+                    .catch(err => console.log('Service Worker registration failed:', err));
+            });
+        }
+    </script>
+
+    <!-- App Logic Scripts -->
+    <script src="js/storage.js?v=4"></script>
+    <script src="js/courier-app.js?v=1"></script>
+</body>
+</html>
