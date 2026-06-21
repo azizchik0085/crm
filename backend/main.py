@@ -193,6 +193,181 @@ def sync_regos_employees():
         print(f"Failed to sync employees from REGOS: {e}")
         raise HTTPException(status_code=500, detail=f"REGOS'dan xodimlarni yuklashda xatolik: {str(e)}")
 
+@app.get("/api/integration/regos/sales-report")
+def get_regos_sales_report(start_date: int = None, end_date: int = None):
+    import base64
+    import gzip
+    from datetime import timezone, timedelta
+    
+    regos_endpoint = settings_state.get("regos_endpoint", "")
+    regos_token = settings_state.get("regos_token", "")
+    
+    if not regos_endpoint or not regos_token:
+        raise HTTPException(status_code=400, detail="REGOS API sozlanmagan. Iltimos, sozlamalar sahifasida Endpoint va Access Tokenni kiritib saqlang.")
+        
+    endpoint = regos_endpoint.strip().rstrip("/")
+    if not endpoint.startswith(("http://", "https://")):
+        endpoint = "https://" + endpoint
+        
+    local_tz = timezone(timedelta(hours=5))
+    now_local = datetime.now(local_tz)
+    
+    if start_date is None or end_date is None:
+        start_of_day = datetime(now_local.year, now_local.month, now_local.day, 0, 0, 0, tzinfo=local_tz)
+        end_of_day = datetime(now_local.year, now_local.month, now_local.day, 23, 59, 59, tzinfo=local_tz)
+        start_date = int(start_of_day.timestamp())
+        end_date = int(end_of_day.timestamp())
+        
+    headers = {
+        "Authorization": f"Bearer {regos_token}",
+        "Content-Type": "application/json"
+    }
+    
+    req_payload = {
+        "start_date": start_date,
+        "end_date": end_date,
+        "firm_id": 1,
+        "currency_id": 1,
+        "report_type": 1, # RetailSale
+        "grouping": 1, # ByEmployees
+        "cost_type": 1 # AVG
+    }
+    
+    req_url = f"{endpoint}/v1/reportrequest/report0021" if "/v1" not in endpoint else f"{endpoint}/reportrequest/report0021"
+    
+    try:
+        res = requests.post(req_url, headers=headers, json=req_payload, timeout=15)
+        res.raise_for_status()
+        res_data = res.json()
+        if not res_data.get("ok"):
+            error_desc = res_data.get("result", {}).get("description", "Noma'lum xatolik")
+            raise HTTPException(status_code=500, detail=f"REGOS hisoboti navbatga qo'shilmadi: {error_desc}")
+            
+        uuid = res_data.get("result", {}).get("new_uuid")
+        if not uuid:
+            raise HTTPException(status_code=500, detail="Qaytgan javobda UUID topilmadi.")
+            
+        status_url = f"{endpoint}/v1/report/getrequest" if "/v1" not in endpoint else f"{endpoint}/report/getrequest"
+        prep_url = f"{endpoint}/v1/report/getprepared" if "/v1" not in endpoint else f"{endpoint}/report/getprepared"
+        
+        ready = False
+        for attempt in range(12):
+            time.sleep(1)
+            status_res = requests.post(status_url, headers=headers, json={}, timeout=10)
+            if status_res.status_code == 200:
+                results = status_res.json().get("result", [])
+                matched = None
+                for r in results:
+                    if r.get("uuid") == uuid:
+                        matched = r
+                        break
+                
+                if not matched:
+                    prep_list_res = requests.post(prep_url, headers=headers, json={}, timeout=10)
+                    if prep_list_res.status_code == 200:
+                        prep_results = prep_list_res.json().get("result", [])
+                        for pr in prep_results:
+                            if pr.get("request_uuid") == uuid:
+                                ready = True
+                                break
+                    if ready:
+                        break
+                else:
+                    status = matched.get("status")
+                    if status == 1:
+                        ready = True
+                        break
+                    elif status == 2:
+                        warnings = matched.get("warnings", "Hisobot xatolik bilan yakunlandi.")
+                        raise HTTPException(status_code=500, detail=f"Hisobot xatosi: {warnings}")
+            else:
+                print(f"Status check failed on attempt {attempt+1}: {status_res.text}")
+                
+        if not ready:
+            raise HTTPException(status_code=504, detail="Hisobot tayyor bo'lishi kutilgan vaqtdan oshib ketdi.")
+            
+        prep_payload = {
+            "request_uuid": uuid,
+            "include_data": True
+        }
+        prep_res = requests.post(prep_url, headers=headers, json=prep_payload, timeout=15)
+        prep_res.raise_for_status()
+        prep_data = prep_res.json()
+        
+        results = prep_data.get("result", [])
+        if not results:
+            raise HTTPException(status_code=500, detail="Hisobot natijasi bo'sh.")
+            
+        first_res = results[0]
+        data_b64 = first_res.get("data")
+        if not data_b64:
+            raise HTTPException(status_code=500, detail="Hisobot ma'lumotlari mavjud emas.")
+            
+        decoded_bytes = base64.b64decode(data_b64)
+        if decoded_bytes.startswith(b'\x1f\x8b'):
+            decompressed = gzip.decompress(decoded_bytes)
+            report_items = json.loads(decompressed.decode("utf-8"))
+        else:
+            report_items = json.loads(decoded_bytes.decode("utf-8"))
+            
+        total_sales = 0
+        total_profit = 0
+        employee_sales = {}
+        
+        firm_items = [i for i in report_items if str(i.get("id")).startswith("f_")]
+        firm_ids = set(f.get("id") for f in firm_items)
+        if not firm_ids:
+            firm_ids = {"f_1"}
+            
+        for item in report_items:
+            p_id = item.get("parent_id")
+            if p_id in firm_ids or (p_id and str(p_id).startswith("f_")):
+                login = item.get("name")
+                total_info = item.get("total", {})
+                
+                emp_sales = float(total_info.get("price_amount", 0))
+                emp_profit = float(total_info.get("gross_profit", 0))
+                
+                employee_sales[login] = {
+                    "login": login,
+                    "name": login,
+                    "sales": emp_sales,
+                    "profit": emp_profit
+                }
+                
+        try:
+            users_url = f"{endpoint}/v1/user/get" if "/v1" not in endpoint else f"{endpoint}/user/get"
+            users_res = requests.post(users_url, headers=headers, json={}, timeout=5)
+            if users_res.status_code == 200:
+                users_list = users_res.json().get("result", [])
+                for u in users_list:
+                    u_login = u.get("login")
+                    if u_login in employee_sales:
+                        full_name = u.get("full_name") or u.get("first_name") or u_login
+                        employee_sales[u_login]["name"] = full_name
+        except Exception as ue:
+            print(f"Failed to enrich user names: {ue}")
+            
+        for f_item in firm_items:
+            f_total = f_item.get("total", {})
+            total_sales += float(f_total.get("price_amount", 0))
+            total_profit += float(f_total.get("gross_profit", 0))
+            
+        if total_sales == 0:
+            total_sales = sum(emp["sales"] for emp in employee_sales.values())
+            total_profit = sum(emp["profit"] for emp in employee_sales.values())
+            
+        return {
+            "status": "success",
+            "total_sales": total_sales,
+            "total_profit": total_profit,
+            "employee_sales": employee_sales
+        }
+        
+    except Exception as e:
+        print(f"Sales report generation error: {e}")
+        raise HTTPException(status_code=500, detail=f"REGOS hisobotini olishda xatolik: {str(e)}")
+
 @app.get("/api/employees")
 def get_employees():
     try:

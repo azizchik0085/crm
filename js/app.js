@@ -589,45 +589,28 @@ window.App = {
         const activeClients = customers.filter(c => c.status !== 'lost').length;
         const inventoryAlerts = inventory.filter(p => p.stock <= 3).length;
 
-        // Calculate today's sales and profit
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = now.getMonth();
-        const day = now.getDate();
-
+        // Calculate today's sales and profit from REGOS report
         let todaySales = 0;
+        let todayProfit = 0;
         const employeeSalesMap = {};
 
-        // Initialize with synced employees only (those whose role is сотувчилар or contains sotuv/сотув)
-        employees.forEach(e => {
-            const roleLower = (e.role || "").toLowerCase();
-            if (roleLower.includes("sotuv") || roleLower.includes("сотув")) {
-                employeeSalesMap[e.name] = 0;
-            }
-        });
-
-        receipts.forEach(r => {
-            const rDate = new Date(r.created_at);
-            const isToday = rDate.getFullYear() === year && rDate.getMonth() === month && rDate.getDate() === day;
-            if (isToday) {
-                const total = parseFloat(r.total_amount) || 0;
-                todaySales += total;
-
-                // Match with employee/seller name
-                let itemsObj = r.items;
-                if (typeof itemsObj === 'string') {
-                    try { itemsObj = JSON.parse(itemsObj); } catch (e) { itemsObj = null; }
-                }
-                const sellerName = (itemsObj && itemsObj.seller_name) || '';
-                if (sellerName) {
-                    const matchedEmp = employees.find(e => e.name.trim().toLowerCase() === sellerName.trim().toLowerCase());
-                    const displayName = matchedEmp ? matchedEmp.name : sellerName;
-                    employeeSalesMap[displayName] = (employeeSalesMap[displayName] || 0) + total;
+        try {
+            const reportRes = await fetch('/api/integration/regos/sales-report');
+            if (reportRes.ok) {
+                const reportData = await reportRes.json();
+                if (reportData.status === 'success') {
+                    todaySales = reportData.total_sales;
+                    todayProfit = reportData.total_profit;
+                    
+                    // Populate employeeSalesMap
+                    for (const [login, emp] of Object.entries(reportData.employee_sales)) {
+                        employeeSalesMap[emp.name] = emp.sales;
+                    }
                 }
             }
-        });
-
-        const todayProfit = todaySales * 0.25; // 25% profit margin
+        } catch (err) {
+            console.error('REGOS sales report fetch failed:', err);
+        }
 
         // Dashboard DOM elementlarini yangilash
         document.getElementById('dash-income').textContent = '+' + formatMoney(totalIncome, currency);
