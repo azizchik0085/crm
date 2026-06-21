@@ -380,7 +380,10 @@
                         <h1>Xodimlar boshqaruvi (HR)</h1>
                         <p>Kompaniya xodimlari va kadrlar tahlili</p>
                     </div>
-                    <div class="header-actions">
+                    <div class="header-actions" style="display: flex; gap: 8px;">
+                        <button class="btn btn-secondary" id="hr-sync-btn" onclick="HR.syncWithRegos()">
+                            <i class="fas fa-sync-alt"></i> REGOS'dan yuklash
+                        </button>
                         <button class="btn btn-primary" id="hr-add-employee-btn" onclick="showModal('employee-modal')">
                             <i class="fas fa-user-plus"></i> Xodim qo'shish
                         </button>

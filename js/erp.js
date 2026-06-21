@@ -363,6 +363,33 @@ window.HR = {
         this.render();
     },
 
+    syncWithRegos: async function() {
+        const btn = document.getElementById('hr-sync-btn');
+        if (!btn) return;
+
+        const originalText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Yuklanmoqda...`;
+
+        try {
+            const response = await fetch('/api/integration/regos/sync-employees', {
+                method: 'POST'
+            });
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.detail || "Xodimlar sinxronizatsiyasida xatolik yuz berdi.");
+            }
+            alert(data.message || "Xodimlar ro'yxati yangilandi.");
+            this.render();
+        } catch (e) {
+            console.error("REGOS sync employees failed:", e);
+            alert("Xatolik: " + e.message);
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
+    },
+
     setupEventListeners: function() {
         const searchInput = document.getElementById('hr-search');
         if (searchInput) {

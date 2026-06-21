@@ -117,8 +117,76 @@ def delete_product(id: str):
     return supabase_req("DELETE", f"inventory?id=eq.{id}")
 
 # --- EMPLOYEES ENDPOINTS ---
+@app.post("/api/integration/regos/sync-employees")
+def sync_regos_employees():
+    regos_endpoint = settings_state.get("regos_endpoint", "")
+    regos_token = settings_state.get("regos_token", "")
+    
+    if not regos_endpoint or not regos_token:
+        raise HTTPException(status_code=400, detail="REGOS API sozlanmagan. Sozlamalardan Endpoint va Access Tokenni kiritib saqlang.")
+        
+    endpoint = regos_endpoint.strip().rstrip("/")
+    if not endpoint.startswith(("http://", "https://")):
+        endpoint = "https://" + endpoint
+        
+    url = f"{endpoint}/v1/user/get" if "/v1" not in endpoint else f"{endpoint}/user/get"
+    headers = {
+        "Authorization": f"Bearer {regos_token}",
+        "Content-Type": "application/json"
+    }
+    
+    try:
+        response = requests.post(url, headers=headers, json={}, timeout=10)
+        response.raise_for_status()
+        resp_data = response.json()
+        users_list = resp_data.get("result", [])
+        
+        if not isinstance(users_list, list):
+            return {"status": "success", "message": "Foydalanuvchilar topilmadi", "synced_count": 0}
+            
+        synced_employees = []
+        for u in users_list:
+            if not isinstance(u, dict):
+                continue
+            
+            u_id = f"regos_{u.get('id')}"
+            full_name = u.get("full_name") or u.get("first_name") or u.get("login") or f"Xodim #{u.get('id')}"
+            full_name = full_name.strip()
+            
+            group_name = u.get("user_group", {}).get("name") if isinstance(u.get("user_group"), dict) else None
+            role = group_name or "Xodim"
+            
+            status = "active" if u.get("active") else "inactive"
+            
+            employee = {
+                "id": u_id,
+                "name": full_name,
+                "role": role,
+                "salary": 0,
+                "kpi": 100,
+                "status": status,
+                "login": u.get("login")
+            }
+            synced_employees.append(employee)
+            
+        if synced_employees:
+            supabase_req("POST", "employees?on_conflict=id", json_data=synced_employees)
+            
+        return {
+            "status": "success", 
+            "message": f"REGOS'dan {len(synced_employees)} ta xodim muvaffaqiyatli yuklandi.",
+            "synced_count": len(synced_employees)
+        }
+    except Exception as e:
+        print(f"Failed to sync employees from REGOS: {e}")
+        raise HTTPException(status_code=500, detail=f"REGOS'dan xodimlarni yuklashda xatolik: {str(e)}")
+
 @app.get("/api/employees")
 def get_employees():
+    try:
+        sync_regos_employees()
+    except Exception as e:
+        print(f"Soft sync employees failed on GET: {e}")
     return supabase_get_all("employees?select=*")
 
 @app.post("/api/employees")
