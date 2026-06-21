@@ -208,9 +208,9 @@ window.Seniklar = {
                                 <div class="senik-price-section">
                                     <span class="senik-price-val">${formattedPrice} So'm</span>
                                 </div>
-                                ${showBarcode ? `
+                                 ${showBarcode ? `
                                     <div class="senik-barcode-area">
-                                        <div class="senik-barcode-lines"></div>
+                                        <svg class="senik-barcode-svg" data-code="${p.sku}"></svg>
                                         <div class="senik-sku">${p.sku}</div>
                                     </div>
                                 ` : `
@@ -237,6 +237,32 @@ window.Seniklar = {
             `;
         } else {
             previewContainer.innerHTML = html;
+
+            // Generate real barcodes using JsBarcode
+            if (showBarcode && window.JsBarcode) {
+                let barcodeHeight = 32;
+                if (templateSize === 'a4-4x10') barcodeHeight = 22;
+                else if (templateSize === 'barcode-label') barcodeHeight = 44;
+
+                previewContainer.querySelectorAll('.senik-barcode-svg').forEach(el => {
+                    const code = el.getAttribute('data-code');
+                    if (code) {
+                        try {
+                            JsBarcode(el, code, {
+                                format: "CODE128",
+                                width: 1.3,
+                                height: barcodeHeight,
+                                displayValue: false,
+                                margin: 0,
+                                background: "transparent",
+                                lineColor: "#000000"
+                            });
+                        } catch (e) {
+                            console.error("Barcode generation failed for SKU:", code, e);
+                        }
+                    }
+                });
+            }
         }
     },
 
