@@ -286,26 +286,51 @@ window.App = {
             console.error("Failed to load active employee role:", err);
         }
         
+        // Extract role name
+        let activeRoleName = activeRole;
+        if (window.HR && typeof window.HR.parseRoleAndPlan === 'function') {
+            activeRoleName = window.HR.parseRoleAndPlan(activeRole).role;
+        } else {
+            const parts = activeRole.split(';');
+            activeRoleName = parts[0].trim();
+        }
+
+        const data = AppStorage.load();
+        const customRoles = data.settings.roles || [];
+        
+        // Find if this role exists in custom roles list
+        const foundRole = customRoles.find(r => {
+            const name = typeof r === 'string' ? r : r.name;
+            return name.toLowerCase() === activeRoleName.toLowerCase();
+        });
+        
         let allowedViews = ['dashboard'];
         
-        const isSupervisor = activeRole.includes('direktor') || activeRole.includes('admin') || activeRole.includes('dasturchi') || activeRole.includes('boshliq') || activeUserId === 'admin';
-        const isSales = activeRole.includes('sotuv') || activeRole.includes('operator') || activeRole.includes('call') || activeRole.includes('aloqa');
-        const isWarehouse = activeRole.includes('ombor') || activeRole.includes('logist') || activeRole.includes('tovar');
-        const isAccountant = activeRole.includes('buxgalter') || activeRole.includes('kassir') || activeRole.includes('moliya') || activeRole.includes('auditor');
-        const isHR = activeRole.includes('hr') || activeRole.includes('kadr') || activeRole.includes('recruiter');
-        
-        if (isSupervisor) {
+        if (activeUserId === 'admin') {
             allowedViews = ['dashboard', 'crm', 'telephony', 'erp', 'finance', 'chats', 'hr', 'settings', 'receipts', 'seniklar', 'kassa'];
-        } else if (isSales) {
-            allowedViews = ['dashboard', 'crm', 'telephony', 'chats', 'erp', 'receipts', 'seniklar', 'kassa'];
-        } else if (isWarehouse) {
-            allowedViews = ['dashboard', 'erp', 'receipts', 'seniklar', 'kassa'];
-        } else if (isAccountant) {
-            allowedViews = ['dashboard', 'finance', 'erp', 'receipts', 'seniklar', 'kassa'];
-        } else if (isHR) {
-            allowedViews = ['dashboard', 'hr'];
+        } else if (foundRole && foundRole.permissions) {
+            allowedViews = ['dashboard', ...foundRole.permissions];
         } else {
-            allowedViews = ['dashboard', 'chats'];
+            // Fallback to legacy hardcoded permissions if not found in custom roles
+            const isSupervisor = activeRoleName.includes('direktor') || activeRoleName.includes('admin') || activeRoleName.includes('dasturchi') || activeRoleName.includes('boshliq');
+            const isSales = activeRoleName.includes('sotuv') || activeRoleName.includes('operator') || activeRoleName.includes('call') || activeRoleName.includes('aloqa');
+            const isWarehouse = activeRoleName.includes('ombor') || activeRoleName.includes('logist') || activeRoleName.includes('tovar');
+            const isAccountant = activeRoleName.includes('buxgalter') || activeRoleName.includes('kassir') || activeRoleName.includes('moliya') || activeRoleName.includes('auditor');
+            const isHR = activeRoleName.includes('hr') || activeRoleName.includes('kadr') || activeRoleName.includes('recruiter');
+            
+            if (isSupervisor) {
+                allowedViews = ['dashboard', 'crm', 'telephony', 'erp', 'finance', 'chats', 'hr', 'settings', 'receipts', 'seniklar', 'kassa'];
+            } else if (isSales) {
+                allowedViews = ['dashboard', 'crm', 'telephony', 'chats', 'erp', 'receipts', 'seniklar', 'kassa'];
+            } else if (isWarehouse) {
+                allowedViews = ['dashboard', 'erp', 'receipts', 'seniklar', 'kassa'];
+            } else if (isAccountant) {
+                allowedViews = ['dashboard', 'finance', 'erp', 'receipts', 'seniklar', 'kassa'];
+            } else if (isHR) {
+                allowedViews = ['dashboard', 'hr'];
+            } else {
+                allowedViews = ['dashboard', 'chats'];
+            }
         }
         
         document.querySelectorAll('.nav-item, .bottom-nav-item').forEach(item => {
@@ -328,19 +353,19 @@ window.App = {
         const addEmployeeBtn = document.getElementById('hr-add-employee-btn');
         const syncRegosBtn = document.getElementById('erp-sync-regos-btn');
         
-        const canAddProduct = isSupervisor || isWarehouse;
+        const canAddProduct = allowedViews.includes('erp');
         if (addProductBtn) addProductBtn.style.setProperty('display', canAddProduct ? '' : 'none', 'important');
         if (syncRegosBtn) syncRegosBtn.style.setProperty('display', canAddProduct ? '' : 'none', 'important');
         
-        const canAddEmployee = isSupervisor || isHR;
+        const canAddEmployee = allowedViews.includes('hr');
         if (addEmployeeBtn) addEmployeeBtn.style.setProperty('display', canAddEmployee ? '' : 'none', 'important');
         
         const crmAddCustomerBtn = document.querySelector('#view-crm .header-actions button');
-        const canAddCustomer = isSupervisor || isSales;
+        const canAddCustomer = allowedViews.includes('crm');
         if (crmAddCustomerBtn) crmAddCustomerBtn.style.setProperty('display', canAddCustomer ? '' : 'none', 'important');
         
         const financeHeaderBtn = document.querySelector('#view-finance .header-actions button');
-        const canAddTransaction = isSupervisor || isAccountant;
+        const canAddTransaction = allowedViews.includes('finance');
         if (financeHeaderBtn) financeHeaderBtn.style.setProperty('display', canAddTransaction ? '' : 'none', 'important');
         
         if (this.currentView === 'erp' && window.ERP && typeof window.ERP.render === 'function') {

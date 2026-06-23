@@ -72,22 +72,49 @@ window.ERP = {
 
         // Fetch active employee role to check permissions
         const activeUserId = localStorage.getItem('activeUserId') || 'admin';
-        let activeRole = 'admin';
+        let activeRoleName = 'admin';
         try {
             if (activeUserId !== 'admin') {
                 const employees = await DB.getEmployees();
                 const currentEmp = employees.find(e => e.id === activeUserId);
-                if (currentEmp) activeRole = (currentEmp.role || '').toLowerCase();
+                if (currentEmp) {
+                    activeRoleName = window.HR.parseRoleAndPlan(currentEmp.role).role;
+                }
             }
         } catch (e) {
             console.error(e);
         }
         
-        const isSupervisor = activeRole.includes('direktor') || activeRole.includes('admin') || activeRole.includes('dasturchi') || activeRole.includes('boshliq') || activeUserId === 'admin';
-        const isWarehouse = activeRole.includes('ombor') || activeRole.includes('logist') || activeRole.includes('tovar');
-        const isAccountant = activeRole.includes('buxgalter') || activeRole.includes('kassir') || activeRole.includes('moliya') || activeRole.includes('auditor');
-        const canWriteInventory = isSupervisor || isWarehouse;
-        const canSeeValuation = isSupervisor || isWarehouse || isAccountant;
+        // Load custom role permissions
+        const customRolesList = settings.roles || [];
+        const userCustomRole = customRolesList.find(r => {
+            const name = typeof r === 'string' ? r : r.name;
+            return name.toLowerCase() === activeRoleName.toLowerCase();
+        });
+        
+        let userPerms = [];
+        if (activeUserId === 'admin') {
+            userPerms = ['crm', 'telephony', 'erp', 'finance', 'chats', 'hr', 'settings', 'receipts', 'seniklar', 'kassa'];
+        } else if (userCustomRole && userCustomRole.permissions) {
+            userPerms = userCustomRole.permissions;
+        } else {
+            // Legacy fallbacks
+            const lower = activeRoleName.toLowerCase();
+            if (lower.includes('direktor') || lower.includes('admin') || lower.includes('dasturchi') || lower.includes('boshliq')) {
+                userPerms = ['crm', 'telephony', 'erp', 'finance', 'chats', 'hr', 'settings', 'receipts', 'seniklar', 'kassa'];
+            } else if (lower.includes('sotuv') || lower.includes('operator')) {
+                userPerms = ['crm', 'telephony', 'chats', 'erp', 'receipts', 'seniklar', 'kassa'];
+            } else if (lower.includes('ombor') || lower.includes('logist')) {
+                userPerms = ['erp', 'receipts', 'seniklar', 'kassa'];
+            } else if (lower.includes('kassir') || lower.includes('buxgalter')) {
+                userPerms = ['finance', 'erp', 'receipts', 'seniklar', 'kassa'];
+            } else if (lower.includes('hr')) {
+                userPerms = ['hr'];
+            }
+        }
+        
+        const canWriteInventory = activeUserId === 'admin' || userPerms.includes('erp');
+        const canSeeValuation = activeUserId === 'admin' || userPerms.includes('finance') || userPerms.includes('erp');
 
         let html = `
             <div class="stats-grid" style="margin-top: 16px;">
@@ -483,20 +510,46 @@ window.HR = {
 
         // Fetch active employee role to check permissions
         const activeUserId = localStorage.getItem('activeUserId') || 'admin';
-        let activeRole = 'admin';
+        let activeRoleName = 'admin';
         try {
             if (activeUserId !== 'admin') {
                 const employeesList = await DB.getEmployees();
                 const currentEmp = employeesList.find(e => e.id === activeUserId);
-                if (currentEmp) activeRole = (currentEmp.role || '').toLowerCase();
+                if (currentEmp) activeRoleName = this.parseRoleAndPlan(currentEmp.role).role;
             }
         } catch (e) {
             console.error(e);
         }
         
-        const isSupervisor = activeRole.includes('direktor') || activeRole.includes('admin') || activeRole.includes('dasturchi') || activeRole.includes('boshliq') || activeUserId === 'admin';
-        const isHR = activeRole.includes('hr') || activeRole.includes('kadr') || activeRole.includes('recruiter');
-        const canWriteHR = isSupervisor || isHR;
+        // Load custom role permissions
+        const customRolesList = settings.roles || [];
+        const userCustomRole = customRolesList.find(r => {
+            const name = typeof r === 'string' ? r : r.name;
+            return name.toLowerCase() === activeRoleName.toLowerCase();
+        });
+        
+        let userPerms = [];
+        if (activeUserId === 'admin') {
+            userPerms = ['crm', 'telephony', 'erp', 'finance', 'chats', 'hr', 'settings', 'receipts', 'seniklar', 'kassa'];
+        } else if (userCustomRole && userCustomRole.permissions) {
+            userPerms = userCustomRole.permissions;
+        } else {
+            // Legacy fallbacks
+            const lower = activeRoleName.toLowerCase();
+            if (lower.includes('direktor') || lower.includes('admin') || lower.includes('dasturchi') || lower.includes('boshliq')) {
+                userPerms = ['crm', 'telephony', 'erp', 'finance', 'chats', 'hr', 'settings', 'receipts', 'seniklar', 'kassa'];
+            } else if (lower.includes('sotuv') || lower.includes('operator')) {
+                userPerms = ['crm', 'telephony', 'chats', 'erp', 'receipts', 'seniklar', 'kassa'];
+            } else if (lower.includes('ombor') || lower.includes('logist')) {
+                userPerms = ['erp', 'receipts', 'seniklar', 'kassa'];
+            } else if (lower.includes('kassir') || lower.includes('buxgalter')) {
+                userPerms = ['finance', 'erp', 'receipts', 'seniklar', 'kassa'];
+            } else if (lower.includes('hr')) {
+                userPerms = ['hr'];
+            }
+        }
+        
+        const canWriteHR = activeUserId === 'admin' || userPerms.includes('hr');
 
         let html = `
             <div class="hr-grid" style="margin-top: 24px;">
@@ -785,14 +838,15 @@ window.HR = {
 
     updateRoleSelects: function() {
         const data = AppStorage.load();
-        const roles = data.settings.roles || ["Sotuvchi", "Omborchi", "Operator", "Kassir", "Direktor"];
+        const roles = data.settings.roles || [];
         
         const empRoleSelect = document.getElementById('emp-role');
         const editEmpRoleSelect = document.getElementById('edit-emp-role');
         
         let optionsHtml = '';
         roles.forEach(role => {
-            optionsHtml += `<option value="${role}">${role}</option>`;
+            const roleName = typeof role === 'string' ? role : role.name;
+            optionsHtml += `<option value="${roleName}">${roleName}</option>`;
         });
         
         if (empRoleSelect) {
@@ -804,13 +858,28 @@ window.HR = {
     },
 
     openRolesModal: function() {
+        // Render add-role form checkboxes
+        const permContainer = document.getElementById('add-role-permissions-container');
+        if (permContainer) {
+            let html = '';
+            this.ALL_PERMISSIONS.forEach(p => {
+                html += `
+                    <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-main); cursor: pointer; user-select: none;">
+                        <input type="checkbox" name="new-role-perm" value="${p.key}" style="width: 14px; height: 14px;">
+                        ${p.label}
+                    </label>
+                `;
+            });
+            permContainer.innerHTML = html;
+        }
+        
         this.renderRolesList();
         showModal('hr-roles-modal');
     },
 
     renderRolesList: function() {
         const data = AppStorage.load();
-        const roles = data.settings.roles || ["Sotuvchi", "Omborchi", "Operator", "Kassir", "Direktor"];
+        const roles = data.settings.roles || [];
         const container = document.getElementById('roles-list-container');
         if (!container) return;
         
@@ -818,18 +887,83 @@ window.HR = {
         if (roles.length === 0) {
             html = `<div style="text-align: center; color: var(--text-muted); padding: 8px; font-size: 13px;">Lavozimlar mavjud emas.</div>`;
         } else {
-            roles.forEach(role => {
+            roles.forEach((role, idx) => {
+                const roleName = typeof role === 'string' ? role : role.name;
+                const rolePerms = typeof role === 'string' ? [] : (role.permissions || []);
+                
                 html += `
-                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 12px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 6px;">
-                        <span style="font-size: 14px; font-weight: 500; color: var(--text-main);">${role}</span>
-                        <button type="button" class="btn btn-secondary btn-sm" onclick="HR.deleteRole('${role.replace(/'/g, "\\'")}')" style="padding: 4px 8px; min-width: auto; height: auto;">
-                            <i class="fas fa-trash-alt" style="color: var(--danger); font-size: 12px;"></i>
-                        </button>
+                    <div class="role-item" style="border: 1px solid var(--border-color); border-radius: 8px; background: rgba(255,255,255,0.02); overflow: hidden;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: rgba(255,255,255,0.02); cursor: pointer;" onclick="HR.toggleRoleExpand('${idx}')">
+                            <span style="font-size: 14px; font-weight: 600; color: var(--text-main); display: flex; align-items: center; gap: 6px;">
+                                <i class="fas fa-chevron-right" id="role-chevron-${idx}" style="font-size: 10px; transition: transform 0.2s;"></i> ${roleName}
+                            </span>
+                            <div style="display: flex; gap: 8px; align-items: center;">
+                                <span style="font-size: 11px; color: var(--text-muted);">${rolePerms.length} ta ruxsatnoma</span>
+                                <button type="button" class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); HR.deleteRole('${roleName.replace(/'/g, "\\'")}')" style="padding: 4px 8px; min-width: auto; height: auto;">
+                                    <i class="fas fa-trash-alt" style="color: var(--danger); font-size: 12px;"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div id="role-permissions-panel-${idx}" style="display: none; padding: 12px; background: rgba(0,0,0,0.15); border-top: 1px solid var(--border-color);">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                                ${this.ALL_PERMISSIONS.map(p => {
+                                    const checked = rolePerms.includes(p.key) ? 'checked' : '';
+                                    return `
+                                        <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-main); cursor: pointer; user-select: none;">
+                                            <input type="checkbox" style="width: 14px; height: 14px;" ${checked} onchange="HR.toggleRolePermission('${roleName.replace(/'/g, "\\'")}', '${p.key}', this.checked)">
+                                            ${p.label}
+                                        </label>
+                                    `;
+                                }).join('')}
+                            </div>
+                        </div>
                     </div>
                 `;
             });
         }
         container.innerHTML = html;
+    },
+
+    toggleRoleExpand: function(idx) {
+        const panel = document.getElementById(`role-permissions-panel-${idx}`);
+        const chevron = document.getElementById(`role-chevron-${idx}`);
+        if (panel) {
+            if (panel.style.display === 'none') {
+                panel.style.display = 'block';
+                if (chevron) chevron.style.transform = 'rotate(90deg)';
+            } else {
+                panel.style.display = 'none';
+                if (chevron) chevron.style.transform = 'rotate(0deg)';
+            }
+        }
+    },
+
+    toggleRolePermission: function(roleName, permissionKey, isChecked) {
+        const data = AppStorage.load();
+        data.settings.roles = data.settings.roles || [];
+        
+        const role = data.settings.roles.find(r => {
+            const name = typeof r === 'string' ? r : r.name;
+            return name.toLowerCase() === roleName.toLowerCase();
+        });
+        
+        if (role) {
+            role.permissions = role.permissions || [];
+            if (isChecked) {
+                if (!role.permissions.includes(permissionKey)) {
+                    role.permissions.push(permissionKey);
+                }
+            } else {
+                role.permissions = role.permissions.filter(p => p !== permissionKey);
+            }
+            AppStorage.save(data);
+            this.renderRolesList();
+            
+            // Immediately apply active user's permission changes
+            if (window.App && typeof window.App.applyPermissions === 'function') {
+                window.App.applyPermissions();
+            }
+        }
     },
 
     addRole: function() {
@@ -840,17 +974,36 @@ window.HR = {
         if (!roleName) return;
         
         const data = AppStorage.load();
-        data.settings.roles = data.settings.roles || ["Sotuvchi", "Omborchi", "Operator", "Kassir", "Direktor"];
+        data.settings.roles = data.settings.roles || [];
         
-        if (data.settings.roles.some(r => r.toLowerCase() === roleName.toLowerCase())) {
+        if (data.settings.roles.some(r => {
+            const name = typeof r === 'string' ? r : r.name;
+            return name.toLowerCase() === roleName.toLowerCase();
+        })) {
             alert("Ushbu lavozim allaqachon mavjud!");
             return;
         }
         
-        data.settings.roles.push(roleName);
+        // Collect checked permissions
+        const perms = [];
+        const checkboxes = document.querySelectorAll('input[name="new-role-perm"]:checked');
+        checkboxes.forEach(cb => {
+            perms.push(cb.value);
+        });
+        
+        data.settings.roles.push({
+            name: roleName,
+            permissions: perms
+        });
         AppStorage.save(data);
         
         input.value = '';
+        
+        // Reset checkboxes
+        document.querySelectorAll('input[name="new-role-perm"]').forEach(cb => {
+            cb.checked = false;
+        });
+        
         this.renderRolesList();
         this.updateRoleSelects();
         
@@ -874,7 +1027,10 @@ window.HR = {
         }
         
         const data = AppStorage.load();
-        data.settings.roles = (data.settings.roles || ["Sotuvchi", "Omborchi", "Operator", "Kassir", "Direktor"]).filter(r => r !== roleName);
+        data.settings.roles = (data.settings.roles || []).filter(r => {
+            const name = typeof r === 'string' ? r : r.name;
+            return name.toLowerCase() !== roleName.toLowerCase();
+        });
         AppStorage.save(data);
         
         this.renderRolesList();
@@ -883,5 +1039,18 @@ window.HR = {
         if (window.App && typeof window.App.syncSettingsToBackend === 'function') {
             window.App.syncSettingsToBackend();
         }
-    }
+    },
+    
+    ALL_PERMISSIONS: [
+        { key: 'crm', label: 'Mijozlar (CRM)' },
+        { key: 'telephony', label: 'Telefoniya' },
+        { key: 'erp', label: 'Omborxona (ERP)' },
+        { key: 'finance', label: 'Moliya' },
+        { key: 'chats', label: 'Muloqotlar' },
+        { key: 'hr', label: 'Xodimlar (HR)' },
+        { key: 'receipts', label: 'Cheklar (POS)' },
+        { key: 'seniklar', label: 'Seniklar (Narxlar)' },
+        { key: 'kassa', label: 'Kassa (POS)' },
+        { key: 'settings', label: 'Sozlamalar' }
+    ]
 };

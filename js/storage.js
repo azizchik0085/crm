@@ -18,7 +18,13 @@ const DEFAULT_DATA = {
         aiAutoReply: false,
         regosEndpoint: '',
         regosToken: '',
-        roles: ["Sotuvchi", "Omborchi", "Operator", "Kassir", "Direktor"]
+        roles: [
+            { name: "Sotuvchi", permissions: ["crm", "telephony", "chats", "erp", "receipts", "seniklar", "kassa"] },
+            { name: "Omborchi", permissions: ["erp", "receipts", "seniklar", "kassa"] },
+            { name: "Operator", permissions: ["crm", "telephony", "chats", "erp", "receipts", "seniklar", "kassa"] },
+            { name: "Kassir", permissions: ["finance", "erp", "receipts", "seniklar", "kassa"] },
+            { name: "Direktor", permissions: ["crm", "telephony", "erp", "finance", "chats", "hr", "settings", "receipts", "seniklar", "kassa"] }
+        ]
     },
     customers: [
         { id: 'c1', name: 'Alisher Navoiy', phone: '+998 90 123 45 67', phone2: '+998 90 999 88 77', source: 'telephony', operator: 'Laylo Toirova', status: 'won', value: 15000000 },
@@ -107,6 +113,35 @@ const AppStorage = {
             if (data && data.settings && data.settings.roles === undefined) {
                 data.settings.roles = [...DEFAULT_DATA.settings.roles];
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+            }
+            // Agar lavozimlar ro'yxatida eski matnli (string) lavozimlar bo'lsa, ularni ob'ektga o'tkazamiz
+            if (data && data.settings && data.settings.roles) {
+                let updated = false;
+                data.settings.roles = data.settings.roles.map(role => {
+                    if (typeof role === 'string') {
+                        updated = true;
+                        let perms = [];
+                        const lower = role.toLowerCase();
+                        if (lower.includes('direktor') || lower.includes('admin') || lower.includes('dasturchi') || lower.includes('boshliq')) {
+                            perms = ['crm', 'telephony', 'erp', 'finance', 'chats', 'hr', 'settings', 'receipts', 'seniklar', 'kassa'];
+                        } else if (lower.includes('sotuv') || lower.includes('operator')) {
+                            perms = ['crm', 'telephony', 'chats', 'erp', 'receipts', 'seniklar', 'kassa'];
+                        } else if (lower.includes('ombor') || lower.includes('logist')) {
+                            perms = ['erp', 'receipts', 'seniklar', 'kassa'];
+                        } else if (lower.includes('kassir') || lower.includes('buxgalter') || lower.includes('moliya')) {
+                            perms = ['finance', 'erp', 'receipts', 'seniklar', 'kassa'];
+                        } else if (lower.includes('hr') || lower.includes('kadr')) {
+                            perms = ['hr'];
+                        } else {
+                            perms = ['chats'];
+                        }
+                        return { name: role, permissions: perms };
+                    }
+                    return role;
+                });
+                if (updated) {
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+                }
             }
             // Agar yangi modullar qo'shilsa va kalitlar bo'lmasa, default ma'lumotlar bilan birlashtiramiz
             return { ...DEFAULT_DATA, ...data };

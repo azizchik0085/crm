@@ -1046,9 +1046,17 @@
                 <button class="close-modal-btn" onclick="closeModal('hr-roles-modal')">&times;</button>
             </div>
             <div class="modal-body">
-                <form id="add-role-form" style="display: flex; gap: 8px; margin-bottom: 16px;">
-                    <input type="text" id="new-role-name" class="form-control" placeholder="Yangi lavozim nomi..." required>
-                    <button type="submit" class="btn btn-primary" style="white-space: nowrap;"><i class="fas fa-plus"></i> Qo'shish</button>
+                <form id="add-role-form" style="margin-bottom: 20px;">
+                    <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+                        <input type="text" id="new-role-name" class="form-control" placeholder="Yangi lavozim nomi..." required>
+                        <button type="submit" class="btn btn-primary" style="white-space: nowrap;"><i class="fas fa-plus"></i> Qo'shish</button>
+                    </div>
+                    <div style="margin-bottom: 12px;">
+                        <label style="font-size: 13px; color: var(--text-muted); display: block; margin-bottom: 6px;">Ruxsat etilgan bo'limlar (Huquqlar):</label>
+                        <div id="add-role-permissions-container" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; background: rgba(0,0,0,0.15); padding: 10px; border-radius: 8px; border: 1px solid var(--border-color);">
+                            <!-- Ruxsatnomalar chekboxlari dinamik ravishda JS orqali to'ldiriladi -->
+                        </div>
+                    </div>
                 </form>
                 <div id="roles-list-container" style="max-height: 250px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px; padding: 8px; display: flex; flex-direction: column; gap: 8px;">
                     <!-- Lavozimlar ro'yxati dinamik yuklanadi -->
