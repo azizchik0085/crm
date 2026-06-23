@@ -793,6 +793,26 @@ async def sipuni_webhook(request: Request):
 SETTINGS_FILE = os.path.join(os.path.dirname(__file__), "settings.json")
 
 def load_settings():
+    # 1. Try loading from Supabase database
+    try:
+        res = supabase_req("GET", "receipts?id=eq.system_settings&select=items")
+        if res and isinstance(res, list) and len(res) > 0:
+            db_settings = res[0].get("items")
+            if db_settings and isinstance(db_settings, dict):
+                # Ensure all default keys are present
+                default_keys = {
+                    "telegram_token": "", "instagram_token": "", "ai_provider": "local",
+                    "telephony_provider": "sarkor", "gemini_api_key": "", "openai_api_key": "",
+                    "groq_api_key": "", "ai_auto_reply": False, "regos_endpoint": "", "regos_token": ""
+                }
+                for k, v in default_keys.items():
+                    if k not in db_settings:
+                        db_settings[k] = v
+                return db_settings
+    except Exception as e:
+        print(f"Failed to load settings from Supabase: {e}. Falling back to local file.")
+
+    # 2. Local fallback
     if os.path.exists(SETTINGS_FILE):
         try:
             with open(SETTINGS_FILE, "r") as f:
@@ -819,11 +839,26 @@ def load_settings():
     return {"telegram_token": "", "instagram_token": "", "ai_provider": "local", "telephony_provider": "sarkor", "gemini_api_key": "", "openai_api_key": "", "groq_api_key": "", "ai_auto_reply": False, "regos_endpoint": "", "regos_token": ""}
 
 def save_settings(settings):
+    # 1. Save locally
     try:
         with open(SETTINGS_FILE, "w") as f:
             json.dump(settings, f, indent=4)
     except Exception as e:
-        print(f"Failed to save settings: {e}")
+        print(f"Failed to save settings locally: {e}")
+
+    # 2. Save to Supabase database (receipts table, system_settings row)
+    try:
+        payload = {
+            "id": "system_settings",
+            "items": settings,
+            "total_amount": 0,
+            "discount": 0,
+            "cashier_name": "System",
+            "code": "SETTINGS"
+        }
+        supabase_req("POST", "receipts?on_conflict=id", json_data=payload)
+    except Exception as e:
+        print(f"Failed to save settings to Supabase: {e}")
 
 # Global settings state
 settings_state = load_settings()
@@ -983,6 +1018,11 @@ async def startup_event():
 
 @app.get("/api/settings")
 def get_settings():
+    global settings_state
+    try:
+        settings_state = load_settings()
+    except Exception as e:
+        print(f"Failed to reload settings: {e}")
     return settings_state
 
 @app.post("/api/settings")
@@ -2663,10 +2703,10 @@ def get_receipts(search: str = None):
             search_cyr = to_cyrillic(search)
             term_lat = f"%{search_lat}%"
             term_cyr = f"%{search_cyr}%"
-            path = f"receipts?select=*&or=(code.ilike.{term_lat},cashier_name.ilike.{term_lat},code.ilike.{term_cyr},cashier_name.ilike.{term_cyr})&order=created_at.desc&limit=1000"
+            path = f"receipts?select=*&id=neq.system_settings&or=(code.ilike.{term_lat},cashier_name.ilike.{term_lat},code.ilike.{term_cyr},cashier_name.ilike.{term_cyr})&order=created_at.desc&limit=1000"
             return supabase_req("GET", path)
         else:
-            return supabase_req("GET", "receipts?select=*&order=created_at.desc&limit=1000")
+            return supabase_req("GET", "receipts?select=*&id=neq.system_settings&order=created_at.desc&limit=1000")
     except Exception as e:
         print(f"Failed to fetch receipts: {e}")
         err_msg = str(e)
@@ -2777,7 +2817,7 @@ def courier_login(payload: dict):
 @app.get("/api/courier/receipts")
 def get_courier_receipts(courier_name: str):
     try:
-        receipts = supabase_req("GET", "receipts?order=created_at.desc&limit=500")
+        receipts = supabase_req("GET", "receipts?id=neq.system_settings&order=created_at.desc&limit=500")
         if not isinstance(receipts, list):
             return []
         
