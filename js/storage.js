@@ -17,7 +17,8 @@ const DEFAULT_DATA = {
         groqApiKey: '',
         aiAutoReply: false,
         regosEndpoint: '',
-        regosToken: ''
+        regosToken: '',
+        roles: ["Sotuvchi", "Omborchi", "Operator", "Kassir", "Direktor"]
     },
     customers: [
         { id: 'c1', name: 'Alisher Navoiy', phone: '+998 90 123 45 67', phone2: '+998 90 999 88 77', source: 'telephony', operator: 'Laylo Toirova', status: 'won', value: 15000000 },
@@ -100,6 +101,11 @@ const AppStorage = {
             if (data && data.settings && data.settings.regosEndpoint === undefined) {
                 data.settings.regosEndpoint = '';
                 data.settings.regosToken = '';
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+            }
+            // Agar foydalanuvchida lavozimlar sozlamalari bo'lmasa, ularni yaratamiz
+            if (data && data.settings && data.settings.roles === undefined) {
+                data.settings.roles = [...DEFAULT_DATA.settings.roles];
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
             }
             // Agar yangi modullar qo'shilsa va kalitlar bo'lmasa, default ma'lumotlar bilan birlashtiramiz

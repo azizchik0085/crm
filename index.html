@@ -425,6 +425,9 @@
                         <p>Kompaniya xodimlari va kadrlar tahlili</p>
                     </div>
                     <div class="header-actions" style="display: flex; gap: 8px;">
+                        <button class="btn btn-secondary" id="hr-roles-btn" onclick="HR.openRolesModal()">
+                            <i class="fas fa-briefcase"></i> Lavozimlar
+                        </button>
                         <button class="btn btn-secondary" id="hr-sync-btn" onclick="HR.syncWithRegos()">
                             <i class="fas fa-sync-alt"></i> REGOS'dan yuklash
                         </button>
@@ -758,6 +761,11 @@
                             <label for="settings-regos-token">REGOS Access Token</label>
                             <input type="password" id="settings-regos-token" class="form-control" placeholder="REGOS API tokeningiz">
                         </div>
+                        <div class="form-group">
+                            <label>REGOS Webhook URL (Qabul qilish manzili)</label>
+                            <input type="text" id="settings-regos-webhook" class="form-control" readonly style="font-family: 'JetBrains Mono'; font-size: 12px; background: rgba(0,0,0,0.1); cursor: text;">
+                            <small style="color: var(--text-muted); font-size: 11px;">REGOS tizimidan real vaqtda cheklar va tovarlarni sinxronlash uchun ushbu manzilni REGOS shaxsiy kabinetida sozlang.</small>
+                        </div>
                         <div style="margin-top: 24px; display:flex; gap:16px;">
                             <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Sozlamalarni saqlash</button>
                             <button type="button" id="settings-reset-data" class="btn btn-secondary" style="border-color:var(--danger); color:var(--danger);"><i class="fas fa-trash-restore"></i> Tizimni tozalash</button>
@@ -952,7 +960,7 @@
                     </div>
                     <div class="form-group">
                         <label for="emp-role">Lavozimi <span style="color:var(--danger)">*</span></label>
-                        <input type="text" id="emp-role" class="form-control" required placeholder="Masalan: Sotuvchi, Omborchi, Buxgalter">
+                        <select id="emp-role" class="form-control" required></select>
                     </div>
                     <div class="form-group">
                         <label for="emp-salary">Oylik maoshi (Base Salary, UZS)</label>
@@ -999,7 +1007,7 @@
                     </div>
                     <div class="form-group">
                         <label for="edit-emp-role">Lavozimi <span style="color:var(--danger)">*</span></label>
-                        <input type="text" id="edit-emp-role" class="form-control" required placeholder="Masalan: Sotuvchi, Omborchi, Buxgalter">
+                        <select id="edit-emp-role" class="form-control" required></select>
                     </div>
                     <div class="form-group">
                         <label for="edit-emp-salary">Oylik maoshi (Base Salary, UZS)</label>
@@ -1027,6 +1035,28 @@
                     <button type="submit" class="btn btn-primary">Saqlash</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Lavozimlarni boshqarish modal oynasi -->
+    <div class="modal" id="hr-roles-modal">
+        <div class="modal-content" style="max-width: 480px;">
+            <div class="modal-header">
+                <h3>Lavozimlarni boshqarish</h3>
+                <button class="close-modal-btn" onclick="closeModal('hr-roles-modal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="add-role-form" style="display: flex; gap: 8px; margin-bottom: 16px;">
+                    <input type="text" id="new-role-name" class="form-control" placeholder="Yangi lavozim nomi..." required>
+                    <button type="submit" class="btn btn-primary" style="white-space: nowrap;"><i class="fas fa-plus"></i> Qo'shish</button>
+                </form>
+                <div id="roles-list-container" style="max-height: 250px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px; padding: 8px; display: flex; flex-direction: column; gap: 8px;">
+                    <!-- Lavozimlar ro'yxati dinamik yuklanadi -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('hr-roles-modal')">Yopish</button>
+            </div>
         </div>
     </div>
 

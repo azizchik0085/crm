@@ -144,6 +144,22 @@ window.App = {
         const regosTokenInput = document.getElementById('settings-regos-token');
         if (regosTokenInput) regosTokenInput.value = data.settings.regosToken || '';
 
+        // Webhook manzillarini joriy domen bo'yicha dinamik to'ldirish
+        const sipuniWebhookInput = document.getElementById('settings-sipuni-webhook');
+        if (sipuniWebhookInput) {
+            sipuniWebhookInput.value = window.location.origin + '/api/integration/sipuni/webhook';
+        }
+
+        const instagramWebhookInput = document.getElementById('settings-instagram-webhook');
+        if (instagramWebhookInput) {
+            instagramWebhookInput.value = window.location.origin + '/api/integration/instagram/webhook';
+        }
+
+        const regosWebhookInput = document.getElementById('settings-regos-webhook');
+        if (regosWebhookInput) {
+            regosWebhookInput.value = window.location.origin + '/api/integration/regos/webhook';
+        }
+
         this.onAIProviderChange();
     },
 

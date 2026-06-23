@@ -364,6 +364,7 @@ window.ERP = {
 window.HR = {
     init: function() {
         this.setupEventListeners();
+        this.updateRoleSelects();
         this.render();
     },
 
@@ -434,6 +435,14 @@ window.HR = {
             editForm.onsubmit = (e) => {
                 e.preventDefault();
                 this.saveEditedEmployee();
+            };
+        }
+
+        const roleForm = document.getElementById('add-role-form');
+        if (roleForm) {
+            roleForm.onsubmit = (e) => {
+                e.preventDefault();
+                this.addRole();
             };
         }
     },
@@ -679,6 +688,28 @@ window.HR = {
 
             document.getElementById('edit-emp-id').value = e.id;
             document.getElementById('edit-emp-name').value = e.name;
+            
+            // Populate select first
+            this.updateRoleSelects();
+            
+            // Check legacy custom role
+            const editEmpRoleSelect = document.getElementById('edit-emp-role');
+            if (editEmpRoleSelect && parsed.role) {
+                let hasRoleOption = false;
+                for (let i = 0; i < editEmpRoleSelect.options.length; i++) {
+                    if (editEmpRoleSelect.options[i].value === parsed.role) {
+                        hasRoleOption = true;
+                        break;
+                    }
+                }
+                if (!hasRoleOption) {
+                    const opt = document.createElement('option');
+                    opt.value = parsed.role;
+                    opt.innerHTML = parsed.role + " (Eski/Maxsus)";
+                    editEmpRoleSelect.appendChild(opt);
+                }
+            }
+
             document.getElementById('edit-emp-role').value = parsed.role;
             document.getElementById('edit-emp-salary').value = e.salary;
             document.getElementById('edit-emp-sales-plan').value = parsed.plan;
@@ -749,6 +780,108 @@ window.HR = {
         } catch (err) {
             console.error("Xodimni o'chirishda xatolik:", err);
             alert("Xodimni o'chirishda xatolik yuz berdi: " + err.message);
+        }
+    },
+
+    updateRoleSelects: function() {
+        const data = AppStorage.load();
+        const roles = data.settings.roles || ["Sotuvchi", "Omborchi", "Operator", "Kassir", "Direktor"];
+        
+        const empRoleSelect = document.getElementById('emp-role');
+        const editEmpRoleSelect = document.getElementById('edit-emp-role');
+        
+        let optionsHtml = '';
+        roles.forEach(role => {
+            optionsHtml += `<option value="${role}">${role}</option>`;
+        });
+        
+        if (empRoleSelect) {
+            empRoleSelect.innerHTML = optionsHtml;
+        }
+        if (editEmpRoleSelect) {
+            editEmpRoleSelect.innerHTML = optionsHtml;
+        }
+    },
+
+    openRolesModal: function() {
+        this.renderRolesList();
+        showModal('hr-roles-modal');
+    },
+
+    renderRolesList: function() {
+        const data = AppStorage.load();
+        const roles = data.settings.roles || ["Sotuvchi", "Omborchi", "Operator", "Kassir", "Direktor"];
+        const container = document.getElementById('roles-list-container');
+        if (!container) return;
+        
+        let html = '';
+        if (roles.length === 0) {
+            html = `<div style="text-align: center; color: var(--text-muted); padding: 8px; font-size: 13px;">Lavozimlar mavjud emas.</div>`;
+        } else {
+            roles.forEach(role => {
+                html += `
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 12px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 6px;">
+                        <span style="font-size: 14px; font-weight: 500; color: var(--text-main);">${role}</span>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="HR.deleteRole('${role.replace(/'/g, "\\'")}')" style="padding: 4px 8px; min-width: auto; height: auto;">
+                            <i class="fas fa-trash-alt" style="color: var(--danger); font-size: 12px;"></i>
+                        </button>
+                    </div>
+                `;
+            });
+        }
+        container.innerHTML = html;
+    },
+
+    addRole: function() {
+        const input = document.getElementById('new-role-name');
+        if (!input) return;
+        
+        const roleName = input.value.trim();
+        if (!roleName) return;
+        
+        const data = AppStorage.load();
+        data.settings.roles = data.settings.roles || ["Sotuvchi", "Omborchi", "Operator", "Kassir", "Direktor"];
+        
+        if (data.settings.roles.some(r => r.toLowerCase() === roleName.toLowerCase())) {
+            alert("Ushbu lavozim allaqachon mavjud!");
+            return;
+        }
+        
+        data.settings.roles.push(roleName);
+        AppStorage.save(data);
+        
+        input.value = '';
+        this.renderRolesList();
+        this.updateRoleSelects();
+        
+        if (window.App && typeof window.App.syncSettingsToBackend === 'function') {
+            window.App.syncSettingsToBackend();
+        }
+    },
+
+    deleteRole: async function(roleName) {
+        if (!confirm(`"${roleName}" lavozimini o'chirib tashlamoqchimisiz?`)) return;
+        
+        const employees = await DB.getEmployees();
+        const isUsed = employees.some(e => {
+            const parsed = this.parseRoleAndPlan(e.role);
+            return parsed.role.toLowerCase() === roleName.toLowerCase();
+        });
+        
+        if (isUsed) {
+            alert("Ushbu lavozimni o'chirib bo'lmaydi, chunki bu lavozimda ishlayotgan xodimlar mavjud!");
+            return;
+        }
+        
+        const data = AppStorage.load();
+        data.settings.roles = (data.settings.roles || ["Sotuvchi", "Omborchi", "Operator", "Kassir", "Direktor"]).filter(r => r !== roleName);
+        AppStorage.save(data);
+        
+        this.renderRolesList();
+        this.updateRoleSelects();
+        
+        if (window.App && typeof window.App.syncSettingsToBackend === 'function') {
+            window.App.syncSettingsToBackend();
         }
     }
 };
