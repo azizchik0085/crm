@@ -27,7 +27,8 @@ window.App = {
     currentView: 'dashboard',
     chartInstance: null,
 
-    init: function() {
+    init: async function() {
+        await this.loadSettingsFromBackend();
         this.applySettings();
         this.setupNavigation();
         this.setupSettingsForm();
@@ -36,9 +37,40 @@ window.App = {
         this.setupAuth();
     },
 
+    loadSettingsFromBackend: async function() {
+        try {
+            const response = await fetch('/api/settings');
+            if (response.ok) {
+                const backendSettings = await response.json();
+                if (backendSettings) {
+                    const data = AppStorage.load();
+                    
+                    data.settings.aiProvider = backendSettings.ai_provider || data.settings.aiProvider;
+                    data.settings.telephonyProvider = backendSettings.telephony_provider || data.settings.telephonyProvider;
+                    data.settings.telegramToken = backendSettings.telegram_token || data.settings.telegramToken;
+                    data.settings.instagramToken = backendSettings.instagram_token || data.settings.instagramToken;
+                    data.settings.geminiApiKey = backendSettings.gemini_api_key || data.settings.geminiApiKey;
+                    data.settings.openaiApiKey = backendSettings.openai_api_key || data.settings.openaiApiKey;
+                    data.settings.groqApiKey = backendSettings.groq_api_key || data.settings.groqApiKey;
+                    data.settings.aiAutoReply = !!backendSettings.ai_auto_reply;
+                    data.settings.regosEndpoint = backendSettings.regos_endpoint || data.settings.regosEndpoint;
+                    data.settings.regosToken = backendSettings.regos_token || data.settings.regosToken;
+                    
+                    if (backendSettings.roles && backendSettings.roles.length > 0) {
+                        data.settings.roles = backendSettings.roles;
+                    }
+                    
+                    AppStorage.save(data);
+                }
+            }
+        } catch (e) {
+            console.error("Backend-dan sozlamalarni yuklashda xatolik:", e);
+        }
+    },
+
     syncSettingsToBackend: function() {
         const data = AppStorage.load();
-        if (data.settings.telegramToken || data.settings.instagramToken || data.settings.geminiApiKey || data.settings.openaiApiKey || data.settings.groqApiKey || data.settings.regosEndpoint || data.settings.regosToken) {
+        if (data.settings.telegramToken || data.settings.instagramToken || data.settings.geminiApiKey || data.settings.openaiApiKey || data.settings.groqApiKey || data.settings.regosEndpoint || data.settings.regosToken || (data.settings.roles && data.settings.roles.length > 0)) {
             fetch('/api/settings', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -52,7 +84,8 @@ window.App = {
                     groq_api_key: data.settings.groqApiKey || '',
                     ai_auto_reply: !!data.settings.aiAutoReply,
                     regos_endpoint: data.settings.regosEndpoint || '',
-                    regos_token: data.settings.regosToken || ''
+                    regos_token: data.settings.regosToken || '',
+                    roles: data.settings.roles || []
                 })
             }).catch(err => console.error("Initial settings sync failed:", err));
         }
@@ -468,7 +501,7 @@ window.App = {
                 
                 AppStorage.save(data);
 
-                // Sync tokens with backend
+                // Sync tokens and roles with backend
                 try {
                     await fetch('/api/settings', {
                         method: 'POST',
@@ -483,7 +516,8 @@ window.App = {
                             groq_api_key: groqApiKey,
                             ai_auto_reply: aiAutoReply,
                             regos_endpoint: regosEndpoint,
-                            regos_token: regosToken
+                            regos_token: regosToken,
+                            roles: data.settings.roles || []
                         })
                     });
                 } catch(err) {

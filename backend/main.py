@@ -998,6 +998,8 @@ def update_settings(settings: dict):
     settings_state["ai_auto_reply"] = settings.get("ai_auto_reply", False)
     settings_state["regos_endpoint"] = settings.get("regos_endpoint", "")
     settings_state["regos_token"] = settings.get("regos_token", "")
+    if "roles" in settings:
+        settings_state["roles"] = settings.get("roles")
     save_settings(settings_state)
     print("Settings updated and saved.")
     return {"status": "success", "settings": settings_state}

@@ -963,6 +963,11 @@ window.HR = {
             if (window.App && typeof window.App.applyPermissions === 'function') {
                 window.App.applyPermissions();
             }
+            
+            // Sync updated permissions to backend
+            if (window.App && typeof window.App.syncSettingsToBackend === 'function') {
+                window.App.syncSettingsToBackend();
+            }
         }
     },
 
