@@ -44,11 +44,15 @@ window.ERP = {
         const settings = AppStorage.load().settings;
         const currency = settings.currency;
 
-        const filtered = inventory.filter(p => 
-            p.name.toLowerCase().includes(searchVal) || 
-            p.sku.toLowerCase().includes(searchVal) || 
-            p.category.toLowerCase().includes(searchVal)
-        );
+        const searchValNorm = window.normalizeUzbek ? window.normalizeUzbek(searchVal) : searchVal.toLowerCase();
+        const filtered = inventory.filter(p => {
+            const nameNorm = window.normalizeUzbek ? window.normalizeUzbek(p.name) : p.name.toLowerCase();
+            const skuNorm = window.normalizeUzbek ? window.normalizeUzbek(p.sku) : p.sku.toLowerCase();
+            const catNorm = p.category ? (window.normalizeUzbek ? window.normalizeUzbek(p.category) : p.category.toLowerCase()) : '';
+            return nameNorm.includes(searchValNorm) || 
+                   skuNorm.includes(searchValNorm) || 
+                   catNorm.includes(searchValNorm);
+        });
 
         // Ombor statistikasi
         const totalProducts = inventory.length;

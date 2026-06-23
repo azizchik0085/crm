@@ -129,3 +129,39 @@ const AppStorage = {
         return DEFAULT_DATA;
     }
 };
+
+// Bi-directional Uzbek transliteration maps for frontend searches
+const CYRILLIC_TO_LATIN = {
+    'А': 'A', 'а': 'a', 'Б': 'B', 'б': 'b', 'В': 'V', 'в': 'v',
+    'Г': 'G', 'г': 'g', 'Д': 'D', 'д': 'd', 'Е': 'E', 'е': 'e',
+    'Ё': 'Yo', 'ё': 'yo', 'Ж': 'J', 'ж': 'j', 'З': 'Z', 'з': 'z',
+    'И': 'I', 'и': 'i', 'Й': 'Y', 'й': 'y', 'К': 'K', 'к': 'k',
+    'Л': 'L', 'л': 'l', 'М': 'M', 'м': 'm', 'Н': 'N', 'н': 'n',
+    'О': 'O', 'о': 'o', 'П': 'P', 'п': 'p', 'Р': 'R', 'р': 'r',
+    'С': 'S', 'с': 's', 'Т': 'T', 'т': 't', 'У': 'U', 'у': 'u',
+    'Ф': 'F', 'ф': 'f', 'Х': 'X', 'х': 'x', 'Ц': 'Ts', 'ц': 'ts',
+    'Ч': 'Ch', 'ч': 'ch', 'Ш': 'Sh', 'ш': 'sh', 'Ъ': '', 'ъ': '',
+    'Ы': 'I', 'ы': 'i', 'Э': 'E', 'э': 'e', 'Ю': 'Yu', 'ю': 'yu',
+    'Я': 'Ya', 'я': 'ya', 'Ў': 'O', 'ў': 'o', 'Қ': 'Q', 'қ': 'q',
+    'Ғ': 'G', 'ғ': 'g', 'Ҳ': 'H', 'ҳ': 'h'
+};
+
+window.normalizeUzbek = function(text) {
+    if (!text) return "";
+    text = text.toLowerCase().trim();
+    
+    // 1. Transliterate Cyrillic to Latin
+    let result = "";
+    for (let i = 0; i < text.length; i++) {
+        const char = text[i];
+        result += CYRILLIC_TO_LATIN[char] || char;
+    }
+    
+    // 2. Normalize apostrophes and typical Uzbek characters
+    const apostrophes = ['’', '‘', '`', '´', '′', "'"];
+    for (const apo of apostrophes) {
+        result = result.split(apo).join("");
+    }
+    
+    return result;
+};

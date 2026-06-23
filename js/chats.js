@@ -73,10 +73,11 @@ window.Chats = {
         const listContainer = document.getElementById('chats-list-content');
         if (!listContainer) return;
 
-        const searchQuery = (document.getElementById('chats-search-input')?.value || '').toLowerCase().trim();
+        const searchQueryNorm = window.normalizeUzbek ? window.normalizeUzbek(searchQuery) : searchQuery.toLowerCase();
         const filteredChats = this.chatsData.filter(chat => {
-            return chat.customer_name.toLowerCase().includes(searchQuery) ||
-                   (chat.last_message_text || '').toLowerCase().includes(searchQuery);
+            const nameNorm = window.normalizeUzbek ? window.normalizeUzbek(chat.customer_name) : chat.customer_name.toLowerCase();
+            const msgNorm = window.normalizeUzbek ? window.normalizeUzbek(chat.last_message_text || '') : (chat.last_message_text || '').toLowerCase();
+            return nameNorm.includes(searchQueryNorm) || msgNorm.includes(searchQueryNorm);
         });
 
         if (filteredChats.length === 0) {

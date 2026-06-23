@@ -70,11 +70,29 @@ window.Receipts = {
 
         let filtered = this.receiptsList;
         if (searchVal) {
-            filtered = filtered.filter(r => 
-                (r.code && r.code.toLowerCase().includes(searchVal)) ||
-                (r.cashier_name && r.cashier_name.toLowerCase().includes(searchVal)) ||
-                (r.id && r.id.toLowerCase().includes(searchVal))
-            );
+            const searchValNorm = window.normalizeUzbek ? window.normalizeUzbek(searchVal) : searchVal.toLowerCase();
+            filtered = filtered.filter(r => {
+                const codeNorm = r.code ? (window.normalizeUzbek ? window.normalizeUzbek(r.code) : r.code.toLowerCase()) : '';
+                const cashierNorm = r.cashier_name ? (window.normalizeUzbek ? window.normalizeUzbek(r.cashier_name) : r.cashier_name.toLowerCase()) : '';
+                const idNorm = r.id ? (window.normalizeUzbek ? window.normalizeUzbek(r.id) : r.id.toLowerCase()) : '';
+                
+                let customerNorm = '';
+                let sellerNorm = '';
+                if (r.items) {
+                    if (r.items.customer_name) {
+                        customerNorm = window.normalizeUzbek ? window.normalizeUzbek(r.items.customer_name) : r.items.customer_name.toLowerCase();
+                    }
+                    if (r.items.seller_name) {
+                        sellerNorm = window.normalizeUzbek ? window.normalizeUzbek(r.items.seller_name) : r.items.seller_name.toLowerCase();
+                    }
+                }
+                
+                return codeNorm.includes(searchValNorm) || 
+                       cashierNorm.includes(searchValNorm) || 
+                       idNorm.includes(searchValNorm) ||
+                       customerNorm.includes(searchValNorm) ||
+                       sellerNorm.includes(searchValNorm);
+            });
         }
 
         // Sort by created_at descending

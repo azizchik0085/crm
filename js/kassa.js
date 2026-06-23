@@ -189,13 +189,19 @@ window.Kassa = {
         }
 
         if (searchVal) {
-            filtered = filtered.filter(r => 
-                (r.code && r.code.toLowerCase().includes(searchVal)) ||
-                (r.cashier_name && r.cashier_name.toLowerCase().includes(searchVal)) ||
-                (r.parsedItems.customer_name && r.parsedItems.customer_name.toLowerCase().includes(searchVal)) ||
-                (r.parsedItems.customer_phone && r.parsedItems.customer_phone.includes(searchVal)) ||
-                (r.parsedItems.delivery.courier_name && r.parsedItems.delivery.courier_name.toLowerCase().includes(searchVal))
-            );
+            const searchValNorm = window.normalizeUzbek ? window.normalizeUzbek(searchVal) : searchVal.toLowerCase();
+            filtered = filtered.filter(r => {
+                const codeNorm = r.code ? (window.normalizeUzbek ? window.normalizeUzbek(r.code) : r.code.toLowerCase()) : '';
+                const cashierNorm = r.cashier_name ? (window.normalizeUzbek ? window.normalizeUzbek(r.cashier_name) : r.cashier_name.toLowerCase()) : '';
+                const customerNorm = r.parsedItems.customer_name ? (window.normalizeUzbek ? window.normalizeUzbek(r.parsedItems.customer_name) : r.parsedItems.customer_name.toLowerCase()) : '';
+                const courierNorm = r.parsedItems.delivery.courier_name ? (window.normalizeUzbek ? window.normalizeUzbek(r.parsedItems.delivery.courier_name) : r.parsedItems.delivery.courier_name.toLowerCase()) : '';
+                
+                return codeNorm.includes(searchValNorm) || 
+                       cashierNorm.includes(searchValNorm) || 
+                       customerNorm.includes(searchValNorm) ||
+                       (r.parsedItems.customer_phone && r.parsedItems.customer_phone.includes(searchVal)) ||
+                       courierNorm.includes(searchValNorm);
+            });
         }
 
         // Sort by date descending

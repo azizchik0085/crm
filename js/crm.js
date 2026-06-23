@@ -98,13 +98,16 @@ window.CRM = {
         // Supabase yoki keshdan mijozlarni olamiz
         const customers = await DB.getCustomers();
         
-        // Qidiruv bo'yicha filtrlaymiz
-        const filteredCustomers = customers.filter(c => 
-            c.name.toLowerCase().includes(searchVal) || 
-            (c.phone && c.phone.includes(searchVal)) ||
-            (c.phone2 && c.phone2.includes(searchVal)) ||
-            (c.operator && c.operator.toLowerCase().includes(searchVal))
-        );
+        // Qidiruv bo'yicha filtrlaymiz (Lotin va Kirill transkripsiyasi bilan)
+        const searchValNorm = window.normalizeUzbek ? window.normalizeUzbek(searchVal) : searchVal.toLowerCase();
+        const filteredCustomers = customers.filter(c => {
+            const nameNorm = window.normalizeUzbek ? window.normalizeUzbek(c.name) : c.name.toLowerCase();
+            const operatorNorm = c.operator ? (window.normalizeUzbek ? window.normalizeUzbek(c.operator) : c.operator.toLowerCase()) : '';
+            return nameNorm.includes(searchValNorm) || 
+                   (c.phone && c.phone.includes(searchVal)) ||
+                   (c.phone2 && c.phone2.includes(searchVal)) ||
+                   operatorNorm.includes(searchValNorm);
+        });
 
         if (this.activeTab === 'kanban') {
             container.innerHTML = this.renderKanban(filteredCustomers);

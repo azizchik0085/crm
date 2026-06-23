@@ -1040,11 +1040,78 @@ def call_gemini(prompt: str, system_instruction: str = None) -> str:
         print(f"Gemini API Exception: {e}")
         return f"Gemini API bilan bog'lanishda xatolik yuz berdi: {e}"
 
+# Bi-directional Uzbek transliteration maps for Latin <-> Cyrillic searches
+CYRILLIC_TO_LATIN = {
+    'А': 'A', 'а': 'a', 'Б': 'B', 'б': 'b', 'В': 'V', 'в': 'v',
+    'Г': 'G', 'г': 'g', 'Д': 'D', 'д': 'd', 'Е': 'E', 'е': 'e',
+    'Ё': 'Yo', 'ё': 'yo', 'Ж': 'J', 'ж': 'j', 'З': 'Z', 'з': 'z',
+    'И': 'I', 'и': 'i', 'Й': 'Y', 'й': 'y', 'К': 'K', 'к': 'k',
+    'Л': 'L', 'л': 'l', 'М': 'M', 'м': 'm', 'Н': 'N', 'н': 'n',
+    'О': 'O', 'о': 'o', 'П': 'P', 'п': 'p', 'Р': 'R', 'р': 'r',
+    'С': 'S', 'с': 's', 'Т': 'T', 'т': 't', 'У': 'U', 'у': 'u',
+    'Ф': 'F', 'ф': 'f', 'Х': 'X', 'х': 'x', 'Ц': 'Ts', 'ц': 'ts',
+    'Ч': 'Ch', 'ч': 'ch', 'Ш': 'Sh', 'ш': 'sh', 'Ъ': '', 'ъ': '',
+    'Ы': 'I', 'ы': 'i', 'Э': 'E', 'э': 'e', 'Ю': 'Yu', 'ю': 'yu',
+    'Я': 'Ya', 'я': 'ya', 'Ў': 'O', 'ў': 'o', 'Қ': 'Q', 'қ': 'q',
+    'Ғ': 'G', 'ғ': 'g', 'Ҳ': 'H', 'ҳ': 'h'
+}
+
+LATIN_TO_CYRILLIC = {
+    'sh': 'ш', 'ch': 'ч', 'yo': 'ё', 'yu': 'ю', 'ya': 'я', 'ts': 'ц',
+    'o\'': 'ў', 'o`': 'ў', 'o’': 'ў', 'o‘': 'ў', 'g\'': 'ғ', 'g`': 'ғ', 'g’': 'ғ', 'g‘': 'ғ',
+    'Sh': 'Ш', 'Ch': 'Ч', 'Yo': 'Ё', 'Yu': 'Ю', 'Ya': 'Я', 'Ts': 'Ц',
+    'O\'': 'Ў', 'O`': 'Ў', 'O’': 'Ў', 'O‘': 'Ў', 'G\'': 'Ғ', 'G`': 'Ғ', 'G’': 'Ғ', 'G‘': 'Ғ',
+    'A': 'А', 'a': 'а', 'B': 'Б', 'b': 'б', 'V': 'В', 'v': 'в',
+    'G': 'Г', 'g': 'г', 'D': 'Д', 'd': 'д', 'E': 'Е', 'e': 'е',
+    'J': 'Ж', 'j': 'ж', 'Z': 'З', 'z': 'з', 'I': 'И', 'i': 'и',
+    'Y': 'Й', 'y': 'й', 'K': 'К', 'k': 'к', 'L': 'Л', 'l': 'л',
+    'M': 'М', 'm': 'м', 'N': 'Н', 'n': 'н', 'O': 'О', 'o': 'о',
+    'P': 'П', 'p': 'п', 'R': 'Р', 'r': 'р', 'S': 'С', 's': 'с',
+    'T': 'Т', 't': 'т', 'U': 'У', 'u': 'у', 'F': 'Ф', 'f': 'ф',
+    'X': 'Х', 'x': 'х', 'Q': 'Қ', 'q': 'қ', 'H': 'Ҳ', 'h': 'ҳ'
+}
+
+def to_latin(text: str) -> str:
+    if not text:
+        return ""
+    res = []
+    for char in text:
+        res.append(CYRILLIC_TO_LATIN.get(char, char))
+    return "".join(res)
+
+def to_cyrillic(text: str) -> str:
+    if not text:
+        return ""
+    temp = text
+    for apo in ['’', '‘', '`', '´', '′']:
+        temp = temp.replace(apo, "'")
+    for lat, cyr in LATIN_TO_CYRILLIC.items():
+        temp = temp.replace(lat, cyr)
+    return temp
+
+def normalize_uzbek(text: str) -> str:
+    if not text:
+        return ""
+    text = text.lower().strip()
+    
+    # 1. Transliterate Cyrillic to Latin
+    res = []
+    for char in text:
+        res.append(CYRILLIC_TO_LATIN.get(char, char))
+    text = "".join(res)
+    
+    # 2. Normalize apostrophes and typical Uzbek characters
+    for apo in ['’', '‘', '`', '´', '′', "'"]:
+        text = text.replace(apo, "")
+        
+    return text
+
 def generate_analyze_fallback(prompt: str, customers: list, inventory: list, total_income: float, total_expense: float, net_balance: float) -> str:
     prompt_lower = prompt.lower().strip()
+    prompt_norm = normalize_uzbek(prompt)
     
     # Clean words in prompt for word-by-word matching
-    prompt_words = [w.strip("?,.:!\"'()-") for w in prompt_lower.split()]
+    prompt_words = [w.strip("?,.:!\"'()-") for w in prompt_norm.split()]
     
     # Excluded common words that should not trigger specific product matches
     exclusions = {
@@ -1058,19 +1125,19 @@ def generate_analyze_fallback(prompt: str, customers: list, inventory: list, tot
     matched_products = []
     for p in inventory:
         p_name = p.get("name", "")
-        p_name_lower = p_name.lower()
+        p_name_norm = normalize_uzbek(p_name)
         p_sku = p.get("sku", "")
-        p_sku_lower = p_sku.lower() if p_sku else ""
+        p_sku_norm = normalize_uzbek(p_sku)
         
         # Check SKU match
-        sku_match = p_sku_lower and p_sku_lower in prompt_lower
+        sku_match = p_sku_norm and p_sku_norm in prompt_norm
         
         # Check if the entire product name is in the prompt
-        full_match = (len(p_name_lower) >= 3 and p_name_lower in prompt_lower)
+        full_match = (len(p_name_norm) >= 3 and p_name_norm in prompt_norm)
         
         # Check word-by-word match with suffix-awareness (prefix/substring matching)
         word_match = False
-        p_words = [w.strip("(),\"'.-") for w in p_name_lower.split()]
+        p_words = [w.strip("(),\"'.-") for w in p_name_norm.split()]
         for pw in p_words:
             if len(pw) >= 3 and pw not in exclusions:
                 for prw in prompt_words:
@@ -1088,7 +1155,7 @@ def generate_analyze_fallback(prompt: str, customers: list, inventory: list, tot
     matched_categories = set()
     for p in inventory:
         cat = p.get("category", "")
-        if cat and len(cat) >= 3 and cat.lower() in prompt_lower:
+        if cat and len(cat) >= 3 and normalize_uzbek(cat) in prompt_norm:
             matched_categories.add(cat)
             
     # 3. Handle specific product results
@@ -1203,9 +1270,10 @@ Tizimning jonli hisoboti:
 
 def generate_chat_fallback(customer_name: str, message_text: str, inventory: list) -> str:
     msg_lower = message_text.lower().strip() if message_text else ""
+    msg_norm = normalize_uzbek(message_text)
     
     # Clean words in prompt for word-by-word matching
-    msg_words = [w.strip("?,.:!\"'()-") for w in msg_lower.split()]
+    msg_words = [w.strip("?,.:!\"'()-") for w in msg_norm.split()]
     
     exclusions = {
         "bor", "bormi", "yoq", "yo'q", "narx", "narxi", "narxlari", "qancha", "necha", "pul", "som", "so'm"
@@ -1215,19 +1283,19 @@ def generate_chat_fallback(customer_name: str, message_text: str, inventory: lis
     matched_product = None
     for p in inventory:
         p_name = p.get("name", "")
-        p_name_lower = p_name.lower()
+        p_name_norm = normalize_uzbek(p_name)
         p_sku = p.get("sku", "")
-        p_sku_lower = p_sku.lower() if p_sku else ""
+        p_sku_norm = normalize_uzbek(p_sku)
         
         # Check SKU match
-        sku_match = p_sku_lower and p_sku_lower in msg_lower
+        sku_match = p_sku_norm and p_sku_norm in msg_norm
         
         # Check if the entire product name is in the prompt
-        full_match = (len(p_name_lower) >= 3 and p_name_lower in msg_lower)
+        full_match = (len(p_name_norm) >= 3 and p_name_norm in msg_norm)
         
         # Check word-by-word match with suffix-awareness (prefix/substring matching)
         word_match = False
-        p_words = [w.strip("(),\"'.-") for w in p_name_lower.split()]
+        p_words = [w.strip("(),\"'.-") for w in p_name_norm.split()]
         for pw in p_words:
             if len(pw) >= 3 and pw not in exclusions:
                 for mw in msg_words:
@@ -2589,8 +2657,11 @@ def run_sync_in_background(days: int):
 def get_receipts(search: str = None):
     try:
         if search:
-            search_escaped = f"%{search}%"
-            path = f"receipts?select=*&or=(code.ilike.{search_escaped},cashier_name.ilike.{search_escaped})&order=created_at.desc&limit=1000"
+            search_lat = to_latin(search)
+            search_cyr = to_cyrillic(search)
+            term_lat = f"%{search_lat}%"
+            term_cyr = f"%{search_cyr}%"
+            path = f"receipts?select=*&or=(code.ilike.{term_lat},cashier_name.ilike.{term_lat},code.ilike.{term_cyr},cashier_name.ilike.{term_cyr})&order=created_at.desc&limit=1000"
             return supabase_req("GET", path)
         else:
             return supabase_req("GET", "receipts?select=*&order=created_at.desc&limit=1000")
