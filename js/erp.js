@@ -892,7 +892,7 @@ window.HR = {
                 const rolePerms = typeof role === 'string' ? [] : (role.permissions || []);
                 
                 html += `
-                    <div class="role-item" style="border: 1px solid var(--border-color); border-radius: 8px; background: rgba(255,255,255,0.02); overflow: hidden;">
+                    <div class="role-item" style="border: 1px solid var(--border-color); border-radius: 8px; background: rgba(255,255,255,0.02); overflow: hidden; margin-bottom: 10px;">
                         <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: rgba(255,255,255,0.02); cursor: pointer;" onclick="HR.toggleRoleExpand('${idx}')">
                             <span style="font-size: 14px; font-weight: 600; color: var(--text-main); display: flex; align-items: center; gap: 6px;">
                                 <i class="fas fa-chevron-right" id="role-chevron-${idx}" style="font-size: 10px; transition: transform 0.2s;"></i> ${roleName}
