@@ -312,6 +312,9 @@
                         <p>Sotuvlar voronkasi va mijozlar ma'lumotlari</p>
                     </div>
                     <div class="header-actions">
+                        <button class="btn btn-secondary" onclick="CRM.syncAmoCRMLeads()" id="btn-amocrm-sync">
+                            <i class="fas fa-sync"></i> amoCRM Sinx
+                        </button>
                         <button class="btn btn-primary" onclick="CRM.openAddCustomerModal()">
                             <i class="fas fa-plus"></i> Yangi Mijoz
                         </button>
@@ -765,6 +768,24 @@
                             <label>REGOS Webhook URL (Qabul qilish manzili)</label>
                             <input type="text" id="settings-regos-webhook" class="form-control" readonly style="font-family: 'JetBrains Mono'; font-size: 12px; background: rgba(0,0,0,0.1); cursor: text;">
                             <small style="color: var(--text-muted); font-size: 11px;">REGOS tizimidan real vaqtda cheklar va tovarlarni sinxronlash uchun ushbu manzilni REGOS shaxsiy kabinetida sozlang.</small>
+                        </div>
+                        <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 24px 0;">
+                        <h4 style="margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+                            <i class="fas fa-plug" style="color: #f59e0b"></i> amoCRM Integratsiyasi
+                        </h4>
+                        <div class="form-group">
+                            <label for="settings-amocrm-subdomain">amoCRM Subdomain</label>
+                            <input type="text" id="settings-amocrm-subdomain" class="form-control" placeholder="Masalan: companyname">
+                            <small style="color: var(--text-muted); font-size: 11px;">Sizning amoCRM subdomeningiz (masalan, agar URL companyname.amocrm.ru bo'lsa, 'companyname' kiriting).</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="settings-amocrm-token">amoCRM Private Integration Token</label>
+                            <input type="password" id="settings-amocrm-token" class="form-control" placeholder="amoCRM shaxsiy integratsiya tokeni (LTI)">
+                        </div>
+                        <div class="form-group">
+                            <label>amoCRM Webhook URL</label>
+                            <input type="text" id="settings-amocrm-webhook" class="form-control" readonly style="font-family: 'JetBrains Mono'; font-size: 12px; background: rgba(0,0,0,0.1); cursor: text;">
+                            <small style="color: var(--text-muted); font-size: 11px;">Mijoz/Sotuv holatlari o'zgarganda real vaqtda yangilanishi uchun ushbu manzilni amoCRM Webhook sozlamalarida sozlang.</small>
                         </div>
                         <div style="margin-top: 24px; display:flex; gap:16px;">
                             <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Sozlamalarni saqlash</button>
@@ -1254,6 +1275,7 @@
                     <div id="rec-detail-customer-row" style="display: none; justify-content: space-between;"><span style="color: var(--text-muted);">Mijoz:</span> <strong id="rec-detail-customer">-</strong></div>
                     <div id="rec-detail-phone-row" style="display: none; justify-content: space-between;"><span style="color: var(--text-muted);">Mijoz telefoni:</span> <span id="rec-detail-phone">-</span></div>
                     <div id="rec-detail-seller-row" style="display: none; justify-content: space-between;"><span style="color: var(--text-muted);">Sotuvchi:</span> <strong id="rec-detail-seller">-</strong></div>
+                    <div id="rec-detail-operator-row" style="display: none; justify-content: space-between;"><span style="color: var(--text-muted);">amoCRM Operator:</span> <strong id="rec-detail-operator">-</strong></div>
                 </div>
                 
                 <h4 style="margin-top: 16px; margin-bottom: 8px; color: var(--text-main);">Sotilgan mahsulotlar</h4>

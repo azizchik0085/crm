@@ -55,6 +55,8 @@ window.App = {
                     data.settings.aiAutoReply = !!backendSettings.ai_auto_reply;
                     data.settings.regosEndpoint = backendSettings.regos_endpoint || data.settings.regosEndpoint;
                     data.settings.regosToken = backendSettings.regos_token || data.settings.regosToken;
+                    data.settings.amocrmSubdomain = backendSettings.amocrm_subdomain || data.settings.amocrmSubdomain;
+                    data.settings.amocrmToken = backendSettings.amocrm_token || data.settings.amocrmToken;
                     
                     if (backendSettings.roles && backendSettings.roles.length > 0) {
                         data.settings.roles = backendSettings.roles;
@@ -70,7 +72,7 @@ window.App = {
 
     syncSettingsToBackend: function() {
         const data = AppStorage.load();
-        if (data.settings.telegramToken || data.settings.instagramToken || data.settings.geminiApiKey || data.settings.openaiApiKey || data.settings.groqApiKey || data.settings.regosEndpoint || data.settings.regosToken || (data.settings.roles && data.settings.roles.length > 0)) {
+        if (data.settings.telegramToken || data.settings.instagramToken || data.settings.geminiApiKey || data.settings.openaiApiKey || data.settings.groqApiKey || data.settings.regosEndpoint || data.settings.regosToken || data.settings.amocrmSubdomain || data.settings.amocrmToken || (data.settings.roles && data.settings.roles.length > 0)) {
             fetch('/api/settings', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -85,6 +87,8 @@ window.App = {
                     ai_auto_reply: !!data.settings.aiAutoReply,
                     regos_endpoint: data.settings.regosEndpoint || '',
                     regos_token: data.settings.regosToken || '',
+                    amocrm_subdomain: data.settings.amocrmSubdomain || '',
+                    amocrm_token: data.settings.amocrmToken || '',
                     roles: data.settings.roles || []
                 })
             }).catch(err => console.error("Initial settings sync failed:", err));
@@ -177,6 +181,12 @@ window.App = {
         const regosTokenInput = document.getElementById('settings-regos-token');
         if (regosTokenInput) regosTokenInput.value = data.settings.regosToken || '';
 
+        const amocrmSubdomainInput = document.getElementById('settings-amocrm-subdomain');
+        if (amocrmSubdomainInput) amocrmSubdomainInput.value = data.settings.amocrmSubdomain || '';
+
+        const amocrmTokenInput = document.getElementById('settings-amocrm-token');
+        if (amocrmTokenInput) amocrmTokenInput.value = data.settings.amocrmToken || '';
+
         // Webhook manzillarini joriy domen bo'yicha dinamik to'ldirish
         const sipuniWebhookInput = document.getElementById('settings-sipuni-webhook');
         if (sipuniWebhookInput) {
@@ -191,6 +201,11 @@ window.App = {
         const regosWebhookInput = document.getElementById('settings-regos-webhook');
         if (regosWebhookInput) {
             regosWebhookInput.value = window.location.origin + '/api/integration/regos/webhook';
+        }
+
+        const amocrmWebhookInput = document.getElementById('settings-amocrm-webhook');
+        if (amocrmWebhookInput) {
+            amocrmWebhookInput.value = window.location.origin + '/api/integration/amocrm/webhook';
         }
 
         this.onAIProviderChange();
@@ -467,6 +482,8 @@ window.App = {
                 const aiAutoReply = !!document.getElementById('settings-ai-auto-reply')?.checked;
                 const regosEndpoint = document.getElementById('settings-regos-endpoint')?.value.trim() || '';
                 const regosToken = document.getElementById('settings-regos-token')?.value.trim() || '';
+                const amocrmSubdomain = document.getElementById('settings-amocrm-subdomain')?.value.trim() || '';
+                const amocrmToken = document.getElementById('settings-amocrm-token')?.value.trim() || '';
                 
                 const data = AppStorage.load();
                 
@@ -498,6 +515,8 @@ window.App = {
                 data.settings.aiAutoReply = aiAutoReply;
                 data.settings.regosEndpoint = regosEndpoint;
                 data.settings.regosToken = regosToken;
+                data.settings.amocrmSubdomain = amocrmSubdomain;
+                data.settings.amocrmToken = amocrmToken;
                 
                 AppStorage.save(data);
 
@@ -517,6 +536,8 @@ window.App = {
                             ai_auto_reply: aiAutoReply,
                             regos_endpoint: regosEndpoint,
                             regos_token: regosToken,
+                            amocrm_subdomain: amocrmSubdomain,
+                            amocrm_token: amocrmToken,
                             roles: data.settings.roles || []
                         })
                     });

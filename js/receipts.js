@@ -65,6 +65,13 @@ window.Receipts = {
 
         this.receiptsList = Array.isArray(dataRes) ? dataRes : [];
 
+        let customers = [];
+        try {
+            customers = await DB.getCustomers();
+        } catch (e) {
+            console.error("Failed to load customers for receipts render:", e);
+        }
+
         const settings = AppStorage.load().settings;
         const currency = settings.currency;
 
@@ -133,6 +140,7 @@ window.Receipts = {
 
                 let customerInfo = '-';
                 let sellerName = '-';
+                let sellerDisplay = '-';
                 let itemsObj = r.items;
                 if (typeof itemsObj === 'string') {
                     try {
@@ -148,13 +156,30 @@ window.Receipts = {
                         customerInfo = `<strong>${cName || 'Mijoz'}</strong><br><span style="font-size: 11px; color: var(--text-muted); font-family: 'JetBrains Mono';">${cPhone || ''}</span>`;
                     }
                     sellerName = itemsObj.seller_name || '-';
+                    sellerDisplay = `<strong>${sellerName}</strong>`;
+
+                    if (cPhone) {
+                        const cleanRecPhone = cPhone.replace(/\D/g, '').slice(-9);
+                        if (cleanRecPhone.length >= 7) {
+                            const matchedCustomer = customers.find(c => {
+                                const phoneClean = c.phone ? c.phone.replace(/\D/g, '').slice(-9) : '';
+                                const phone2Clean = c.phone2 ? c.phone2.replace(/\D/g, '').slice(-9) : '';
+                                return (phoneClean && phoneClean === cleanRecPhone) || (phone2Clean && phone2Clean === cleanRecPhone);
+                            });
+                            if (matchedCustomer && matchedCustomer.operator) {
+                                sellerDisplay += `<br><span style="font-size: 11px; color: var(--text-muted); display: inline-flex; align-items: center; gap: 4px;" title="amoCRM Operator"><i class="fas fa-user-tie" style="color:var(--accent);"></i> ${matchedCustomer.operator}</span>`;
+                            }
+                        }
+                    }
+                } else {
+                    sellerDisplay = sellerName;
                 }
 
                 html += `
                     <tr>
                         <td><strong>${r.code || 'CH-' + r.id.substring(0, 8)}</strong></td>
                         <td>${r.cashier_name || 'Noma\'lum'}</td>
-                        <td>${sellerName}</td>
+                        <td>${sellerDisplay}</td>
                         <td>${customerInfo}</td>
                         <td><span class="badge ${badgeClass}">${r.payment_type || 'Naqd'}</span></td>
                         <td><span style="font-family: 'JetBrains Mono'; font-size: 13px;">${formattedDate}</span></td>
@@ -185,7 +210,7 @@ window.Receipts = {
         container.innerHTML = html;
     },
 
-    openDetails: function(id) {
+    openDetails: async function(id) {
         try {
             const receipt = this.receiptsList.find(r => String(r.id) === String(id));
             if (!receipt) {
@@ -251,6 +276,15 @@ window.Receipts = {
             const customerPhoneEl = document.getElementById('rec-detail-phone');
             const sellerRowEl = document.getElementById('rec-detail-seller-row');
             const sellerEl = document.getElementById('rec-detail-seller');
+            const operatorRowEl = document.getElementById('rec-detail-operator-row');
+            const operatorEl = document.getElementById('rec-detail-operator');
+
+            let customers = [];
+            try {
+                customers = await DB.getCustomers();
+            } catch (e) {
+                console.error("Failed to load customers for receipt details:", e);
+            }
 
             if (customerName) {
                 if (customerNameEl) customerNameEl.textContent = customerName;
@@ -271,6 +305,28 @@ window.Receipts = {
                 if (sellerRowEl) sellerRowEl.style.display = 'flex';
             } else {
                 if (sellerRowEl) sellerRowEl.style.display = 'none';
+            }
+
+            let operatorName = '';
+            if (customerPhone) {
+                const cleanRecPhone = customerPhone.replace(/\D/g, '').slice(-9);
+                if (cleanRecPhone.length >= 7) {
+                    const matchedCustomer = customers.find(c => {
+                        const phoneClean = c.phone ? c.phone.replace(/\D/g, '').slice(-9) : '';
+                        const phone2Clean = c.phone2 ? c.phone2.replace(/\D/g, '').slice(-9) : '';
+                        return (phoneClean && phoneClean === cleanRecPhone) || (phone2Clean && phone2Clean === cleanRecPhone);
+                    });
+                    if (matchedCustomer && matchedCustomer.operator) {
+                        operatorName = matchedCustomer.operator;
+                    }
+                }
+            }
+
+            if (operatorName) {
+                if (operatorEl) operatorEl.textContent = operatorName;
+                if (operatorRowEl) operatorRowEl.style.display = 'flex';
+            } else {
+                if (operatorRowEl) operatorRowEl.style.display = 'none';
             }
 
             if (itemsEl) {

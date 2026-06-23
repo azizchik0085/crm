@@ -803,7 +803,8 @@ def load_settings():
                 default_keys = {
                     "telegram_token": "", "instagram_token": "", "ai_provider": "local",
                     "telephony_provider": "sarkor", "gemini_api_key": "", "openai_api_key": "",
-                    "groq_api_key": "", "ai_auto_reply": False, "regos_endpoint": "", "regos_token": ""
+                    "groq_api_key": "", "ai_auto_reply": False, "regos_endpoint": "", "regos_token": "",
+                    "amocrm_subdomain": "", "amocrm_token": ""
                 }
                 for k, v in default_keys.items():
                     if k not in db_settings:
@@ -833,10 +834,14 @@ def load_settings():
                     data["regos_endpoint"] = ""
                 if "regos_token" not in data:
                     data["regos_token"] = ""
+                if "amocrm_subdomain" not in data:
+                    data["amocrm_subdomain"] = ""
+                if "amocrm_token" not in data:
+                    data["amocrm_token"] = ""
                 return data
         except Exception:
             pass
-    return {"telegram_token": "", "instagram_token": "", "ai_provider": "local", "telephony_provider": "sarkor", "gemini_api_key": "", "openai_api_key": "", "groq_api_key": "", "ai_auto_reply": False, "regos_endpoint": "", "regos_token": ""}
+    return {"telegram_token": "", "instagram_token": "", "ai_provider": "local", "telephony_provider": "sarkor", "gemini_api_key": "", "openai_api_key": "", "groq_api_key": "", "ai_auto_reply": False, "regos_endpoint": "", "regos_token": "", "amocrm_subdomain": "", "amocrm_token": ""}
 
 def save_settings(settings):
     # 1. Save locally
@@ -1038,6 +1043,8 @@ def update_settings(settings: dict):
     settings_state["ai_auto_reply"] = settings.get("ai_auto_reply", False)
     settings_state["regos_endpoint"] = settings.get("regos_endpoint", "")
     settings_state["regos_token"] = settings.get("regos_token", "")
+    settings_state["amocrm_subdomain"] = settings.get("amocrm_subdomain", "")
+    settings_state["amocrm_token"] = settings.get("amocrm_token", "")
     if "roles" in settings:
         settings_state["roles"] = settings.get("roles")
     save_settings(settings_state)
@@ -2831,6 +2838,272 @@ def get_courier_receipts(courier_name: str):
         return filtered
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+# --- AMOCRM INTEGRATION ENDPOINTS AND HELPERS ---
+
+def get_amocrm_headers(token):
+    return {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json"
+    }
+
+def fetch_amocrm_lead_details(subdomain, token, lead_id):
+    headers = get_amocrm_headers(token)
+    url = f"https://{subdomain}.amocrm.ru/api/v4/leads/{lead_id}?with=contacts"
+    try:
+        res = requests.request("GET", url, headers=headers, timeout=10)
+        if res.status_code == 200:
+            return res.json()
+    except Exception as e:
+        print(f"Failed to fetch amoCRM lead {lead_id}: {e}")
+    return None
+
+def fetch_amocrm_contact_details(subdomain, token, contact_id):
+    headers = get_amocrm_headers(token)
+    url = f"https://{subdomain}.amocrm.ru/api/v4/contacts/{contact_id}"
+    try:
+        res = requests.request("GET", url, headers=headers, timeout=10)
+        if res.status_code == 200:
+            return res.json()
+    except Exception as e:
+        print(f"Failed to fetch amoCRM contact {contact_id}: {e}")
+    return None
+
+def extract_phone_from_contact(contact):
+    if not contact:
+        return ""
+    cf_values = contact.get("custom_fields_values") or []
+    for cf in cf_values:
+        if cf.get("field_code") == "PHONE":
+            vals = cf.get("values") or []
+            if vals:
+                return vals[0].get("value", "")
+    return ""
+
+def get_amocrm_users(subdomain, token):
+    url = f"https://{subdomain}.amocrm.ru/api/v4/users"
+    headers = get_amocrm_headers(token)
+    user_map = {}
+    try:
+        res = requests.request("GET", url, headers=headers, timeout=10)
+        if res.status_code == 200:
+            users = res.json().get("_embedded", {}).get("users", [])
+            for u in users:
+                user_map[u.get("id")] = u.get("name")
+    except Exception as e:
+        print(f"Failed to fetch amoCRM users: {e}")
+    return user_map
+
+# Cache for pipelines to avoid querying on every webhook
+amocrm_pipelines_cache = {}
+
+def get_amocrm_status_map(subdomain, token):
+    global amocrm_pipelines_cache
+    cache_key = f"{subdomain}:{token}"
+    if cache_key in amocrm_pipelines_cache:
+        return amocrm_pipelines_cache[cache_key]
+    
+    status_map = {}
+    url = f"https://{subdomain}.amocrm.ru/api/v4/leads/pipelines"
+    headers = get_amocrm_headers(token)
+    try:
+        res = requests.request("GET", url, headers=headers, timeout=10)
+        if res.status_code == 200:
+            pipelines = res.json().get("_embedded", {}).get("pipelines", [])
+            for p in pipelines:
+                statuses = p.get("_embedded", {}).get("statuses", [])
+                for s in statuses:
+                    s_id = s.get("id")
+                    s_name = s.get("name", "").lower()
+                    s_type = s.get("type") # 3 is won, 4 is lost
+                    
+                    if s_type == 3 or "успеш" in s_name or "won" in s_name:
+                        status_map[s_id] = "won"
+                    elif s_type == 4 or "закрыт" in s_name or "lost" in s_name or "отказ" in s_name:
+                        status_map[s_id] = "lost"
+                    elif "доgovor" in s_name or "кп" in s_name or "proposal" in s_name or "предлож" in s_name:
+                        status_map[s_id] = "proposal"
+                    elif "контакт" in s_name or "звон" in s_name or "обсуж" in s_name:
+                        status_map[s_id] = "contacted"
+                    else:
+                        status_map[s_id] = "lead"
+            amocrm_pipelines_cache[cache_key] = status_map
+    except Exception as e:
+        print(f"Failed to fetch amoCRM pipelines: {e}")
+    return status_map
+
+def get_amocrm_contacts_map(subdomain, token):
+    headers = get_amocrm_headers(token)
+    contact_map = {}
+    url = f"https://{subdomain}.amocrm.ru/api/v4/contacts"
+    params = {"limit": 250}
+    
+    for _ in range(4): # Fetch up to 1000 contacts (4 pages)
+        try:
+            res = requests.request("GET", url, headers=headers, params=params, timeout=10)
+            if res.status_code == 200:
+                data = res.json()
+                contacts = data.get("_embedded", {}).get("contacts", [])
+                if not contacts:
+                    break
+                for c in contacts:
+                    c_id = c.get("id")
+                    c_name = c.get("name", "")
+                    phone = ""
+                    cf_values = c.get("custom_fields_values") or []
+                    for cf in cf_values:
+                        if cf.get("field_code") == "PHONE":
+                            vals = cf.get("values") or []
+                            if vals:
+                                phone = vals[0].get("value", "")
+                                break
+                    contact_map[c_id] = {
+                        "name": c_name,
+                        "phone": phone
+                    }
+                
+                links = data.get("_links", {})
+                next_url = links.get("next", {}).get("href")
+                if next_url:
+                    url = next_url
+                    params = None
+                else:
+                    break
+            else:
+                break
+        except Exception as e:
+            print(f"Failed to fetch amoCRM contacts: {e}")
+            break
+            
+    return contact_map
+
+# Background task for full sync
+def run_amocrm_sync_background(subdomain, token):
+    print("amoCRM Background Sync: started.")
+    user_map = get_amocrm_users(subdomain, token)
+    status_map = get_amocrm_status_map(subdomain, token)
+    contact_map = get_amocrm_contacts_map(subdomain, token)
+    
+    headers = get_amocrm_headers(token)
+    url = f"https://{subdomain}.amocrm.ru/api/v4/leads"
+    params = {"limit": 250, "with": "contacts"}
+    
+    synced_customers = []
+    
+    try:
+        res = requests.request("GET", url, headers=headers, params=params, timeout=15)
+        if res.status_code == 200:
+            data = res.json()
+            leads = data.get("_embedded", {}).get("leads", [])
+            for l in leads:
+                lead_id = l.get("id")
+                lead_name = l.get("name")
+                price = float(l.get("price") or 0)
+                status_id = l.get("status_id")
+                resp_user_id = l.get("responsible_user_id")
+                
+                operator_name = user_map.get(resp_user_id, "")
+                status = status_map.get(status_id, "lead")
+                
+                contacts_list = l.get("_embedded", {}).get("contacts", [])
+                cust_name = lead_name
+                phone = ""
+                
+                if contacts_list:
+                    c_id = contacts_list[0].get("id")
+                    if c_id in contact_map:
+                        phone = contact_map[c_id]["phone"]
+                        cust_name = contact_map[c_id]["name"]
+                
+                if phone:
+                    clean_phone = "".join(c for c in phone if c.isdigit() or c == "+")
+                    customer = {
+                        "id": f"amocrm_{lead_id}",
+                        "name": cust_name,
+                        "phone": clean_phone,
+                        "operator": operator_name,
+                        "status": status,
+                        "value": price,
+                        "source": "amocrm"
+                    }
+                    synced_customers.append(customer)
+            
+            if synced_customers:
+                supabase_req("POST", "customers?on_conflict=id", json_data=synced_customers)
+                print(f"amoCRM Background Sync: successfully synced {len(synced_customers)} customers to database.")
+            else:
+                print("amoCRM Background Sync: no customers with phone numbers found.")
+        else:
+            print(f"amoCRM Background Sync failed: {res.status_code} - {res.text}")
+    except Exception as e:
+        print(f"amoCRM Background Sync failed with exception: {e}")
+
+@app.post("/api/integration/amocrm/sync")
+def sync_amocrm_leads(background_tasks: BackgroundTasks):
+    subdomain = settings_state.get("amocrm_subdomain", "")
+    token = settings_state.get("amocrm_token", "")
+    if not subdomain or not token:
+        raise HTTPException(status_code=400, detail="amoCRM sozlanmagan. Iltimos, sozlamalar sahifasida Subdomain va Tokenni saqlang.")
+        
+    background_tasks.add_task(run_amocrm_sync_background, subdomain, token)
+    return {"status": "success", "message": "Sinxronizatsiya orqa fonda boshlandi."}
+
+@app.post("/api/integration/amocrm/webhook")
+async def amocrm_webhook(request: Request):
+    try:
+        form_data = await request.form()
+        form_dict = dict(form_data)
+        print(f"Received amoCRM webhook: {form_dict}")
+        
+        lead_id = None
+        for k, v in form_dict.items():
+            if k.startswith("leads[") and k.endswith("][id]"):
+                lead_id = v
+                break
+                
+        if lead_id:
+            subdomain = settings_state.get("amocrm_subdomain")
+            token = settings_state.get("amocrm_token")
+            if subdomain and token:
+                lead = fetch_amocrm_lead_details(subdomain, token, lead_id)
+                if lead:
+                    user_map = get_amocrm_users(subdomain, token)
+                    status_map = get_amocrm_status_map(subdomain, token)
+                    
+                    price = float(lead.get("price") or 0)
+                    status_id = lead.get("status_id")
+                    resp_user_id = lead.get("responsible_user_id")
+                    operator_name = user_map.get(resp_user_id, "")
+                    status = status_map.get(status_id, "lead")
+                    
+                    contacts_list = lead.get("_embedded", {}).get("contacts", [])
+                    cust_name = lead.get("name")
+                    phone = ""
+                    
+                    if contacts_list:
+                        c_id = contacts_list[0].get("id")
+                        contact = fetch_amocrm_contact_details(subdomain, token, c_id)
+                        if contact:
+                            cust_name = contact.get("name")
+                            phone = extract_phone_from_contact(contact)
+                            
+                    if phone:
+                        clean_phone = "".join(c for c in phone if c.isdigit() or c == "+")
+                        customer = {
+                            "id": f"amocrm_{lead_id}",
+                            "name": cust_name,
+                            "phone": clean_phone,
+                            "operator": operator_name,
+                            "status": status,
+                            "value": price,
+                            "source": "amocrm"
+                        }
+                        supabase_req("POST", "customers?on_conflict=id", json_data=customer)
+                        print(f"Webhook successfully synced customer from amoCRM: {customer}")
+    except Exception as e:
+        print(f"Error processing amoCRM webhook: {e}")
+        
+    return {"status": "success"}
 
 # Mount frontend files (HTML, CSS, JS) to run at root url (must be mounted last)
 STATIC_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))

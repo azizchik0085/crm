@@ -557,5 +557,44 @@ window.CRM = {
         if (window.App && typeof window.App.updateDashboardStats === 'function') {
             window.App.updateDashboardStats();
         }
+    },
+
+    syncAmoCRMLeads: async function() {
+        const btn = document.getElementById('btn-amocrm-sync');
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sinxronizatsiya...';
+        }
+        
+        try {
+            const response = await fetch('/api/integration/amocrm/sync', {
+                method: 'POST'
+            });
+            const result = await response.json();
+            if (response.ok) {
+                alert(result.message || 'Sinxronizatsiya orqa fonda boshlandi!');
+                // Re-enable and refresh after a short delay
+                setTimeout(async () => {
+                    await this.render();
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = '<i class="fas fa-sync"></i> amoCRM Sinx';
+                    }
+                }, 3000);
+            } else {
+                alert(result.detail || 'Sinxronizatsiya boshlashda xatolik yuz berdi.');
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-sync"></i> amoCRM Sinx';
+                }
+            }
+        } catch (e) {
+            console.error("amoCRM sync error:", e);
+            alert("Serverga ulanishda xatolik yuz berdi.");
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-sync"></i> amoCRM Sinx';
+            }
+        }
     }
 };
