@@ -1041,7 +1041,98 @@ def call_gemini(prompt: str, system_instruction: str = None) -> str:
         return f"Gemini API bilan bog'lanishda xatolik yuz berdi: {e}"
 
 def generate_analyze_fallback(prompt: str, customers: list, inventory: list, total_income: float, total_expense: float, net_balance: float) -> str:
-    prompt_lower = prompt.lower()
+    prompt_lower = prompt.lower().strip()
+    
+    # Clean words in prompt for word-by-word matching
+    prompt_words = [w.strip("?,.:!\"'()-") for w in prompt_lower.split()]
+    
+    # Excluded common words that should not trigger specific product matches
+    exclusions = {
+        "bor", "bormi", "yoq", "yo'q", "narx", "narxi", "narxlari", "qancha", "necha", "pul", "som", "so'm", 
+        "ombor", "mahsulot", "tovar", "qoldiq", "stock", "inventory", "nechta", "tahlil", "yordamchi", "tizim",
+        "moliya", "balans", "kirim", "chiqim", "daromad", "foyda", "xodim", "sotuv", "dona", "kabel", "yangi",
+        "lead", "voronka", "status", "customer", "kontakt"
+    }
+
+    # 1. Search for specific product matches in inventory
+    matched_products = []
+    for p in inventory:
+        p_name = p.get("name", "")
+        p_name_lower = p_name.lower()
+        p_sku = p.get("sku", "")
+        p_sku_lower = p_sku.lower() if p_sku else ""
+        
+        # Check SKU match
+        sku_match = p_sku_lower and p_sku_lower in prompt_lower
+        
+        # Check if the entire product name is in the prompt
+        full_match = (len(p_name_lower) >= 3 and p_name_lower in prompt_lower)
+        
+        # Check word-by-word match with suffix-awareness (prefix/substring matching)
+        word_match = False
+        p_words = [w.strip("(),\"'.-") for w in p_name_lower.split()]
+        for pw in p_words:
+            if len(pw) >= 3 and pw not in exclusions:
+                for prw in prompt_words:
+                    if len(prw) >= 3 and prw not in exclusions:
+                        if prw in pw or pw in prw:
+                            word_match = True
+                            break
+                if word_match:
+                    break
+                    
+        if sku_match or full_match or word_match:
+            matched_products.append(p)
+            
+    # 2. Check if a category was queried
+    matched_categories = set()
+    for p in inventory:
+        cat = p.get("category", "")
+        if cat and len(cat) >= 3 and cat.lower() in prompt_lower:
+            matched_categories.add(cat)
+            
+    # 3. Handle specific product results
+    if matched_products:
+        res_list = []
+        for p in matched_products[:5]:
+            stock = p.get("stock", 0)
+            status = f"✅ Omborda bor ({stock} dona)" if stock > 0 else "❌ Omborda tugagan"
+            price = p.get("price", 0)
+            res_list.append(
+                f"### 📦 **{p.get('name')}**\n"
+                f"- 🏷️ **SKU:** `{p.get('sku')}`\n"
+                f"- 💰 **Sotish narxi:** {price:,} so'm\n"
+                f"- 📊 **Kategoriya:** {p.get('category')}\n"
+                f"- 📈 **Holati:** {status}"
+            )
+        matched_str = "\n\n".join(res_list)
+        if len(matched_products) > 5:
+            matched_str += f"\n\n*Yana {len(matched_products) - 5} ta mos keladigan mahsulot topildi. Savolingizni aniqroq bering.*"
+        return f"""🔍 **Qidirilgan Mahsulotlar (Lokal Dvigatel):**
+
+{matched_str}
+
+*Eslatma: Jonli ma'lumotlar ombordan qidirib ko'rsatildi.*"""
+
+    # 4. Handle category results
+    if matched_categories:
+        cat_products = [p for p in inventory if p.get("category") in matched_categories]
+        if cat_products:
+            res_list = []
+            for p in cat_products[:10]:
+                stock = p.get("stock", 0)
+                status = f"{stock} dona" if stock > 0 else "Tugagan ❌"
+                res_list.append(f"- **{p.get('name')}** (SKU: `{p.get('sku')}`): Narxi: {p.get('price'):,} so'm | Qoldiq: {status}")
+            cat_str = "\n".join(res_list)
+            if len(cat_products) > 10:
+                cat_str += f"\n- ... va yana {len(cat_products) - 10} ta mahsulot."
+            return f"""📁 **Kategoriyadagi mahsulotlar ({', '.join(matched_categories)}) (Lokal Dvigatel):**
+
+{cat_str}
+
+*Eslatma: Ushbu toifadagi ma'lumotlar ombordan olindi.*"""
+
+    # 5. Fallback to general financial, stock or customer reports
     if any(k in prompt_lower for k in ["moliya", "pul", "balans", "kirim", "chiqim", "daromad", "foyda", "expense", "income", "balance"]):
         return f"""💰 **Moliyaviy Tahlil (Lokal Dvigatel):**
 
@@ -1113,20 +1204,41 @@ Tizimning jonli hisoboti:
 def generate_chat_fallback(customer_name: str, message_text: str, inventory: list) -> str:
     msg_lower = message_text.lower().strip() if message_text else ""
     
-    # 1. Product matching
+    # Clean words in prompt for word-by-word matching
+    msg_words = [w.strip("?,.:!\"'()-") for w in msg_lower.split()]
+    
+    exclusions = {
+        "bor", "bormi", "yoq", "yo'q", "narx", "narxi", "narxlari", "qancha", "necha", "pul", "som", "so'm"
+    }
+
+    # 1. Specific product matching
     matched_product = None
     for p in inventory:
-        p_name = p.get("name", "").lower()
-        p_sku = p.get("sku", "").lower() if p.get("sku") else ""
+        p_name = p.get("name", "")
+        p_name_lower = p_name.lower()
+        p_sku = p.get("sku", "")
+        p_sku_lower = p_sku.lower() if p_sku else ""
         
-        # Split product name into words and extract meaningful keywords (length >= 3)
-        words = [w.strip("(),\"'.-") for w in p_name.split()]
-        meaningful_words = [w for w in words if len(w) >= 3 and w not in ["dona", "kabel", "stuli", "stoli"]]
+        # Check SKU match
+        sku_match = p_sku_lower and p_sku_lower in msg_lower
         
-        sku_match = p_sku and p_sku in msg_lower
-        word_match = any(w in msg_lower for w in meaningful_words)
+        # Check if the entire product name is in the prompt
+        full_match = (len(p_name_lower) >= 3 and p_name_lower in msg_lower)
         
-        if sku_match or word_match:
+        # Check word-by-word match with suffix-awareness (prefix/substring matching)
+        word_match = False
+        p_words = [w.strip("(),\"'.-") for w in p_name_lower.split()]
+        for pw in p_words:
+            if len(pw) >= 3 and pw not in exclusions:
+                for mw in msg_words:
+                    if len(mw) >= 3 and mw not in exclusions:
+                        if mw in pw or pw in mw:
+                            word_match = True
+                            break
+                if word_match:
+                    break
+                    
+        if sku_match or full_match or word_match:
             matched_product = p
             break
             
