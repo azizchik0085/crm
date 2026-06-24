@@ -3046,10 +3046,13 @@ def run_amocrm_sync_background(subdomain, token):
             
     try:
         if synced_customers:
-            supabase_req("POST", "customers?on_conflict=id", json_data=synced_customers)
+            chunk_size = 100
+            for i in range(0, len(synced_customers), chunk_size):
+                chunk = synced_customers[i:i + chunk_size]
+                supabase_req("POST", "customers?on_conflict=id", json_data=chunk)
             print(f"amoCRM Background Sync: successfully synced {len(synced_customers)} active customers to database.")
         else:
-            print("amoCRM Background Sync: no active customers with phone numbers found.")
+            print("amoCRM Background Sync: no active customers found.")
     except Exception as e:
         print(f"amoCRM Background Sync failed saving to Supabase: {e}")
 
