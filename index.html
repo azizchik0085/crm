@@ -490,7 +490,10 @@
                         <h1>Sotuv Cheklari (POS)</h1>
                         <p>Kassada urilgan va yopilgan sotuv cheklari tarixi</p>
                     </div>
-                    <div class="header-actions">
+                    <div class="header-actions" style="display: flex; gap: 8px;">
+                        <button class="btn btn-secondary" onclick="CRM.syncAmoCRMLeads()" id="btn-amocrm-sync-receipts">
+                            <i class="fas fa-sync"></i> amoCRM Sinx
+                        </button>
                         <button class="btn btn-primary" id="receipts-sync-btn" onclick="Receipts.syncWithRegos()">
                             <i class="fas fa-sync-alt"></i> REGOS bilan sinxronizatsiya
                         </button>
@@ -1441,18 +1444,18 @@
 
     <!-- Tizim fayllari ulash -->
     <script src="js/storage.js?v=4"></script>
-    <script src="js/db.js?v=4"></script>
+    <script src="js/db.js?v=5"></script>
     <script src="js/telephony.js?v=4"></script>
-    <script src="js/crm.js?v=4"></script>
+    <script src="js/crm.js?v=5"></script>
     <script src="js/chats.js?v=4"></script>
     <script src="js/erp.js?v=7"></script>
     <script src="js/finance.js?v=4"></script>
-    <script src="js/receipts.js?v=5"></script>
+    <script src="js/receipts.js?v=6"></script>
     <script src="js/kassa.js?v=1"></script>
     <!-- JsBarcode Library -->
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
     <script src="js/seniklar.js?v=6"></script>
-    <script src="js/app.js?v=6"></script>
+    <script src="js/app.js?v=7"></script>
     
     <!-- Floating AI Assistant Widget -->
     <div id="ai-assistant-widget" class="ai-widget-closed">
