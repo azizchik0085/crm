@@ -930,7 +930,6 @@ window.App = {
             }
             recentLeadsContainer.innerHTML = leadsHtml;
         }
-    },}
 
         // Grafik chizish
         if (isDirector) {
