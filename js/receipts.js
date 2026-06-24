@@ -162,21 +162,33 @@ window.Receipts = {
                         sellerDisplay = '';
                     }
 
+                    let matchedCustomer = null;
                     if (cPhone) {
                         const cleanRecPhone = cPhone.replace(/\D/g, '').slice(-9);
                         if (cleanRecPhone.length >= 7) {
-                            const matchedCustomer = customers.find(c => {
+                            matchedCustomer = customers.find(c => {
                                 const phoneClean = c.phone ? c.phone.replace(/\D/g, '').slice(-9) : '';
                                 const phone2Clean = c.phone2 ? c.phone2.replace(/\D/g, '').slice(-9) : '';
                                 return (phoneClean && phoneClean === cleanRecPhone) || (phone2Clean && phone2Clean === cleanRecPhone);
                             });
-                            if (matchedCustomer && matchedCustomer.operator) {
-                                if (sellerDisplay) {
-                                    sellerDisplay += `<br><span style="font-size: 11px; color: var(--text-muted); display: inline-flex; align-items: center; gap: 4px;" title="amoCRM Operator"><i class="fas fa-user-tie" style="color:var(--accent);"></i> ${matchedCustomer.operator}</span>`;
-                                } else {
-                                    sellerDisplay = `<span style="font-size: 13px; color: var(--text-main); display: inline-flex; align-items: center; gap: 4px;" title="amoCRM Operator"><i class="fas fa-user-tie" style="color:var(--accent);"></i> ${matchedCustomer.operator}</span>`;
-                                }
-                            }
+                        }
+                    }
+                    
+                    if (!matchedCustomer && cName) {
+                        const cleanRecName = cName.trim().toLowerCase();
+                        if (cleanRecName && cleanRecName !== 'mijoz' && cleanRecName !== 'noma\'lum') {
+                            matchedCustomer = customers.find(c => {
+                                const cNameClean = c.name ? c.name.trim().toLowerCase() : '';
+                                return cNameClean && cNameClean === cleanRecName;
+                            });
+                        }
+                    }
+
+                    if (matchedCustomer && matchedCustomer.operator) {
+                        if (sellerDisplay && sellerDisplay !== '-') {
+                            sellerDisplay += `<br><span style="font-size: 11px; color: var(--text-muted); display: inline-flex; align-items: center; gap: 4px;" title="amoCRM Operator"><i class="fas fa-user-tie" style="color:var(--accent);"></i> ${matchedCustomer.operator}</span>`;
+                        } else {
+                            sellerDisplay = `<span style="font-size: 13px; color: var(--text-main); display: inline-flex; align-items: center; gap: 4px;" title="amoCRM Operator"><i class="fas fa-user-tie" style="color:var(--accent);"></i> ${matchedCustomer.operator}</span>`;
                         }
                     }
                     if (!sellerDisplay) {
@@ -319,18 +331,30 @@ window.Receipts = {
             }
 
             let operatorName = '';
+            let matchedCustomer = null;
             if (customerPhone) {
                 const cleanRecPhone = customerPhone.replace(/\D/g, '').slice(-9);
                 if (cleanRecPhone.length >= 7) {
-                    const matchedCustomer = customers.find(c => {
+                    matchedCustomer = customers.find(c => {
                         const phoneClean = c.phone ? c.phone.replace(/\D/g, '').slice(-9) : '';
                         const phone2Clean = c.phone2 ? c.phone2.replace(/\D/g, '').slice(-9) : '';
                         return (phoneClean && phoneClean === cleanRecPhone) || (phone2Clean && phone2Clean === cleanRecPhone);
                     });
-                    if (matchedCustomer && matchedCustomer.operator) {
-                        operatorName = matchedCustomer.operator;
-                    }
                 }
+            }
+            
+            if (!matchedCustomer && customerName) {
+                const cleanRecName = customerName.trim().toLowerCase();
+                if (cleanRecName && cleanRecName !== 'mijoz' && cleanRecName !== 'noma\'lum') {
+                    matchedCustomer = customers.find(c => {
+                        const cNameClean = c.name ? c.name.trim().toLowerCase() : '';
+                        return cNameClean && cNameClean === cleanRecName;
+                    });
+                }
+            }
+
+            if (matchedCustomer && matchedCustomer.operator) {
+                operatorName = matchedCustomer.operator;
             }
 
             if (operatorName) {

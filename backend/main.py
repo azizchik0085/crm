@@ -3019,18 +3019,17 @@ def run_amocrm_sync_background(subdomain, token):
                             phone = contact_map[c_id]["phone"]
                             cust_name = contact_map[c_id]["name"]
                     
-                    if phone:
-                        clean_phone = "".join(c for c in phone if c.isdigit() or c == "+")
-                        customer = {
-                            "id": f"amocrm_{lead_id}",
-                            "name": cust_name,
-                            "phone": clean_phone,
-                            "operator": operator_name,
-                            "status": status,
-                            "value": price,
-                            "source": "amocrm"
-                        }
-                        synced_customers.append(customer)
+                    clean_phone = "".join(c for c in phone if c.isdigit() or c == "+") if phone else ""
+                    customer = {
+                        "id": f"amocrm_{lead_id}",
+                        "name": cust_name,
+                        "phone": clean_phone,
+                        "operator": operator_name,
+                        "status": status,
+                        "value": price,
+                        "source": "amocrm"
+                    }
+                    synced_customers.append(customer)
                 
                 links = data.get("_links", {})
                 next_url = links.get("next", {}).get("href")
