@@ -2917,13 +2917,13 @@ def get_amocrm_status_map(subdomain, token):
                     s_name = s.get("name", "").lower()
                     s_type = s.get("type") # 3 is won, 4 is lost
                     
-                    if s_type == 3 or "успеш" in s_name or "won" in s_name:
+                    if s_type == 3 or "успеш" in s_name or "won" in s_name or "xarid qildi" in s_name or "sotuv" in s_name:
                         status_map[s_id] = "won"
-                    elif s_type == 4 or "закрыт" in s_name or "lost" in s_name or "отказ" in s_name:
+                    elif s_type == 4 or "закрыт" in s_name or "lost" in s_name or "отказ" in s_name or "qilmadi" in s_name or "samarasiz" in s_name or "ahamiyatsiz" in s_name:
                         status_map[s_id] = "lost"
-                    elif "доgovor" in s_name or "кп" in s_name or "proposal" in s_name or "предлож" in s_name:
+                    elif "доgovor" in s_name or "кп" in s_name or "proposal" in s_name or "предлож" in s_name or "keladigan" in s_name:
                         status_map[s_id] = "proposal"
-                    elif "контакт" in s_name or "звон" in s_name or "обсуж" in s_name:
+                    elif "контакт" in s_name or "звон" in s_name or "обсуж" in s_name or "qayta" in s_name or "gaplash" in s_name:
                         status_map[s_id] = "contacted"
                     else:
                         status_map[s_id] = "lead"
