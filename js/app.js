@@ -669,93 +669,203 @@ window.App = {
         const settings = AppStorage.load().settings;
         const currency = settings.currency;
 
-        // Ma'lumotlarni olish
-        const transactions = await DB.getTransactions();
-        const customers = await DB.getCustomers();
-        const inventory = await DB.getInventory();
-        const calls = await DB.getCalls();
-        const receipts = await DB.getReceipts();
+        const activeUserId = localStorage.getItem('activeUserId') || 'admin';
         const employees = await DB.getEmployees();
-
-        // Hisob-kitoblar
-        const totalIncome = transactions
-            .filter(t => t.type === 'income')
-            .reduce((sum, t) => sum + t.amount, 0);
-
-        const totalExpense = transactions
-            .filter(t => t.type === 'expense')
-            .reduce((sum, t) => sum + t.amount, 0);
-
-        const activeClients = customers.filter(c => c.status !== 'lost').length;
-        const inventoryAlerts = inventory.filter(p => p.stock <= 3).length;
-
-        // Calculate today's sales and profit from REGOS report
-        let todaySales = 0;
-        let todayProfit = 0;
-        const employeeSalesMap = {};
-
-        try {
-            const reportRes = await fetch('/api/integration/regos/sales-report');
-            if (reportRes.ok) {
-                const reportData = await reportRes.json();
-                if (reportData.status === 'success') {
-                    todaySales = reportData.total_sales;
-                    todayProfit = reportData.total_profit;
-                    
-                    // Populate employeeSalesMap
-                    for (const [login, emp] of Object.entries(reportData.employee_sales)) {
-                        employeeSalesMap[emp.name] = emp.sales;
-                    }
+        
+        let activeUserName = 'Administrator';
+        let isDirector = activeUserId === 'admin';
+        
+        if (!isDirector) {
+            try {
+                const currentEmp = employees.find(e => e.id === activeUserId);
+                if (currentEmp) {
+                    activeUserName = currentEmp.name;
+                    const role = (currentEmp.role || '').toLowerCase();
+                    const isSupervisor = role.includes('direktor') || role.includes('admin') || role.includes('dasturchi') || role.includes('boshliq');
+                    isDirector = isSupervisor;
                 }
+            } catch (err) {
+                console.error("Failed to load active employee for dashboard:", err);
             }
-        } catch (err) {
-            console.error('REGOS sales report fetch failed:', err);
         }
 
-        // Dashboard DOM elementlarini yangilash
-        document.getElementById('dash-income').textContent = '+' + formatMoney(totalIncome, currency);
-        document.getElementById('dash-expense').textContent = '-' + formatMoney(totalExpense, currency);
-        document.getElementById('dash-clients').textContent = activeClients + ' faol';
-        document.getElementById('dash-alerts').textContent = inventoryAlerts + ' ta mahsulot';
+        // Header titles update
+        const titleEl = document.getElementById('main-header-title');
+        const subtitleEl = document.querySelector('#view-dashboard .header-title p');
+        if (isDirector) {
+            if (titleEl) titleEl.textContent = "Boshqaruv Paneli";
+            if (subtitleEl) subtitleEl.textContent = "Kompaniyangiz ko'rsatkichlarining qisqacha tahlili";
+        } else {
+            if (titleEl) titleEl.textContent = `Boshqaruv Paneli (${activeUserName})`;
+            if (subtitleEl) subtitleEl.textContent = "Sizning shaxsiy ko'rsatkichlaringiz tahlili";
+        }
 
-        const todaySalesEl = document.getElementById('dash-today-sales');
-        const todayProfitEl = document.getElementById('dash-today-profit');
-        if (todaySalesEl) todaySalesEl.textContent = formatMoney(todaySales, currency);
-        if (todayProfitEl) todayProfitEl.textContent = formatMoney(todayProfit, currency);
+        // Data fetching based on role
+        const customers = await DB.getCustomers();
+        const calls = await DB.getCalls();
 
-        // Oxirgi tranzaksiyalar jadvalini yuklash (5 ta)
-        const recentTxContainer = document.getElementById('dash-recent-transactions');
-        if (recentTxContainer) {
-            const recent = [...transactions]
-                .sort((a, b) => new Date(b.date) - new Date(a.date))
-                .slice(0, 5);
+        if (isDirector) {
+            const transactions = await DB.getTransactions();
+            const inventory = await DB.getInventory();
 
-            let txHtml = '';
-            if (recent.length === 0) {
-                txHtml = '<tr><td colspan="3" style="text-align: center; color: var(--text-muted);">Tranzaksiyalar mavjud emas.</td></tr>';
-            } else {
-                recent.forEach(t => {
-                    const isIncome = t.type === 'income';
-                    const amountText = (isIncome ? '+' : '-') + formatMoney(t.amount, currency);
-                    const amountColor = isIncome ? 'var(--success)' : 'var(--danger)';
-                    txHtml += `
-                        <tr>
-                            <td><strong>${t.category}</strong><br><span style="font-size:11px; color:var(--text-muted);">${t.date}</span></td>
-                            <td style="font-size: 13px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${t.description || '-'}</td>
-                            <td style="text-align: right; color: ${amountColor}; font-weight: 600; font-family: 'JetBrains Mono';">${amountText}</td>
-                        </tr>
-                    `;
-                });
+            let totalIncome = transactions
+                .filter(t => t.type === 'income')
+                .reduce((sum, t) => sum + t.amount, 0);
+
+            let totalExpense = transactions
+                .filter(t => t.type === 'expense')
+                .reduce((sum, t) => sum + t.amount, 0);
+
+            let activeClients = customers.filter(c => c.status !== 'lost').length;
+            let inventoryAlerts = inventory.filter(p => p.stock <= 3).length;
+            
+            let todaySales = 0;
+            let todayProfit = 0;
+            const employeeSalesMap = {};
+
+            try {
+                const reportRes = await fetch('/api/integration/regos/sales-report');
+                if (reportRes.ok) {
+                    const reportData = await reportRes.json();
+                    if (reportData.status === 'success') {
+                        todaySales = reportData.total_sales;
+                        todayProfit = reportData.total_profit;
+                        for (const [login, emp] of Object.entries(reportData.employee_sales)) {
+                            employeeSalesMap[emp.name] = emp.sales;
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error('REGOS sales report fetch failed:', err);
             }
-            recentTxContainer.innerHTML = txHtml;
+
+            // Reset DOM displays
+            const card1 = document.querySelector('.stats-grid > div:nth-child(1)');
+            const card2 = document.querySelector('.stats-grid > div:nth-child(2)');
+            const card3 = document.querySelector('.stats-grid > div:nth-child(3)');
+            const card4 = document.querySelector('.stats-grid > div:nth-child(4)');
+            
+            if (card1) {
+                card1.style.display = 'flex';
+                card1.querySelector('h3').textContent = 'Jami Kirim';
+            }
+            if (card2) card2.style.display = 'flex';
+            if (card3) {
+                card3.style.display = 'flex';
+                card3.querySelector('h3').textContent = 'Mijozlar';
+            }
+            if (card4) card4.style.display = 'flex';
+            
+            const cashflowCard = document.getElementById('cashflowChart')?.closest('.card');
+            if (cashflowCard) cashflowCard.style.display = 'block';
+            
+            const todaySalesCard = document.getElementById('todaySalesProfitChart')?.closest('.card');
+            if (todaySalesCard) todaySalesCard.style.display = 'block';
+            
+            const empSalesCard = document.getElementById('employeeSalesChart')?.closest('.card');
+            if (empSalesCard) empSalesCard.style.display = 'block';
+            
+            const recentTxCard = document.getElementById('dash-recent-transactions')?.closest('.card');
+            if (recentTxCard) recentTxCard.style.display = 'block';
+            
+            const firstGrid = document.querySelector('#view-dashboard .dashboard-grid:nth-of-type(1)');
+            if (firstGrid) firstGrid.style.gridTemplateColumns = '';
+            
+            // Dashboard DOM elementlarini yangilash
+            document.getElementById('dash-income').textContent = '+' + formatMoney(totalIncome, currency);
+            document.getElementById('dash-expense').textContent = '-' + formatMoney(totalExpense, currency);
+            document.getElementById('dash-clients').textContent = activeClients + ' faol';
+            document.getElementById('dash-alerts').textContent = inventoryAlerts + ' ta mahsulot';
+    
+            const todaySalesEl = document.getElementById('dash-today-sales');
+            const todayProfitEl = document.getElementById('dash-today-profit');
+            if (todaySalesEl) todaySalesEl.textContent = formatMoney(todaySales, currency);
+            if (todayProfitEl) todayProfitEl.textContent = formatMoney(todayProfit, currency);
+
+            // Oxirgi tranzaksiyalar jadvalini yuklash (5 ta)
+            const recentTxContainer = document.getElementById('dash-recent-transactions');
+            if (recentTxContainer) {
+                const recent = [...transactions]
+                    .sort((a, b) => new Date(b.date) - new Date(a.date))
+                    .slice(0, 5);
+    
+                let txHtml = '';
+                if (recent.length === 0) {
+                    txHtml = '<tr><td colspan="3" style="text-align: center; color: var(--text-muted);">Tranzaksiyalar mavjud emas.</td></tr>';
+                } else {
+                    recent.forEach(t => {
+                        const isIncome = t.type === 'income';
+                        const amountText = (isIncome ? '+' : '-') + formatMoney(t.amount, currency);
+                        const amountColor = isIncome ? 'var(--success)' : 'var(--danger)';
+                        txHtml += `
+                            <tr>
+                                <td><strong>${t.category}</strong><br><span style="font-size:11px; color:var(--text-muted);">${t.date}</span></td>
+                                <td style="font-size: 13px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${t.description || '-'}</td>
+                                <td style="text-align: right; color: ${amountColor}; font-weight: 600; font-family: 'JetBrains Mono';">${amountText}</td>
+                            </tr>
+                        `;
+                    });
+                }
+                recentTxContainer.innerHTML = txHtml;
+            }
+
+            // Grafik chizish
+            this.renderCharts(transactions);
+            this.renderSalesCharts(todaySales, todayProfit, employeeSalesMap);
+
+        } else {
+            // Operator specific stats
+            // "qancha savdo qildi" -> Won status leads total value
+            const mySales = customers
+                .filter(c => c.operator === activeUserName && c.status === 'won')
+                .reduce((sum, c) => sum + (c.value || 0), 0);
+            
+            // "nechta mijoz bilan gaplashdi" -> Count of unique customers assigned to this operator in amoCRM (they talked to them)
+            const myCustomersCount = customers.filter(c => c.operator === activeUserName).length;
+            
+            // Modify Stats Cards for Operator
+            const card1 = document.querySelector('.stats-grid > div:nth-child(1)');
+            const card2 = document.querySelector('.stats-grid > div:nth-child(2)');
+            const card3 = document.querySelector('.stats-grid > div:nth-child(3)');
+            const card4 = document.querySelector('.stats-grid > div:nth-child(4)');
+            
+            if (card1) {
+                card1.style.display = 'flex';
+                card1.querySelector('h3').textContent = 'Siz qilgan savdo (Jami)';
+                document.getElementById('dash-income').textContent = formatMoney(mySales, currency);
+            }
+            if (card2) card2.style.display = 'none';
+            if (card3) {
+                card3.style.display = 'flex';
+                card3.querySelector('h3').textContent = 'Siz gaplashgan mijozlar';
+                document.getElementById('dash-clients').textContent = myCustomersCount + ' ta';
+            }
+            if (card4) card4.style.display = 'none';
+            
+            const cashflowCard = document.getElementById('cashflowChart')?.closest('.card');
+            if (cashflowCard) cashflowCard.style.display = 'none';
+            
+            const todaySalesCard = document.getElementById('todaySalesProfitChart')?.closest('.card');
+            if (todaySalesCard) todaySalesCard.style.display = 'none';
+            
+            const empSalesCard = document.getElementById('employeeSalesChart')?.closest('.card');
+            if (empSalesCard) empSalesCard.style.display = 'none';
+            
+            const recentTxCard = document.getElementById('dash-recent-transactions')?.closest('.card');
+            if (recentTxCard) recentTxCard.style.display = 'none';
+            
+            const firstGrid = document.querySelector('#view-dashboard .dashboard-grid:nth-of-type(1)');
+            if (firstGrid) firstGrid.style.gridTemplateColumns = '1fr';
         }
 
         // Oxirgi faol leadlarni chiqarish (3 ta)
         const recentLeadsContainer = document.getElementById('dash-recent-leads');
         if (recentLeadsContainer) {
-            const leads = customers
-                .filter(c => c.status === 'lead' || c.status === 'contacted')
-                .slice(0, 4);
+            let leads = customers.filter(c => c.status === 'lead' || c.status === 'contacted');
+            if (!isDirector) {
+                leads = leads.filter(c => c.operator === activeUserName);
+            }
+            leads = leads.slice(0, 4);
 
             let leadsHtml = '';
             if (leads.length === 0) {
@@ -779,38 +889,54 @@ window.App = {
             // Oxirgi qo'ng'iroqlardan 3 tasini qo'shamiz (Agar bo'lsa)
             if (calls && calls.length > 0) {
                 leadsHtml += '<h3 style="margin-top:20px; border-top:1px solid var(--border-color); padding-top:16px; margin-bottom: 12px;">Oxirgi Qo\'ng\'iroqlar</h3>';
-                const recentCalls = [...calls]
+                
+                let recentCalls = [...calls];
+                if (!isDirector) {
+                    const myCustomerIds = customers
+                        .filter(cust => cust.operator === activeUserName)
+                        .map(cust => cust.id);
+                    recentCalls = recentCalls.filter(c => myCustomerIds.includes(c.customer_id));
+                }
+                
+                recentCalls = recentCalls
                     .sort((a, b) => b.id.localeCompare(a.id))
                     .slice(0, 3);
                 
-                recentCalls.forEach(c => {
-                    const client = customers.find(cust => cust.id === c.customer_id);
-                    const name = client ? client.name : c.phone;
-                    const isIncoming = c.direction === 'incoming';
-                    const icon = isIncoming 
-                        ? '<i class="fas fa-arrow-down-left" style="color:var(--info); font-size:11px;"></i>' 
-                        : '<i class="fas fa-arrow-up-right" style="color:var(--accent); font-size:11px;"></i>';
-                    
-                    const statusText = c.status === 'answered' ? 'Suhbatlashildi' : 'Javobsiz';
-                    const statusColor = c.status === 'answered' ? 'var(--success)' : 'var(--warning)';
-
-                    leadsHtml += `
-                        <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--border-color)">
-                            <div>
-                                <strong style="font-size:13px; display:flex; align-items:center; gap:6px;">${icon} ${name}</strong>
-                                <span style="font-size:11px; color:var(--text-muted); font-family:\'JetBrains Mono\'">${c.phone}</span>
+                if (recentCalls.length === 0) {
+                    leadsHtml += '<div style="color:var(--text-muted); text-align:center; padding:12px 0;">Qo\'ng\'iroqlar mavjud emas.</div>';
+                } else {
+                    recentCalls.forEach(c => {
+                        const client = customers.find(cust => cust.id === c.customer_id);
+                        const name = client ? client.name : c.phone;
+                        const isIncoming = c.direction === 'incoming';
+                        const icon = isIncoming 
+                            ? '<i class="fas fa-arrow-down-left" style="color:var(--info); font-size:11px;"></i>' 
+                            : '<i class="fas fa-arrow-up-right" style="color:var(--accent); font-size:11px;"></i>';
+                        
+                        const statusText = c.status === 'answered' ? 'Suhbatlashildi' : 'Javobsiz';
+                        const statusColor = c.status === 'answered' ? 'var(--success)' : 'var(--warning)';
+    
+                        leadsHtml += `
+                            <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--border-color)">
+                                <div>
+                                    <strong style="font-size:13px; display:flex; align-items:center; gap:6px;">${icon} ${name}</strong>
+                                    <span style="font-size:11px; color:var(--text-muted); font-family:\'JetBrains Mono\'">${c.phone}</span>
+                                </div>
+                                <span style="font-size:11px; font-weight:600; color:${statusColor}">${statusText}</span>
                             </div>
-                            <span style="font-size:11px; font-weight:600; color:${statusColor}">${statusText}</span>
-                        </div>
-                    `;
-                });
+                        `;
+                    });
+                }
             }
             recentLeadsContainer.innerHTML = leadsHtml;
         }
+    },}
 
         // Grafik chizish
-        this.renderCharts(transactions);
-        this.renderSalesCharts(todaySales, todayProfit, employeeSalesMap);
+        if (isDirector) {
+            this.renderCharts(transactions);
+            this.renderSalesCharts(todaySales, todayProfit, employeeSalesMap);
+        }
     },
 
     renderCharts: function(transactions) {
