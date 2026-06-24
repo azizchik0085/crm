@@ -2938,7 +2938,7 @@ def get_amocrm_contacts_map(subdomain, token):
     url = f"https://{subdomain}.amocrm.ru/api/v4/contacts"
     params = {"limit": 250}
     
-    for _ in range(4): # Fetch up to 1000 contacts (4 pages)
+    for _ in range(12): # Fetch up to 3000 contacts (12 pages)
         try:
             res = requests.request("GET", url, headers=headers, params=params, timeout=10)
             if res.status_code == 200:
@@ -2988,55 +2988,71 @@ def run_amocrm_sync_background(subdomain, token):
     url = f"https://{subdomain}.amocrm.ru/api/v4/leads"
     params = {"limit": 250, "with": "contacts"}
     
-    synced_customers = []
-    
-    try:
-        res = requests.request("GET", url, headers=headers, params=params, timeout=15)
-        if res.status_code == 200:
-            data = res.json()
-            leads = data.get("_embedded", {}).get("leads", [])
-            for l in leads:
-                lead_id = l.get("id")
-                lead_name = l.get("name")
-                price = float(l.get("price") or 0)
-                status_id = l.get("status_id")
-                resp_user_id = l.get("responsible_user_id")
+    for _ in range(12): # Fetch up to 3000 leads (12 pages)
+        try:
+            res = requests.request("GET", url, headers=headers, params=params, timeout=15)
+            if res.status_code == 200:
+                data = res.json()
+                leads = data.get("_embedded", {}).get("leads", [])
+                if not leads:
+                    break
+                for l in leads:
+                    lead_id = l.get("id")
+                    lead_name = l.get("name")
+                    price = float(l.get("price") or 0)
+                    status_id = l.get("status_id")
+                    resp_user_id = l.get("responsible_user_id")
+                    
+                    operator_name = user_map.get(resp_user_id, "")
+                    status = status_map.get(status_id, "lead")
+                    
+                    if status == "lost":
+                        continue
+                        
+                    contacts_list = l.get("_embedded", {}).get("contacts", [])
+                    cust_name = lead_name
+                    phone = ""
+                    
+                    if contacts_list:
+                        c_id = contacts_list[0].get("id")
+                        if c_id in contact_map:
+                            phone = contact_map[c_id]["phone"]
+                            cust_name = contact_map[c_id]["name"]
+                    
+                    if phone:
+                        clean_phone = "".join(c for c in phone if c.isdigit() or c == "+")
+                        customer = {
+                            "id": f"amocrm_{lead_id}",
+                            "name": cust_name,
+                            "phone": clean_phone,
+                            "operator": operator_name,
+                            "status": status,
+                            "value": price,
+                            "source": "amocrm"
+                        }
+                        synced_customers.append(customer)
                 
-                operator_name = user_map.get(resp_user_id, "")
-                status = status_map.get(status_id, "lead")
-                
-                contacts_list = l.get("_embedded", {}).get("contacts", [])
-                cust_name = lead_name
-                phone = ""
-                
-                if contacts_list:
-                    c_id = contacts_list[0].get("id")
-                    if c_id in contact_map:
-                        phone = contact_map[c_id]["phone"]
-                        cust_name = contact_map[c_id]["name"]
-                
-                if phone:
-                    clean_phone = "".join(c for c in phone if c.isdigit() or c == "+")
-                    customer = {
-                        "id": f"amocrm_{lead_id}",
-                        "name": cust_name,
-                        "phone": clean_phone,
-                        "operator": operator_name,
-                        "status": status,
-                        "value": price,
-                        "source": "amocrm"
-                    }
-                    synced_customers.append(customer)
-            
-            if synced_customers:
-                supabase_req("POST", "customers?on_conflict=id", json_data=synced_customers)
-                print(f"amoCRM Background Sync: successfully synced {len(synced_customers)} customers to database.")
+                links = data.get("_links", {})
+                next_url = links.get("next", {}).get("href")
+                if next_url:
+                    url = next_url
+                    params = None
+                else:
+                    break
             else:
-                print("amoCRM Background Sync: no customers with phone numbers found.")
+                break
+        except Exception as e:
+            print(f"Failed to fetch amoCRM leads page: {e}")
+            break
+            
+    try:
+        if synced_customers:
+            supabase_req("POST", "customers?on_conflict=id", json_data=synced_customers)
+            print(f"amoCRM Background Sync: successfully synced {len(synced_customers)} active customers to database.")
         else:
-            print(f"amoCRM Background Sync failed: {res.status_code} - {res.text}")
+            print("amoCRM Background Sync: no active customers with phone numbers found.")
     except Exception as e:
-        print(f"amoCRM Background Sync failed with exception: {e}")
+        print(f"amoCRM Background Sync failed saving to Supabase: {e}")
 
 @app.post("/api/integration/amocrm/sync")
 def sync_amocrm_leads(background_tasks: BackgroundTasks):
