@@ -181,6 +181,12 @@ window.Receipts = {
                                 const cNameClean = c.name ? c.name.trim().toLowerCase() : '';
                                 return cNameClean && cNameClean === cleanRecName;
                             });
+                            if (!matchedCustomer) {
+                                matchedCustomer = customers.find(c => {
+                                    const cNameClean = c.name ? c.name.trim().toLowerCase() : '';
+                                    return cNameClean && (cNameClean.includes(cleanRecName) || cleanRecName.includes(cNameClean));
+                                });
+                            }
                         }
                     }
 
@@ -350,6 +356,12 @@ window.Receipts = {
                         const cNameClean = c.name ? c.name.trim().toLowerCase() : '';
                         return cNameClean && cNameClean === cleanRecName;
                     });
+                    if (!matchedCustomer) {
+                        matchedCustomer = customers.find(c => {
+                            const cNameClean = c.name ? c.name.trim().toLowerCase() : '';
+                            return cNameClean && (cNameClean.includes(cleanRecName) || cleanRecName.includes(cNameClean));
+                        });
+                    }
                 }
             }
 
