@@ -2987,6 +2987,7 @@ def run_amocrm_sync_background(subdomain, token):
     headers = get_amocrm_headers(token)
     url = f"https://{subdomain}.amocrm.ru/api/v4/leads"
     params = {"limit": 250, "with": "contacts"}
+    synced_customers = []
     
     for _ in range(12): # Fetch up to 3000 leads (12 pages)
         try:
