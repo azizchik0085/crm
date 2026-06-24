@@ -3007,8 +3007,9 @@ def run_amocrm_sync_background(subdomain, token):
                     operator_name = user_map.get(resp_user_id, "")
                     status = status_map.get(status_id, "lead")
                     
-                    if status == "lost":
-                        continue
+                    # Don't skip lost leads so we can match their operators and show stats
+                    # if status == "lost":
+                    #     continue
                         
                     contacts_list = l.get("_embedded", {}).get("contacts", [])
                     cust_name = lead_name
