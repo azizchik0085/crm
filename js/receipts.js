@@ -155,8 +155,12 @@ window.Receipts = {
                     if (cName || cPhone) {
                         customerInfo = `<strong>${cName || 'Mijoz'}</strong><br><span style="font-size: 11px; color: var(--text-muted); font-family: 'JetBrains Mono';">${cPhone || ''}</span>`;
                     }
-                    sellerName = itemsObj.seller_name || '-';
-                    sellerDisplay = `<strong>${sellerName}</strong>`;
+                    sellerName = itemsObj.seller_name || '';
+                    if (sellerName && sellerName !== '-') {
+                        sellerDisplay = `<strong>${sellerName}</strong>`;
+                    } else {
+                        sellerDisplay = '';
+                    }
 
                     if (cPhone) {
                         const cleanRecPhone = cPhone.replace(/\D/g, '').slice(-9);
@@ -167,12 +171,19 @@ window.Receipts = {
                                 return (phoneClean && phoneClean === cleanRecPhone) || (phone2Clean && phone2Clean === cleanRecPhone);
                             });
                             if (matchedCustomer && matchedCustomer.operator) {
-                                sellerDisplay += `<br><span style="font-size: 11px; color: var(--text-muted); display: inline-flex; align-items: center; gap: 4px;" title="amoCRM Operator"><i class="fas fa-user-tie" style="color:var(--accent);"></i> ${matchedCustomer.operator}</span>`;
+                                if (sellerDisplay) {
+                                    sellerDisplay += `<br><span style="font-size: 11px; color: var(--text-muted); display: inline-flex; align-items: center; gap: 4px;" title="amoCRM Operator"><i class="fas fa-user-tie" style="color:var(--accent);"></i> ${matchedCustomer.operator}</span>`;
+                                } else {
+                                    sellerDisplay = `<span style="font-size: 13px; color: var(--text-main); display: inline-flex; align-items: center; gap: 4px;" title="amoCRM Operator"><i class="fas fa-user-tie" style="color:var(--accent);"></i> ${matchedCustomer.operator}</span>`;
+                                }
                             }
                         }
                     }
+                    if (!sellerDisplay) {
+                        sellerDisplay = '-';
+                    }
                 } else {
-                    sellerDisplay = sellerName;
+                    sellerDisplay = sellerName || '-';
                 }
 
                 html += `
