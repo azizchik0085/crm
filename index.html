@@ -1188,6 +1188,17 @@
                     <div id="customer-platform-info" style="font-size: 13px; color: var(--text-muted); margin-top: 12px; display: none; padding: 10px; background: rgba(255,255,255,0.03); border-radius: 8px;">
                         <!-- Platforma ma'lumotlari chiqadi -->
                     </div>
+                    
+                    <!-- Xaridlar tarixi -->
+                    <div id="customer-purchase-history" style="margin-top: 16px; border-top: 1px solid var(--border-color); padding-top: 16px;">
+                        <h4 style="margin-bottom: 12px; display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text-main);">
+                            <i class="fas fa-shopping-cart" style="color: var(--accent);"></i>
+                            <span>Xaridlar tarixi</span>
+                        </h4>
+                        <div id="customer-purchase-list" style="max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;">
+                            <!-- Dinamik ravishda xaridlar ro'yxati joylashtiriladi -->
+                        </div>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" onclick="closeModal('customer-details-modal')">Yopish</button>
@@ -1446,7 +1457,7 @@
     <script src="js/storage.js?v=4"></script>
     <script src="js/db.js?v=5"></script>
     <script src="js/telephony.js?v=4"></script>
-    <script src="js/crm.js?v=6"></script>
+    <script src="js/crm.js?v=7"></script>
     <script src="js/chats.js?v=4"></script>
     <script src="js/erp.js?v=7"></script>
     <script src="js/finance.js?v=4"></script>

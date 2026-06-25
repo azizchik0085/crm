@@ -512,6 +512,107 @@ window.CRM = {
             }
         }
 
+        // Xaridlar tarixini yuklash va chiqarish
+        const purchaseListEl = document.getElementById('customer-purchase-list');
+        if (purchaseListEl) {
+            purchaseListEl.innerHTML = '<div style="text-align: center; padding: 12px; color: var(--text-muted); font-size: 13px;"><i class="fas fa-spinner fa-spin"></i> Yuklanmoqda...</div>';
+            
+            // Xaridlar tarixini asinxron yuklaymiz (modal ochilishini to'sib qo'ymasligi uchun)
+            (async () => {
+                try {
+                    const receipts = await DB.getReceipts();
+                    const settings = AppStorage.load().settings || {};
+                    const currency = settings.currency || "so'm";
+                    
+                    // Telefon raqamlarni tozalash va solishtirish funksiyasi
+                    const cleanPhone = (p) => p ? p.replace(/\D/g, '') : '';
+                    const p1 = cleanPhone(customer.phone);
+                    const p2 = cleanPhone(customer.phone2);
+                    
+                    const matchesPhone = (recPhone) => {
+                        const cleanRec = cleanPhone(recPhone);
+                        if (!cleanRec) return false;
+                        if (p1 && cleanRec.length >= 9 && p1.length >= 9 && cleanRec.slice(-9) === p1.slice(-9)) return true;
+                        if (p2 && cleanRec.length >= 9 && p2.length >= 9 && cleanRec.slice(-9) === p2.slice(-9)) return true;
+                        return cleanRec === p1 || cleanRec === p2;
+                    };
+
+                    // Mijozning cheklarini topamiz
+                    const customerReceipts = receipts.filter(rec => {
+                        let items = rec.items || [];
+                        if (typeof items === 'string') {
+                            try { items = JSON.parse(items); } catch(e) { items = []; }
+                        }
+                        if (items && !Array.isArray(items) && typeof items === 'object') {
+                            return matchesPhone(items.customer_phone);
+                        }
+                        return false;
+                    });
+
+                    if (customerReceipts.length === 0) {
+                        purchaseListEl.innerHTML = '<div style="text-align: center; padding: 16px; color: var(--text-muted); font-size: 13px; font-style: italic;">Xaridlar tarixi mavjud emas</div>';
+                    } else {
+                        // Yangi xaridlarni birinchi ko'rsatish uchun saralaymiz
+                        customerReceipts.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+                        let listHtml = '';
+                        customerReceipts.forEach(rec => {
+                            let items = rec.items || [];
+                            if (typeof items === 'string') {
+                                try { items = JSON.parse(items); } catch(e) { items = []; }
+                            }
+                            
+                            let products = [];
+                            if (items && !Array.isArray(items) && typeof items === 'object') {
+                                products = items.products || [];
+                            } else if (Array.isArray(items)) {
+                                products = items;
+                            }
+
+                            const dateObj = new Date(rec.created_at);
+                            const dateStr = isNaN(dateObj.getTime()) ? rec.created_at : dateObj.toLocaleString('uz-UZ', { hour12: false });
+                            const recCode = rec.code || 'CH-' + String(rec.id).substring(0, 8);
+                            
+                            const payBadgeClass = rec.payment_type === 'Karta' 
+                                ? 'badge-primary' 
+                                : (rec.payment_type === 'Elektron' ? 'badge-success' : 'badge-secondary');
+
+                            let productsHtml = '';
+                            products.forEach(prod => {
+                                const prodTotal = prod.total || (parseFloat(prod.price) * parseFloat(prod.qty || 1)) || 0;
+                                productsHtml += `
+                                    <div style="display: flex; justify-content: space-between; color: var(--text-muted); font-size: 12px; margin-bottom: 2px;">
+                                        <span>${prod.name || 'Noma\'lum maxsulot'} x ${prod.qty || 1}</span>
+                                        <span style="color: var(--text-main); font-weight: 500;">${formatMoney(prodTotal, currency)}</span>
+                                    </div>
+                                `;
+                            });
+
+                            listHtml += `
+                                <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 12px; padding: 12px; font-size: 13px; display: flex; flex-direction: column; gap: 6px; transition: var(--transition);">
+                                    <div style="display: flex; justify-content: space-between; font-weight: 600;">
+                                        <span style="color: var(--accent);">${recCode}</span>
+                                        <span style="color: var(--text-muted); font-size: 11px; font-weight: normal;">${dateStr}</span>
+                                    </div>
+                                    <div style="border-top: 1px dashed var(--border-color); padding-top: 6px; padding-bottom: 4px; display: flex; flex-direction: column; gap: 2px;">
+                                        ${productsHtml || '<div style="color:var(--text-muted); font-size: 12px; font-style:italic;">Maxsulotlar ko\'rsatilmagan</div>'}
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-color); padding-top: 6px; font-size: 12px;">
+                                        <span style="color: var(--text-muted);">To'lov: <span class="badge ${payBadgeClass}" style="font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight:500;">${rec.payment_type || 'Naqd'}</span></span>
+                                        <span style="color: var(--success); font-weight: 700;">Jami: ${formatMoney(rec.total_amount || 0, currency)}</span>
+                                    </div>
+                                </div>
+                            `;
+                        });
+                        purchaseListEl.innerHTML = listHtml;
+                    }
+                } catch (err) {
+                    console.error("Xaridlar tarixini yuklashda xatolik:", err);
+                    purchaseListEl.innerHTML = '<div style="text-align: center; padding: 12px; color: var(--danger); font-size: 13px;">Yuklashda xatolik yuz berdi</div>';
+                }
+            })();
+        }
+
         window.showModal('customer-details-modal');
     },
 
