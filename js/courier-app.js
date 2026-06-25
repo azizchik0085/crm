@@ -1,5 +1,32 @@
 // ERP & CRM Tizimi - Kuryer Mobil Ilovasi Logikasi
 
+// Intercept all fetch calls to add the active company ID header
+(function() {
+    const originalFetch = window.fetch;
+    window.fetch = function(url, options) {
+        options = options || {};
+        options.headers = options.headers || {};
+        // Courier uses activeCourier.company_id
+        let companyId = localStorage.getItem('activeCourierCompanyId');
+        if (!companyId) {
+            const stored = localStorage.getItem('activeCourier');
+            if (stored) {
+                try {
+                    const courier = JSON.parse(stored);
+                    companyId = courier.company_id;
+                    if (companyId) {
+                        localStorage.setItem('activeCourierCompanyId', companyId);
+                    }
+                } catch(e){}
+            }
+        }
+        if (companyId && !options.headers['X-Company-ID']) {
+            options.headers['X-Company-ID'] = companyId;
+        }
+        return originalFetch(url, options);
+    };
+})();
+
 window.formatMoney = function(amount, currency = 'UZS') {
     if (currency === 'UZS') {
         return new Intl.NumberFormat('uz-UZ', { style: 'decimal' }).format(amount) + " so'm";
@@ -59,12 +86,14 @@ window.CourierApp = {
     },
 
     handleLogin: async function() {
+        const companyInput = document.getElementById('login-company');
         const usernameInput = document.getElementById('login-username');
         const passwordInput = document.getElementById('login-password');
         const errorBanner = document.getElementById('login-error');
 
         if (!usernameInput || !passwordInput) return;
 
+        const companyId = companyInput ? companyInput.value.trim() : '';
         const login = usernameInput.value.trim();
         const password = passwordInput.value.trim();
 
@@ -74,7 +103,7 @@ window.CourierApp = {
             const response = await fetch('/api/courier/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ login, password })
+                body: JSON.stringify({ company_id: companyId, login, password })
             });
 
             if (!response.ok) {
@@ -84,9 +113,11 @@ window.CourierApp = {
 
             const data = await response.json();
             localStorage.setItem('activeCourier', JSON.stringify(data.employee));
+            localStorage.setItem('activeCourierCompanyId', data.employee.company_id);
             this.courierUser = data.employee;
 
             // Clear inputs
+            if (companyInput) companyInput.value = '';
             usernameInput.value = '';
             passwordInput.value = '';
 
@@ -108,6 +139,7 @@ window.CourierApp = {
             }
             this.knownActiveIds.clear();
             localStorage.removeItem('activeCourier');
+            localStorage.removeItem('activeCourierCompanyId');
             this.showLogin();
         }
     },

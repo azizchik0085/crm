@@ -1,5 +1,19 @@
 // ERP & CRM Tizimi - Mahalliy Python Backend API Integratsiyasi
 
+// Intercept all fetch calls to add the active company ID header
+(function() {
+    const originalFetch = window.fetch;
+    window.fetch = function(url, options) {
+        options = options || {};
+        options.headers = options.headers || {};
+        const companyId = localStorage.getItem('activeCompanyId');
+        if (companyId && !options.headers['X-Company-ID']) {
+            options.headers['X-Company-ID'] = companyId;
+        }
+        return originalFetch(url, options);
+    };
+})();
+
 window.DB = {
     client: { localApi: true }, // Supabase JS SDK o'rniga local API ishlatilishini bildiradi
 

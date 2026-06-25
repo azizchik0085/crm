@@ -1,4 +1,12 @@
--- Supabase Database Schema for Smart ERP & CRM
+-- Supabase Database Schema for Smart ERP & CRM (Multi-Company Version)
+
+-- 0. Companies Table (Kompaniyalar)
+CREATE TABLE IF NOT EXISTS public.companies (
+    id TEXT PRIMARY KEY, -- e.g., 'maxdecor'
+    name TEXT NOT NULL,
+    status TEXT DEFAULT 'active', -- 'active' yoki 'disabled'
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
 
 -- 1. Customers Table (Mijozlar)
 CREATE TABLE IF NOT EXISTS public.customers (
@@ -12,6 +20,7 @@ CREATE TABLE IF NOT EXISTS public.customers (
     company TEXT,
     status TEXT DEFAULT 'lead',
     value NUMERIC DEFAULT 0,
+    company_id TEXT, -- Multi-tenant partitioning
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -23,6 +32,7 @@ CREATE TABLE IF NOT EXISTS public.inventory (
     price NUMERIC DEFAULT 0,
     stock INTEGER DEFAULT 0,
     category TEXT,
+    company_id TEXT, -- Multi-tenant partitioning
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -34,6 +44,9 @@ CREATE TABLE IF NOT EXISTS public.employees (
     salary NUMERIC DEFAULT 0,
     kpi INTEGER DEFAULT 100,
     status TEXT DEFAULT 'active',
+    login TEXT,
+    password TEXT,
+    company_id TEXT, -- Multi-tenant partitioning
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -45,6 +58,7 @@ CREATE TABLE IF NOT EXISTS public.transactions (
     amount NUMERIC NOT NULL,
     date DATE NOT NULL,
     description TEXT,
+    company_id TEXT, -- Multi-tenant partitioning
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -56,6 +70,7 @@ CREATE TABLE IF NOT EXISTS public.calls (
     direction TEXT NOT NULL, -- 'incoming' yoki 'outgoing'
     duration INTEGER DEFAULT 0, -- soniyalarda
     status TEXT NOT NULL, -- 'answered', 'missed', 'failed'
+    company_id TEXT, -- Multi-tenant partitioning
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -66,6 +81,7 @@ CREATE TABLE IF NOT EXISTS public.messages (
     sender TEXT NOT NULL, -- 'customer' yoki 'agent'
     platform TEXT NOT NULL, -- 'telegram' yoki 'instagram'
     text TEXT NOT NULL,
+    company_id TEXT, -- Multi-tenant partitioning
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -78,10 +94,12 @@ CREATE TABLE IF NOT EXISTS public.receipts (
     discount NUMERIC DEFAULT 0,
     payment_type TEXT DEFAULT 'cash',
     items JSONB,
+    company_id TEXT, -- Multi-tenant partitioning
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Eslatma: Sinov rejimida ishlash uchun RLS (Row Level Security) ni o'chirib qo'yish yoki ochiq ruxsat berish kerak:
+-- Row Level Security (RLS) ni o'chirib qo'yish (ishlab chiqish rejimi uchun)
+ALTER TABLE public.companies DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.customers DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.inventory DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.employees DISABLE ROW LEVEL SECURITY;
@@ -89,3 +107,17 @@ ALTER TABLE public.transactions DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.calls DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.messages DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.receipts DISABLE ROW LEVEL SECURITY;
+
+
+-- =========================================================================
+-- MIGRATION SCRIPT (Mavjud bazaga ustunlarni qo'shish uchun)
+-- Supabase SQL Editor'da ushbu qismni alohida ishga tushirsangiz ham bo'ladi:
+-- =========================================================================
+
+-- ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS company_id TEXT;
+-- ALTER TABLE public.inventory ADD COLUMN IF NOT EXISTS company_id TEXT;
+-- ALTER TABLE public.employees ADD COLUMN IF NOT EXISTS company_id TEXT;
+-- ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS company_id TEXT;
+-- ALTER TABLE public.calls ADD COLUMN IF NOT EXISTS company_id TEXT;
+-- ALTER TABLE public.messages ADD COLUMN IF NOT EXISTS company_id TEXT;
+-- ALTER TABLE public.receipts ADD COLUMN IF NOT EXISTS company_id TEXT;

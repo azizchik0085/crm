@@ -30,6 +30,18 @@ headers = {
     "Content-Type": "application/json"
 }
 
+def get_company_id(request: Request = None, company_id: str = None):
+    if company_id:
+        return company_id
+    if request:
+        # Check headers or query params
+        cid = request.headers.get("x-company-id") or request.query_params.get("company_id")
+        if cid:
+            return cid
+        # Check if json body has it (if it is a post request)
+        # Note: we don't read body here to avoid blocking body consumption, we do it in route handlers or parameters
+    return None
+
 # Helper to proxy requests to Supabase REST API
 def supabase_req(method, path, json_data=None, params=None):
     url = f"{SUPABASE_URL}/rest/v1/{path}"
@@ -92,29 +104,49 @@ def supabase_get_all(path, params=None):
 
 # --- CRM / CUSTOMERS ENDPOINTS ---
 @app.get("/api/customers")
-def get_customers():
-    return supabase_get_all("customers?select=*")
+def get_customers(request: Request):
+    company_id = get_company_id(request)
+    if not company_id:
+        return []
+    return supabase_get_all(f"customers?select=*&company_id=eq.{company_id}")
 
 @app.post("/api/customers")
-def save_customer(customer: dict):
+def save_customer(customer: dict, request: Request):
+    company_id = get_company_id(request)
+    if company_id:
+        customer["company_id"] = company_id
     return supabase_req("POST", "customers?on_conflict=id", json_data=customer)
 
 @app.delete("/api/customers/{id}")
-def delete_customer(id: str):
-    return supabase_req("DELETE", f"customers?id=eq.{id}")
+def delete_customer(id: str, request: Request):
+    company_id = get_company_id(request)
+    path = f"customers?id=eq.{id}"
+    if company_id:
+        path += f"&company_id=eq.{company_id}"
+    return supabase_req("DELETE", path)
 
 # --- INVENTORY ENDPOINTS ---
 @app.get("/api/inventory")
-def get_inventory():
-    return supabase_get_all("inventory?select=*")
+def get_inventory(request: Request):
+    company_id = get_company_id(request)
+    if not company_id:
+        return []
+    return supabase_get_all(f"inventory?select=*&company_id=eq.{company_id}")
 
 @app.post("/api/inventory")
-def save_product(product: dict):
+def save_product(product: dict, request: Request):
+    company_id = get_company_id(request)
+    if company_id:
+        product["company_id"] = company_id
     return supabase_req("POST", "inventory?on_conflict=id", json_data=product)
 
 @app.delete("/api/inventory/{id}")
-def delete_product(id: str):
-    return supabase_req("DELETE", f"inventory?id=eq.{id}")
+def delete_product(id: str, request: Request):
+    company_id = get_company_id(request)
+    path = f"inventory?id=eq.{id}"
+    if company_id:
+        path += f"&company_id=eq.{company_id}"
+    return supabase_req("DELETE", path)
 
 # --- EMPLOYEES ENDPOINTS ---
 @app.post("/api/integration/regos/sync-employees")
@@ -446,47 +478,70 @@ def get_regos_sales_report(start_date: int = None, end_date: int = None):
         raise HTTPException(status_code=500, detail=f"REGOS hisobotini olishda xatolik: {str(e)}")
 
 @app.get("/api/employees")
-def get_employees():
+def get_employees(request: Request):
+    company_id = get_company_id(request)
+    if not company_id:
+        return []
     try:
-        sync_regos_employees()
+        sync_regos_employees(company_id=company_id)
     except Exception as e:
         print(f"Soft sync employees failed on GET: {e}")
-    return supabase_get_all("employees?select=*")
+    return supabase_get_all(f"employees?select=*&company_id=eq.{company_id}")
 
 @app.post("/api/employees")
-def save_employee(employee: dict):
+def save_employee(employee: dict, request: Request):
+    company_id = get_company_id(request)
+    if company_id:
+        employee["company_id"] = company_id
     return supabase_req("POST", "employees?on_conflict=id", json_data=employee)
 
 @app.delete("/api/employees/{id}")
-def delete_employee(id: str):
-    return supabase_req("DELETE", f"employees?id=eq.{id}")
+def delete_employee(id: str, request: Request):
+    company_id = get_company_id(request)
+    path = f"employees?id=eq.{id}"
+    if company_id:
+        path += f"&company_id=eq.{company_id}"
+    return supabase_req("DELETE", path)
 
 # --- TRANSACTIONS ENDPOINTS ---
 @app.get("/api/transactions")
-def get_transactions():
-    return supabase_get_all("transactions?select=*")
+def get_transactions(request: Request):
+    company_id = get_company_id(request)
+    if not company_id:
+        return []
+    return supabase_get_all(f"transactions?select=*&company_id=eq.{company_id}")
 
 @app.post("/api/transactions")
-def save_transaction(tx: dict):
+def save_transaction(tx: dict, request: Request):
+    company_id = get_company_id(request)
+    if company_id:
+        tx["company_id"] = company_id
     return supabase_req("POST", "transactions?on_conflict=id", json_data=tx)
 
 @app.delete("/api/transactions/{id}")
-def delete_transaction(id: str):
-    return supabase_req("DELETE", f"transactions?id=eq.{id}")
+def delete_transaction(id: str, request: Request):
+    company_id = get_company_id(request)
+    path = f"transactions?id=eq.{id}"
+    if company_id:
+        path += f"&company_id=eq.{company_id}"
+    return supabase_req("DELETE", path)
 
 # --- CALLS HISTORY ENDPOINTS ---
 @app.get("/api/calls")
-def get_calls(status: str = None, duration: int = None):
-    params = {}
-    select_query = "calls?select=*"
-    
-    # We build the query parameters dynamically for calls poller
+def get_calls(request: Request, status: str = None, duration: int = None):
+    company_id = get_company_id(request)
+    if not company_id:
+        return []
+    select_query = f"calls?select=*&company_id=eq.{company_id}"
     if status and duration is not None:
-        select_query = f"calls?select=*&status=in.({status})&duration=eq.{duration}"
+        select_query = f"calls?select=*&company_id=eq.{company_id}&status=in.({status})&duration=eq.{duration}"
     return supabase_get_all(select_query)
 
 @app.post("/api/calls")
-def save_call(call: dict):
+def save_call(call: dict, request: Request):
+    company_id = get_company_id(request)
+    if company_id:
+        call["company_id"] = company_id
     return supabase_req("POST", "calls?on_conflict=id", json_data=call)
 
 
@@ -792,69 +847,88 @@ async def sipuni_webhook(request: Request):
 
 SETTINGS_FILE = os.path.join(os.path.dirname(__file__), "settings.json")
 
-def load_settings():
+_settings_cache = {}
+
+def get_company_settings(company_id: str):
+    if not company_id:
+        return {
+            "telegram_token": "", "instagram_token": "", "ai_provider": "local",
+            "telephony_provider": "sarkor", "gemini_api_key": "", "openai_api_key": "",
+            "groq_api_key": "", "ai_auto_reply": False, "regos_endpoint": "", "regos_token": "",
+            "amocrm_subdomain": "", "amocrm_token": ""
+        }
+    if company_id in _settings_cache:
+        return _settings_cache[company_id]
+        
+    default_keys = {
+        "telegram_token": "", "instagram_token": "", "ai_provider": "local",
+        "telephony_provider": "sarkor", "gemini_api_key": "", "openai_api_key": "",
+        "groq_api_key": "", "ai_auto_reply": False, "regos_endpoint": "", "regos_token": "",
+        "amocrm_subdomain": "", "amocrm_token": ""
+    }
+    
     # 1. Try loading from Supabase database
     try:
-        res = supabase_req("GET", "receipts?id=eq.system_settings&select=items")
+        res = supabase_req("GET", f"receipts?id=eq.settings_{company_id}&select=items")
         if res and isinstance(res, list) and len(res) > 0:
             db_settings = res[0].get("items")
             if db_settings and isinstance(db_settings, dict):
-                # Ensure all default keys are present
-                default_keys = {
-                    "telegram_token": "", "instagram_token": "", "ai_provider": "local",
-                    "telephony_provider": "sarkor", "gemini_api_key": "", "openai_api_key": "",
-                    "groq_api_key": "", "ai_auto_reply": False, "regos_endpoint": "", "regos_token": "",
-                    "amocrm_subdomain": "", "amocrm_token": ""
-                }
                 for k, v in default_keys.items():
                     if k not in db_settings:
                         db_settings[k] = v
+                _settings_cache[company_id] = db_settings
                 return db_settings
     except Exception as e:
-        print(f"Failed to load settings from Supabase: {e}. Falling back to local file.")
-
+        print(f"Failed to load settings for {company_id} from Supabase: {e}")
+        
     # 2. Local fallback
-    if os.path.exists(SETTINGS_FILE):
+    local_file = os.path.join(os.path.dirname(__file__), f"settings_{company_id}.json")
+    if os.path.exists(local_file):
         try:
-            with open(SETTINGS_FILE, "r") as f:
+            with open(local_file, "r") as f:
                 data = json.load(f)
-                if "ai_provider" not in data:
-                    data["ai_provider"] = "local"
-                if "telephony_provider" not in data:
-                    data["telephony_provider"] = "sarkor"
-                if "gemini_api_key" not in data:
-                    data["gemini_api_key"] = ""
-                if "openai_api_key" not in data:
-                    data["openai_api_key"] = ""
-                if "groq_api_key" not in data:
-                    data["groq_api_key"] = ""
-                if "ai_auto_reply" not in data:
-                    data["ai_auto_reply"] = False
-                if "regos_endpoint" not in data:
-                    data["regos_endpoint"] = ""
-                if "regos_token" not in data:
-                    data["regos_token"] = ""
-                if "amocrm_subdomain" not in data:
-                    data["amocrm_subdomain"] = ""
-                if "amocrm_token" not in data:
-                    data["amocrm_token"] = ""
+                for k, v in default_keys.items():
+                    if k not in data:
+                        data[k] = v
+                _settings_cache[company_id] = data
                 return data
         except Exception:
             pass
-    return {"telegram_token": "", "instagram_token": "", "ai_provider": "local", "telephony_provider": "sarkor", "gemini_api_key": "", "openai_api_key": "", "groq_api_key": "", "ai_auto_reply": False, "regos_endpoint": "", "regos_token": "", "amocrm_subdomain": "", "amocrm_token": ""}
+            
+    # Try global fallback just in case
+    global_file = os.path.join(os.path.dirname(__file__), "settings.json")
+    if os.path.exists(global_file):
+        try:
+            with open(global_file, "r") as f:
+                data = json.load(f)
+                for k, v in default_keys.items():
+                    if k not in data:
+                        data[k] = v
+                _settings_cache[company_id] = data
+                return data
+        except Exception:
+            pass
+            
+    return default_keys
 
-def save_settings(settings):
+def save_company_settings(company_id: str, settings: dict):
+    if not company_id:
+        return
+    _settings_cache[company_id] = settings
+    
     # 1. Save locally
+    local_file = os.path.join(os.path.dirname(__file__), f"settings_{company_id}.json")
     try:
-        with open(SETTINGS_FILE, "w") as f:
+        with open(local_file, "w") as f:
             json.dump(settings, f, indent=4)
     except Exception as e:
-        print(f"Failed to save settings locally: {e}")
-
-    # 2. Save to Supabase database (receipts table, system_settings row)
+        print(f"Failed to save settings for {company_id} locally: {e}")
+        
+    # 2. Save to Supabase
     try:
         payload = {
-            "id": "system_settings",
+            "id": f"settings_{company_id}",
+            "company_id": company_id,
             "items": settings,
             "total_amount": 0,
             "discount": 0,
@@ -863,10 +937,10 @@ def save_settings(settings):
         }
         supabase_req("POST", "receipts?on_conflict=id", json_data=payload)
     except Exception as e:
-        print(f"Failed to save settings to Supabase: {e}")
+        print(f"Failed to save settings for {company_id} to Supabase: {e}")
 
-# Global settings state
-settings_state = load_settings()
+# Global settings state (fallback)
+settings_state = get_company_settings("")
 tg_polling_task = None
 
 def send_telegram_message(token, chat_id, text):
@@ -901,7 +975,16 @@ def send_instagram_message(token, recipient_id, text):
         print(f"Failed to send Instagram message to {recipient_id}: {e}")
         return None
 
-async def process_telegram_update(update):
+def get_all_companies_settings():
+    try:
+        res = supabase_req("GET", "receipts?select=id,items&id=like.settings_*")
+        if res and isinstance(res, list):
+            return {r["id"].replace("settings_", ""): r["items"] for r in res if r.get("items") and isinstance(r.get("items"), dict)}
+    except Exception as e:
+        print(f"Failed to load all company settings for polling: {e}")
+    return {}
+
+async def process_telegram_update(update, company_id=None):
     message = update.get("message")
     if not message:
         return
@@ -938,11 +1021,13 @@ async def process_telegram_update(update):
                 "status": "lead",
                 "value": 0
             }
+            if company_id:
+                new_customer["company_id"] = company_id
             await loop.run_in_executor(
                 None,
                 lambda: supabase_req("POST", "customers?on_conflict=id", json_data=new_customer)
             )
-            print(f"Auto-created Telegram customer: {customer_id} ({name})")
+            print(f"Auto-created Telegram customer for company {company_id}: {customer_id} ({name})")
             
         new_msg = {
             "customer_id": customer_id,
@@ -950,14 +1035,17 @@ async def process_telegram_update(update):
             "platform": "telegram",
             "text": text
         }
+        if company_id:
+            new_msg["company_id"] = company_id
         await loop.run_in_executor(
             None,
             lambda: supabase_req("POST", "messages", json_data=new_msg)
         )
-        print(f"Stored Telegram message from {customer_id}: {text}")
+        print(f"Stored Telegram message for company {company_id} from {customer_id}: {text}")
         
         # Trigger AI auto reply if enabled
-        if settings_state.get("ai_auto_reply"):
+        settings = get_company_settings(company_id) if company_id else settings_state
+        if settings.get("ai_auto_reply"):
             cust_name = ""
             try:
                 cust_res = await loop.run_in_executor(None, lambda: supabase_req("GET", f"customers?id=eq.{customer_id}"))
@@ -970,49 +1058,57 @@ async def process_telegram_update(update):
                 
             await loop.run_in_executor(
                 None,
-                lambda: trigger_ai_auto_reply(customer_id, "telegram", cust_name, text)
+                lambda: trigger_ai_auto_reply(customer_id, "telegram", cust_name, text, company_id=company_id)
             )
         
     except Exception as e:
         print(f"Failed to process Telegram message: {e}")
 
 async def telegram_polling_loop():
-    print("Telegram polling task started.")
-    last_update_id = 0
+    print("Telegram multi-tenant polling task started.")
+    last_update_ids = {}
     
     while True:
-        token = settings_state.get("telegram_token", "")
-        if not token:
-            await asyncio.sleep(5)
-            continue
-            
-        url = f"https://api.telegram.org/bot{token}/getUpdates"
-        params = {"offset": last_update_id + 1, "timeout": 30}
-        
         try:
-            loop = asyncio.get_event_loop()
-            response = await loop.run_in_executor(
-                None, 
-                lambda: requests.get(url, params=params, timeout=35)
-            )
+            comp_settings = get_all_companies_settings()
+            active_tokens = {}
+            for cid, settings in comp_settings.items():
+                token = settings.get("telegram_token", "")
+                if token:
+                    active_tokens[cid] = token
             
-            if response.status_code == 200:
-                data = response.json()
-                if data.get("ok"):
-                    updates = data.get("result", [])
-                    for update in updates:
-                        last_update_id = max(last_update_id, update.get("update_id", 0))
-                        await process_telegram_update(update)
-            elif response.status_code == 401:
-                print("Telegram Bot Token is invalid or expired. Disabling polling.")
-                await asyncio.sleep(10)
-            else:
-                print(f"Telegram polling returned status code: {response.status_code}")
+            if not active_tokens:
                 await asyncio.sleep(5)
-        except requests.exceptions.RequestException:
-            await asyncio.sleep(2)
-        except Exception as e:
-            print(f"Error in telegram polling: {e}")
+                continue
+                
+            for cid, token in active_tokens.items():
+                last_update_id = last_update_ids.get(token, 0)
+                url = f"https://api.telegram.org/bot{token}/getUpdates"
+                params = {"offset": last_update_id + 1, "timeout": 2}
+                
+                try:
+                    loop = asyncio.get_event_loop()
+                    response = await loop.run_in_executor(
+                        None, 
+                        lambda: requests.get(url, params=params, timeout=5)
+                    )
+                    
+                    if response.status_code == 200:
+                        data = response.json()
+                        if data.get("ok"):
+                            updates = data.get("result", [])
+                            for update in updates:
+                                last_update_id = max(last_update_id, update.get("update_id", 0))
+                                last_update_ids[token] = last_update_id
+                                await process_telegram_update(update, company_id=cid)
+                    elif response.status_code == 401:
+                        pass
+                except Exception:
+                    pass
+            
+            await asyncio.sleep(1)
+        except Exception as loop_err:
+            print(f"Error in telegram multi-polling loop: {loop_err}")
             await asyncio.sleep(5)
 
 @app.on_event("startup")
@@ -1021,38 +1117,119 @@ async def startup_event():
     tg_polling_task = asyncio.create_task(telegram_polling_loop())
     print("Telegram Polling task spawned in startup.")
 
-@app.get("/api/settings")
-def get_settings():
-    global settings_state
+@app.get("/api/companies")
+def get_companies():
     try:
-        settings_state = load_settings()
+        # Load all companies from Supabase
+        return supabase_req("GET", "companies?select=*&order=created_at.desc")
     except Exception as e:
-        print(f"Failed to reload settings: {e}")
-    return settings_state
+        print(f"Failed to fetch companies: {e}")
+        return []
+
+@app.post("/api/companies/register")
+def register_company(payload: dict):
+    company_id = payload.get("company_id")
+    company_name = payload.get("company_name")
+    admin_name = payload.get("admin_name")
+    admin_login = payload.get("admin_login")
+    admin_password = payload.get("admin_password")
+    
+    if not all([company_id, company_name, admin_name, admin_login, admin_password]):
+        raise HTTPException(status_code=400, detail="Barcha maydonlarni to'ldirish majburiy.")
+    
+    # Clean company_id (alphanumeric only)
+    company_id = "".join(c for c in company_id if c.isalnum()).lower()
+    if not company_id:
+        raise HTTPException(status_code=400, detail="Kompaniya kodi yaroqsiz.")
+        
+    try:
+        # Check if company already exists
+        exists = supabase_req("GET", f"companies?id=eq.{company_id}")
+        if exists:
+            raise HTTPException(status_code=400, detail="Ushbu kompaniya kodi allaqachon ro'yxatdan o'tgan.")
+    except HTTPException as he:
+        if he.status_code == 400:
+            raise he
+        pass
+        
+    # 1. Save company
+    company_payload = {
+        "id": company_id,
+        "name": company_name,
+        "status": "active"
+    }
+    supabase_req("POST", "companies", json_data=company_payload)
+    
+    # 2. Save Admin Employee
+    employee_payload = {
+        "id": f"emp_{company_id}_admin",
+        "company_id": company_id,
+        "name": f"{admin_name} (Admin)",
+        "role": "admin",
+        "login": admin_login,
+        "password": admin_password,
+        "status": "active"
+    }
+    supabase_req("POST", "employees", json_data=employee_payload)
+    
+    # 3. Create default settings
+    default_settings = {
+        "telegram_token": "", "instagram_token": "", "ai_provider": "local",
+        "telephony_provider": "sarkor", "gemini_api_key": "", "openai_api_key": "",
+        "groq_api_key": "", "ai_auto_reply": False, "regos_endpoint": "", "regos_token": "",
+        "amocrm_subdomain": "", "amocrm_token": ""
+    }
+    save_company_settings(company_id, default_settings)
+    
+    return {"status": "success", "message": "Kompaniya muvaffaqiyatli ro'yxatdan o'tkazildi."}
+
+@app.post("/api/companies/toggle")
+def toggle_company(payload: dict):
+    company_id = payload.get("company_id")
+    status = payload.get("status")
+    if not company_id or status not in ["active", "disabled"]:
+        raise HTTPException(status_code=400, detail="Noto'g'ri so'rov parametrlari.")
+        
+    update_payload = {"status": status}
+    supabase_req("POST", f"companies?id=eq.{company_id}", json_data=update_payload)
+    return {"status": "success", "message": f"Kompaniya holati {status} ga o'zgartirildi."}
+
+@app.get("/api/settings")
+def get_settings(request: Request):
+    company_id = get_company_id(request)
+    if not company_id:
+        return {}
+    return get_company_settings(company_id)
 
 @app.post("/api/settings")
-def update_settings(settings: dict):
-    global settings_state
-    settings_state["telegram_token"] = settings.get("telegram_token", "")
-    settings_state["instagram_token"] = settings.get("instagram_token", "")
-    settings_state["ai_provider"] = settings.get("ai_provider", "local")
-    settings_state["telephony_provider"] = settings.get("telephony_provider", "sarkor")
-    settings_state["gemini_api_key"] = settings.get("gemini_api_key", "")
-    settings_state["openai_api_key"] = settings.get("openai_api_key", "")
-    settings_state["groq_api_key"] = settings.get("groq_api_key", "")
-    settings_state["ai_auto_reply"] = settings.get("ai_auto_reply", False)
-    settings_state["regos_endpoint"] = settings.get("regos_endpoint", "")
-    settings_state["regos_token"] = settings.get("regos_token", "")
-    settings_state["amocrm_subdomain"] = settings.get("amocrm_subdomain", "")
-    settings_state["amocrm_token"] = settings.get("amocrm_token", "")
+def update_settings(settings: dict, request: Request):
+    company_id = get_company_id(request)
+    if not company_id:
+        raise HTTPException(status_code=400, detail="Kompaniya ID topilmadi")
+    
+    company_settings = get_company_settings(company_id)
+    company_settings["telegram_token"] = settings.get("telegram_token", "")
+    company_settings["instagram_token"] = settings.get("instagram_token", "")
+    company_settings["ai_provider"] = settings.get("ai_provider", "local")
+    company_settings["telephony_provider"] = settings.get("telephony_provider", "sarkor")
+    company_settings["gemini_api_key"] = settings.get("gemini_api_key", "")
+    company_settings["openai_api_key"] = settings.get("openai_api_key", "")
+    company_settings["groq_api_key"] = settings.get("groq_api_key", "")
+    company_settings["ai_auto_reply"] = settings.get("ai_auto_reply", False)
+    company_settings["regos_endpoint"] = settings.get("regos_endpoint", "")
+    company_settings["regos_token"] = settings.get("regos_token", "")
+    company_settings["amocrm_subdomain"] = settings.get("amocrm_subdomain", "")
+    company_settings["amocrm_token"] = settings.get("amocrm_token", "")
     if "roles" in settings:
-        settings_state["roles"] = settings.get("roles")
-    save_settings(settings_state)
-    print("Settings updated and saved.")
-    return {"status": "success", "settings": settings_state}
+        company_settings["roles"] = settings.get("roles")
+    
+    save_company_settings(company_id, company_settings)
+    print(f"Settings for company {company_id} updated.")
+    return {"status": "success", "settings": company_settings}
 
-def call_gemini(prompt: str, system_instruction: str = None) -> str:
-    api_key = settings_state.get("gemini_api_key", "")
+def call_gemini(prompt: str, system_instruction: str = None, settings: dict = None) -> str:
+    active_settings = settings if settings is not None else settings_state
+    api_key = active_settings.get("gemini_api_key", "")
     if not api_key:
         return "Tizim sozlamalarida Gemini API Key kiritilmagan! Iltimos, Sozlamalar sahifasida kalitni saqlang."
     
@@ -1443,11 +1620,12 @@ def call_groq(prompt: str, system_instruction: str = None) -> str:
         return choices[0].get("message", {}).get("content", "")
     return "ERROR: Groq dan bo'sh javob qaytdi."
 
-def call_ai_engine(prompt: str, system_instruction: str = None) -> str:
-    provider = settings_state.get("ai_provider", "local")
+def call_ai_engine(prompt: str, system_instruction: str = None, company_id: str = None) -> str:
+    settings = get_company_settings(company_id) if company_id else settings_state
+    provider = settings.get("ai_provider", "local")
     if provider == "gemini":
         try:
-            res = call_gemini(prompt, system_instruction)
+            res = call_gemini(prompt, system_instruction, settings=settings)
             if "Gemini API bilan bog'lanishda xatolik" in res or "API Key kiritilmagan" in res or "bo'sh javob qaytdi" in res:
                 return "FALLBACK"
             return res
@@ -1455,7 +1633,7 @@ def call_ai_engine(prompt: str, system_instruction: str = None) -> str:
             return "FALLBACK"
     elif provider == "openai":
         try:
-            res = call_openai(prompt, system_instruction)
+            res = call_openai(prompt, system_instruction, settings=settings)
             if res.startswith("ERROR:"):
                 return "FALLBACK"
             return res
@@ -1463,7 +1641,7 @@ def call_ai_engine(prompt: str, system_instruction: str = None) -> str:
             return "FALLBACK"
     elif provider == "groq":
         try:
-            res = call_groq(prompt, system_instruction)
+            res = call_groq(prompt, system_instruction, settings=settings)
             if res.startswith("ERROR:"):
                 return "FALLBACK"
             return res
@@ -1471,13 +1649,17 @@ def call_ai_engine(prompt: str, system_instruction: str = None) -> str:
             return "FALLBACK"
     return "FALLBACK"
 
-def trigger_ai_auto_reply(customer_id: str, platform: str, customer_name: str, message_text: str):
-    if not settings_state.get("ai_auto_reply"):
+def trigger_ai_auto_reply(customer_id: str, platform: str, customer_name: str, message_text: str, company_id: str = None):
+    settings = get_company_settings(company_id) if company_id else settings_state
+    if not settings.get("ai_auto_reply"):
         return
         
     try:
         # 1. Fetch inventory context
-        inventory = supabase_req("GET", "inventory?select=*")
+        inv_path = "inventory?select=*"
+        if company_id:
+            inv_path += f"&company_id=eq.{company_id}"
+        inventory = supabase_req("GET", inv_path)
         inv_list = []
         for p in inventory:
             status = "Sotuvda bor" if p.get("stock", 0) > 0 else "Tugagan (tez orada keladi)"
@@ -1485,7 +1667,10 @@ def trigger_ai_auto_reply(customer_id: str, platform: str, customer_name: str, m
         inv_context = "\n".join(inv_list)
         
         # 2. Fetch recent messages
-        messages = supabase_req("GET", f"messages?customer_id=eq.{customer_id}&order=created_at.asc")
+        msg_path = f"messages?customer_id=eq.{customer_id}&order=created_at.asc"
+        if company_id:
+            msg_path += f"&company_id=eq.{company_id}"
+        messages = supabase_req("GET", msg_path)
         chat_history = []
         for m in messages[-8:]:
             sender_label = "Mijoz" if m.get("sender") == "customer" else "Siz (AI)"
@@ -1510,7 +1695,7 @@ Qoidalar:
 5. Javobingiz juda qisqa bo'lsin: 1 ta yoki maksimum 2 ta gap.
 6. Avtomatik javoblar faqat mijozga yuboriladigan javob matnini o'zidan iborat bo'lsin, izohlar qo'shmang."""
 
-        reply_text = call_ai_engine(message_text, system_instruction)
+        reply_text = call_ai_engine(message_text, system_instruction, company_id=company_id)
         if reply_text == "FALLBACK":
             reply_text = generate_chat_fallback(customer_name, message_text, inventory)
             
@@ -1523,18 +1708,20 @@ Qoidalar:
             "platform": platform,
             "text": reply_text
         }
+        if company_id:
+            new_msg["company_id"] = company_id
         supabase_req("POST", "messages", json_data=new_msg)
-        print(f"[Auto-Pilot] Stored AI auto-reply to {customer_id}: {reply_text}")
+        print(f"[Auto-Pilot] Stored AI auto-reply for company {company_id} to {customer_id}: {reply_text}")
         
         # 4. Send the message via Telegram / Instagram API
         if platform == "telegram":
             chat_id = customer_id.replace("c_tg_", "")
-            token = settings_state.get("telegram_token")
+            token = settings.get("telegram_token")
             if token:
                 send_telegram_message(token, chat_id, reply_text)
         elif platform == "instagram":
             recipient_id = customer_id.replace("c_ig_", "")
-            token = settings_state.get("instagram_token")
+            token = settings.get("instagram_token")
             if token:
                 send_instagram_message(token, recipient_id, reply_text)
     except Exception as e:
@@ -2703,34 +2890,38 @@ def run_sync_in_background(days: int):
         print(f"Background Sync: failed with error: {e_sync}")
 
 @app.get("/api/receipts")
-def get_receipts(search: str = None):
+def get_receipts(request: Request, search: str = None):
+    company_id = get_company_id(request)
+    if not company_id:
+        return []
     try:
         if search:
             search_lat = to_latin(search)
             search_cyr = to_cyrillic(search)
             term_lat = f"%{search_lat}%"
             term_cyr = f"%{search_cyr}%"
-            path = f"receipts?select=*&id=neq.system_settings&or=(code.ilike.{term_lat},cashier_name.ilike.{term_lat},code.ilike.{term_cyr},cashier_name.ilike.{term_cyr})&order=created_at.desc&limit=1000"
+            path = f"receipts?select=*&company_id=eq.{company_id}&id=not.like.settings_*&or=(code.ilike.{term_lat},cashier_name.ilike.{term_lat},code.ilike.{term_cyr},cashier_name.ilike.{term_cyr})&order=created_at.desc&limit=1000"
             return supabase_req("GET", path)
         else:
-            return supabase_req("GET", "receipts?select=*&id=neq.system_settings&order=created_at.desc&limit=1000")
+            return supabase_req("GET", f"receipts?select=*&company_id=eq.{company_id}&id=not.like.settings_*&order=created_at.desc&limit=1000")
     except Exception as e:
         print(f"Failed to fetch receipts: {e}")
-        err_msg = str(e)
-        if "PGRST205" in err_msg or "Could not find the table" in err_msg or "404" in err_msg:
-            return {
-                "error": "migration_required", 
-                "sql": "CREATE TABLE IF NOT EXISTS public.receipts (\n    id TEXT PRIMARY KEY,\n    code TEXT,\n    cashier_name TEXT,\n    total_amount NUMERIC DEFAULT 0,\n    discount NUMERIC DEFAULT 0,\n    payment_type TEXT DEFAULT 'cash',\n    items JSONB,\n    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()\n);\nALTER TABLE public.receipts DISABLE ROW LEVEL SECURITY;"
-            }
         return []
 
 @app.post("/api/receipts")
-def save_receipt(receipt: dict):
+def save_receipt(receipt: dict, request: Request):
+    company_id = get_company_id(request)
+    if company_id:
+        receipt["company_id"] = company_id
     return supabase_req("POST", "receipts?on_conflict=id", json_data=receipt)
 
 @app.delete("/api/receipts/{id}")
-def delete_receipt(id: str):
-    return supabase_req("DELETE", f"receipts?id=eq.{id}")
+def delete_receipt(id: str, request: Request):
+    company_id = get_company_id(request)
+    path = f"receipts?id=eq.{id}"
+    if company_id:
+        path += f"&company_id=eq.{company_id}"
+    return supabase_req("DELETE", path)
 
 from fastapi import BackgroundTasks
 
@@ -2788,24 +2979,94 @@ async def regos_webhook(request: Request):
     
     return {"status": "success", "message": "Webhook processed successfully"}
 
-@app.post("/api/courier/login")
-def courier_login(payload: dict):
+@app.post("/api/auth/login")
+def auth_login(payload: dict):
     login = payload.get("login")
     password = payload.get("password")
-    if not login or not password:
-        raise HTTPException(status_code=400, detail="Login va parol kiritilishi shart.")
+    company_id = payload.get("company_id")
+    
+    # 1. Super Admin check
+    if login == "admin" and password == "admin":
+        return {
+            "status": "success",
+            "user": {
+                "id": "admin",
+                "name": "Super Admin",
+                "role": "superadmin",
+                "company_id": "admin"
+            }
+        }
+        
+    if not login or not password or not company_id:
+        raise HTTPException(status_code=400, detail="Kompaniya kodi, login va parol kiritilishi shart.")
+        
+    company_id = "".join(c for c in company_id if c.isalnum()).lower()
     
     try:
-        emps = supabase_req("GET", "employees")
+        # 2. Check company status
+        comp = supabase_req("GET", f"companies?id=eq.{company_id}")
+        if not comp:
+            raise HTTPException(status_code=404, detail="Kompaniya topilmadi.")
+        if comp[0].get("status") != "active":
+            raise HTTPException(status_code=403, detail="Kompaniya faoliyati to'xtatilgan.")
+            
+        # 3. Verify employee credentials
+        emps = supabase_req("GET", f"employees?company_id=eq.{company_id}")
         if not isinstance(emps, list):
             emps = []
-        
+            
         found = None
         for e in emps:
             if e.get("login") == login and e.get("password") == password:
                 found = e
                 break
+                
+        if found:
+            return {
+                "status": "success",
+                "user": {
+                    "id": found.get("id"),
+                    "name": found.get("name"),
+                    "role": found.get("role"),
+                    "company_id": company_id
+                }
+            }
+        else:
+            raise HTTPException(status_code=401, detail="Noto'g'ri login yoki parol.")
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/courier/login")
+def courier_login(payload: dict):
+    login = payload.get("login")
+    password = payload.get("password")
+    company_id = payload.get("company_id")
+    if not login or not password or not company_id:
+        raise HTTPException(status_code=400, detail="Kompaniya kodi, login va parol kiritilishi shart.")
         
+    company_id = "".join(c for c in company_id if c.isalnum()).lower()
+    
+    try:
+        # Check company status
+        comp = supabase_req("GET", f"companies?id=eq.{company_id}")
+        if not comp:
+            raise HTTPException(status_code=404, detail="Kompaniya topilmadi.")
+        if comp[0].get("status") != "active":
+            raise HTTPException(status_code=403, detail="Kompaniya faoliyati to'xtatilgan.")
+            
+        # Get employees of this company
+        emps = supabase_req("GET", f"employees?company_id=eq.{company_id}")
+        if not isinstance(emps, list):
+            emps = []
+            
+        found = None
+        for e in emps:
+            if e.get("login") == login and e.get("password") == password:
+                found = e
+                break
+                
         if found:
             return {
                 "status": "success",
@@ -2813,18 +3074,24 @@ def courier_login(payload: dict):
                     "id": found.get("id"),
                     "name": found.get("name"),
                     "role": found.get("role"),
-                    "phone": found.get("phone")
+                    "phone": found.get("phone"),
+                    "company_id": company_id
                 }
             }
         else:
             raise HTTPException(status_code=401, detail="Noto'g'ri login yoki parol.")
+    except HTTPException as he:
+        raise he
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/courier/receipts")
-def get_courier_receipts(courier_name: str):
+def get_courier_receipts(request: Request, courier_name: str):
+    company_id = get_company_id(request)
+    if not company_id:
+        return []
     try:
-        receipts = supabase_req("GET", "receipts?id=neq.system_settings&order=created_at.desc&limit=500")
+        receipts = supabase_req("GET", f"receipts?company_id=eq.{company_id}&id=not.like.settings_*&order=created_at.desc&limit=500")
         if not isinstance(receipts, list):
             return []
         

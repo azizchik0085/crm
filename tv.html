@@ -538,7 +538,10 @@
         // Main live update logic
         async function fetchAndRenderMonitor() {
             try {
-                const response = await fetch('/api/receipts');
+                const companyId = new URLSearchParams(window.location.search).get('company');
+                const url = companyId ? `/api/receipts?company_id=${encodeURIComponent(companyId)}` : '/api/receipts';
+                const headers = companyId ? { 'X-Company-ID': companyId } : {};
+                const response = await fetch(url, { headers });
                 if (!response.ok) throw new Error("HTTP error " + response.status);
                 const receipts = await response.json();
                 

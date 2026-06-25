@@ -31,6 +31,14 @@
             
             <form id="login-form" style="display: flex; flex-direction: column; gap: 16px; text-align: left;" onsubmit="App.handleLoginSubmit(event)">
                 <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
+                    <label for="login-company" style="font-size: 13px; font-weight: 500; color: var(--text-main);">Kompaniya kodi</label>
+                    <div style="position: relative;">
+                        <span style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--text-muted);"><i class="fas fa-building"></i></span>
+                        <input type="text" id="login-company" class="form-control" placeholder="Kompaniya kodi (Super admin uchun bo'sh)" style="padding-left: 40px; background-color: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); color: var(--text-main); height: 44px; border-radius: 8px; width: 100%; box-sizing: border-box;">
+                    </div>
+                </div>
+
+                <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
                     <label for="login-username" style="font-size: 13px; font-weight: 500; color: var(--text-main);">Foydalanuvchi logini</label>
                     <div style="position: relative;">
                         <span style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--text-muted);"><i class="fas fa-user"></i></span>
@@ -101,6 +109,9 @@
                     </li>
                     <li class="nav-item" data-view="settings">
                         <a href="#" data-view="settings"><i class="fas fa-sliders-h"></i> Sozlamalar</a>
+                    </li>
+                    <li class="nav-item" data-view="superadmin" id="nav-superadmin" style="display: none;">
+                        <a href="#" data-view="superadmin"><i class="fas fa-building"></i> Kompaniyalar</a>
                     </li>
                 </ul>
             </nav>
@@ -867,10 +878,87 @@
                 </div>
             </section>
 
+            <!-- SUPERADMIN (KOMPANIYALAR BOSHQARUVI) BO'LIMI -->
+            <section id="view-superadmin" class="view-section">
+                <div class="header" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                    <div class="header-title">
+                        <h1>Kompaniyalar boshqaruvi (Super Admin)</h1>
+                        <p>Tizimdagi barcha kompaniyalarni va ularning holatini boshqarish</p>
+                    </div>
+                    <button class="btn btn-primary" onclick="showModal('superadmin-company-modal')">
+                        <i class="fas fa-plus"></i> Yangi kompaniya qo'shish
+                    </button>
+                </div>
+
+                <div class="card" style="margin-top: 20px;">
+                    <div class="table-responsive">
+                        <table class="custom-table">
+                            <thead>
+                                <tr>
+                                    <th>Kompaniya Kodi</th>
+                                    <th>Kompaniya Nomi</th>
+                                    <th>Yaratilgan Sana</th>
+                                    <th>Holati</th>
+                                    <th style="text-align: right;">Amallar</th>
+                                </tr>
+                            </thead>
+                            <tbody id="superadmin-companies-list">
+                                <!-- Dinamik kompaniyalar -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
         </main>
     </div>
 
     <!-- MODAL OYNAlari (YANGI ELEMENT QO'SHISH SHAKLLARI) -->
+
+    <!-- Super Admin Yangi kompaniya qo'shish modal oynasi -->
+    <div class="modal" id="superadmin-company-modal">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3>Yangi Kompaniya Qo'shish</h3>
+                <button class="close-modal-btn" onclick="closeModal('superadmin-company-modal')">&times;</button>
+            </div>
+            <form id="superadmin-add-company-form" onsubmit="SuperAdmin.handleCreateCompany(event)">
+                <div class="modal-body">
+                    <div class="form-group" style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px;">
+                        <label for="company-reg-id" style="font-size: 13px; font-weight: 500; color: var(--text-main);">Kompaniya Kodi (Faqat harf va raqamlar, masalan: maxdecor) <span style="color:var(--danger)">*</span></label>
+                        <input type="text" id="company-reg-id" class="form-control" required placeholder="Masalan: maxdecor" style="background-color: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); color: var(--text-main); height: 40px; border-radius: 8px; width: 100%; box-sizing: border-box; padding: 0 12px;">
+                    </div>
+                    <div class="form-group" style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px;">
+                        <label for="company-reg-name" style="font-size: 13px; font-weight: 500; color: var(--text-main);">Kompaniya Nomi <span style="color:var(--danger)">*</span></label>
+                        <input type="text" id="company-reg-name" class="form-control" required placeholder="Masalan: Max Decor LLC" style="background-color: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); color: var(--text-main); height: 40px; border-radius: 8px; width: 100%; box-sizing: border-box; padding: 0 12px;">
+                    </div>
+                    
+                    <div class="form-group" style="border-top: 1px solid var(--border-color); padding-top: 15px; margin-top: 15px; margin-bottom: 12px;">
+                        <h4 style="margin: 0 0 10px 0; color: var(--text-main); font-size: 14px; font-weight: 600;">Kompaniya Admini Sozlamalari</h4>
+                    </div>
+                    
+                    <div class="form-group" style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px;">
+                        <label for="company-reg-admin-name" style="font-size: 13px; font-weight: 500; color: var(--text-main);">Admin Ismi <span style="color:var(--danger)">*</span></label>
+                        <input type="text" id="company-reg-admin-name" class="form-control" required placeholder="Masalan: Bekzod" style="background-color: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); color: var(--text-main); height: 40px; border-radius: 8px; width: 100%; box-sizing: border-box; padding: 0 12px;">
+                    </div>
+                    <div class="form-group" style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px;">
+                        <label for="company-reg-admin-login" style="font-size: 13px; font-weight: 500; color: var(--text-main);">Admin Logini <span style="color:var(--danger)">*</span></label>
+                        <input type="text" id="company-reg-admin-login" class="form-control" required placeholder="Masalan: bekzod" style="background-color: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); color: var(--text-main); height: 40px; border-radius: 8px; width: 100%; box-sizing: border-box; padding: 0 12px;">
+                    </div>
+                    <div class="form-group" style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px;">
+                        <label for="company-reg-admin-password" style="font-size: 13px; font-weight: 500; color: var(--text-main);">Admin Paroli <span style="color:var(--danger)">*</span></label>
+                        <input type="password" id="company-reg-admin-password" class="form-control" required placeholder="Parol" style="background-color: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); color: var(--text-main); height: 40px; border-radius: 8px; width: 100%; box-sizing: border-box; padding: 0 12px;">
+                    </div>
+                    <div id="company-reg-error-msg" style="display: none; color: #ef4444; font-size: 13px; font-weight: 500; text-align: center; background: rgba(239, 68, 68, 0.1); padding: 8px; border-radius: 6px; border: 1px solid rgba(239, 68, 68, 0.2); margin-top: 10px;">
+                    </div>
+                </div>
+                <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 12px; border-top: 1px solid var(--border-color); padding-top: 15px; margin-top: 15px;">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('superadmin-company-modal')">Bekor qilish</button>
+                    <button type="submit" class="btn btn-primary">Saqlash</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
     <!-- 1. CRM Yangi mijoz qo'shish modal oynasi -->
     <div class="modal" id="crm-modal">

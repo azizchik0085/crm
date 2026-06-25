@@ -226,11 +226,17 @@ window.App = {
         if (appContainer) appContainer.style.display = 'flex';
         
         const savedView = localStorage.getItem('activeView');
-        this.currentView = savedView || 'dashboard';
+        const activeUserRole = localStorage.getItem('activeUserRole');
+        
+        if (activeUserRole === 'superadmin') {
+            this.currentView = 'superadmin';
+        } else {
+            this.currentView = savedView || 'dashboard';
+        }
         
         await this.updateProfileCard(activeUserId);
         this.applyPermissions();
-        this.renderView(this.currentView || 'dashboard');
+        this.renderView(this.currentView);
     },
 
     updateProfileCard: async function(activeUserId) {
@@ -238,70 +244,81 @@ window.App = {
         const roleLabel = document.getElementById('active-user-role');
         const avatarLabel = document.getElementById('active-user-avatar');
         
-        if (activeUserId === 'admin') {
-            if (nameLabel) nameLabel.textContent = 'Administrator';
-            if (roleLabel) roleLabel.textContent = 'Direktor';
-            if (avatarLabel) avatarLabel.textContent = 'A';
+        const activeUserName = localStorage.getItem('activeUserName');
+        const activeUserRole = localStorage.getItem('activeUserRole');
+        
+        if (activeUserRole === 'superadmin' || activeUserId === 'admin') {
+            if (nameLabel) nameLabel.textContent = 'Super Admin';
+            if (roleLabel) roleLabel.textContent = 'Platform Admin';
+            if (avatarLabel) avatarLabel.textContent = 'SA';
             return;
         }
         
-        try {
-            const employees = await DB.getEmployees();
-            const currentEmp = employees.find(e => e.id === activeUserId);
-            if (currentEmp) {
-                if (nameLabel) nameLabel.textContent = currentEmp.name;
-                if (roleLabel) roleLabel.textContent = currentEmp.role || 'Xodim';
-                if (avatarLabel) {
-                    const firstChar = (currentEmp.name || 'X').charAt(0).toUpperCase();
-                    avatarLabel.textContent = firstChar;
-                }
-            } else {
-                this.logout();
+        if (nameLabel && activeUserName) nameLabel.textContent = activeUserName;
+        if (roleLabel) {
+            let roleStr = activeUserRole || 'Xodim';
+            if (roleStr.includes(';')) {
+                roleStr = roleStr.split(';')[0].trim();
             }
-        } catch(err) {
-            console.error("Failed to load active employee for profile card:", err);
+            roleLabel.textContent = roleStr;
+        }
+        if (avatarLabel && activeUserName) {
+            avatarLabel.textContent = activeUserName.charAt(0).toUpperCase();
         }
     },
 
     handleLoginSubmit: async function(event) {
         event.preventDefault();
+        const companyInput = document.getElementById('login-company');
         const usernameInput = document.getElementById('login-username');
         const passwordInput = document.getElementById('login-password');
         const errorMsg = document.getElementById('login-error-msg');
         
         if (!usernameInput || !passwordInput) return;
         
+        const companyId = companyInput ? companyInput.value.trim() : '';
         const login = usernameInput.value.trim();
         const password = passwordInput.value.trim();
         
         if (errorMsg) errorMsg.style.display = 'none';
         
-        if (login === 'admin' && password === 'admin') {
-            localStorage.setItem('activeUserId', 'admin');
-            usernameInput.value = '';
-            passwordInput.value = '';
-            await this.setupAuth();
-            return;
-        }
-        
         try {
-            const employees = await DB.getEmployees();
-            const foundEmp = employees.find(e => e.login === login && e.password === password);
-            if (foundEmp) {
-                localStorage.setItem('activeUserId', foundEmp.id);
+            const response = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    company_id: companyId,
+                    login: login,
+                    password: password
+                })
+            });
+            
+            if (!response.ok) {
+                const errData = await response.json();
+                throw new Error(errData.detail || "Noto'g'ri login, parol yoki kompaniya kodi!");
+            }
+            
+            const data = await response.json();
+            if (data.status === 'success') {
+                localStorage.setItem('activeUserId', data.user.id);
+                localStorage.setItem('activeCompanyId', data.user.company_id);
+                localStorage.setItem('activeUserRole', data.user.role);
+                localStorage.setItem('activeUserName', data.user.name);
+                
+                if (companyInput) companyInput.value = '';
                 usernameInput.value = '';
                 passwordInput.value = '';
+                
                 await this.setupAuth();
             } else {
-                if (errorMsg) {
-                    errorMsg.textContent = "Noto'g'ri login yoki parol kiritildi!";
-                    errorMsg.style.display = 'block';
-                }
+                throw new Error("Tizimga kirishda xatolik yuz berdi.");
             }
         } catch (err) {
             console.error("Login verification failed:", err);
             if (errorMsg) {
-                errorMsg.textContent = "Tizimga ulanishda xatolik yuz berdi.";
+                errorMsg.textContent = err.message || "Tizimga ulanishda xatolik yuz berdi.";
                 errorMsg.style.display = 'block';
             }
         }
@@ -309,9 +326,17 @@ window.App = {
 
     logout: function() {
         localStorage.removeItem('activeUserId');
+        localStorage.removeItem('activeCompanyId');
+        localStorage.removeItem('activeUserRole');
+        localStorage.removeItem('activeUserName');
+        localStorage.removeItem('activeView');
+        
+        const companyInput = document.getElementById('login-company');
         const usernameInput = document.getElementById('login-username');
         const passwordInput = document.getElementById('login-password');
         const errorMsg = document.getElementById('login-error-msg');
+        
+        if (companyInput) companyInput.value = '';
         if (usernameInput) usernameInput.value = '';
         if (passwordInput) passwordInput.value = '';
         if (errorMsg) errorMsg.style.display = 'none';
@@ -320,7 +345,31 @@ window.App = {
 
     applyPermissions: async function() {
         try {
+            const activeUserRole = localStorage.getItem('activeUserRole');
             const activeUserId = localStorage.getItem('activeUserId') || 'admin';
+            
+            if (activeUserRole === 'superadmin') {
+                const navSA = document.getElementById('nav-superadmin');
+                if (navSA) navSA.style.setProperty('display', '', 'important');
+                
+                // Hide all other sidebar navigation items
+                document.querySelectorAll('.nav-item, .bottom-nav-item').forEach(item => {
+                    const link = item.tagName === 'A' ? item : item.querySelector('a');
+                    const targetView = item.getAttribute('data-view') || (link ? link.getAttribute('data-view') : null);
+                    if (targetView && targetView !== 'superadmin') {
+                        item.style.setProperty('display', 'none', 'important');
+                    }
+                });
+                
+                if (this.currentView !== 'superadmin') {
+                    this.renderView('superadmin');
+                }
+                return;
+            }
+            
+            // For normal users, hide the superadmin navigation link
+            const navSA = document.getElementById('nav-superadmin');
+            if (navSA) navSA.style.setProperty('display', 'none', 'important');
             
             let activeRole = 'admin';
             let activeUserName = 'Administrator';
@@ -686,6 +735,8 @@ window.App = {
             if (window.Seniklar) window.Seniklar.init();
         } else if (viewName === 'kassa') {
             if (window.Kassa) window.Kassa.init();
+        } else if (viewName === 'superadmin') {
+            if (window.SuperAdmin) window.SuperAdmin.init();
         }
     },
 
@@ -1301,3 +1352,127 @@ window.App = {
 document.addEventListener('DOMContentLoaded', () => {
     window.App.init();
 });
+
+window.SuperAdmin = {
+    init: async function() {
+        await this.loadCompanies();
+    },
+
+    loadCompanies: async function() {
+        const tbody = document.getElementById('superadmin-companies-list');
+        if (!tbody) return;
+
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center;"><i class="fas fa-spinner fa-spin"></i> Yuklanmoqda...</td></tr>';
+
+        try {
+            const response = await fetch('/api/companies');
+            if (!response.ok) throw new Error("Kompaniyalarni yuklashda xatolik yuz berdi.");
+            
+            const companies = await response.json();
+            tbody.innerHTML = '';
+
+            if (companies.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-muted);">Kompaniyalar topilmadi.</td></tr>';
+                return;
+            }
+
+            companies.forEach(company => {
+                const tr = document.createElement('tr');
+                const createdDate = company.created_at ? new Date(company.created_at).toLocaleString('uz-UZ') : 'Noma\'lum';
+                
+                const isActive = company.status === 'active';
+                const statusBadge = isActive 
+                    ? '<span class="badge" style="background: rgba(16, 185, 129, 0.1); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.2); padding: 4px 8px; border-radius: 4px; font-size: 12px; display: inline-flex; align-items: center; gap: 4px;"><i class="fas fa-check-circle"></i> Faol</span>'
+                    : '<span class="badge" style="background: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.2); padding: 4px 8px; border-radius: 4px; font-size: 12px; display: inline-flex; align-items: center; gap: 4px;"><i class="fas fa-times-circle"></i> O\'chirilgan</span>';
+
+                const toggleBtn = isActive
+                    ? `<button class="btn btn-secondary btn-sm" onclick="SuperAdmin.toggleStatus('${company.id}', 'disabled')" style="border-color: var(--danger); color: var(--danger); font-size: 12px; padding: 4px 8px; border-radius: 6px; cursor: pointer;"><i class="fas fa-ban"></i> O'chirish</button>`
+                    : `<button class="btn btn-primary btn-sm" onclick="SuperAdmin.toggleStatus('${company.id}', 'active')" style="font-size: 12px; padding: 4px 8px; border-radius: 6px; cursor: pointer;"><i class="fas fa-check"></i> Faollashtirish</button>`;
+
+                tr.innerHTML = `
+                    <td style="font-weight: 700; font-family: 'JetBrains Mono';">${company.id}</td>
+                    <td>${company.name}</td>
+                    <td>${createdDate}</td>
+                    <td>${statusBadge}</td>
+                    <td style="text-align: right;">${toggleBtn}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        } catch (err) {
+            console.error(err);
+            tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--danger);"><i class="fas fa-exclamation-triangle"></i> Yuklashda xatolik: ${err.message}</td></tr>`;
+        }
+    },
+
+    toggleStatus: async function(companyId, newStatus) {
+        if (!confirm(`Kompaniya holatini o'zgartirishni xohlaysizmi?`)) return;
+        try {
+            const response = await fetch('/api/companies/toggle', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    company_id: companyId,
+                    status: newStatus
+                })
+            });
+
+            if (!response.ok) {
+                const errData = await response.json();
+                throw new Error(errData.detail || "Statusni o'zgartirishda xatolik yuz berdi.");
+            }
+
+            await this.loadCompanies();
+        } catch (err) {
+            alert("Xatolik: " + err.message);
+        }
+    },
+
+    handleCreateCompany: async function(event) {
+        event.preventDefault();
+        
+        const companyIdInput = document.getElementById('company-reg-id');
+        const companyNameInput = document.getElementById('company-reg-name');
+        const adminNameInput = document.getElementById('company-reg-admin-name');
+        const adminLoginInput = document.getElementById('company-reg-admin-login');
+        const adminPasswordInput = document.getElementById('company-reg-admin-password');
+        const errorMsg = document.getElementById('company-reg-error-msg');
+
+        if (errorMsg) errorMsg.style.display = 'none';
+
+        const payload = {
+            company_id: companyIdInput.value.trim(),
+            company_name: companyNameInput.value.trim(),
+            admin_name: adminNameInput.value.trim(),
+            admin_login: adminLoginInput.value.trim(),
+            admin_password: adminPasswordInput.value.trim()
+        };
+
+        try {
+            const response = await fetch('/api/companies/register', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                const errData = await response.json();
+                throw new Error(errData.detail || "Kompaniya qo'shishda xatolik yuz berdi.");
+            }
+
+            // Reset form and close modal
+            event.target.reset();
+            closeModal('superadmin-company-modal');
+            await this.loadCompanies();
+        } catch (err) {
+            console.error(err);
+            if (errorMsg) {
+                errorMsg.textContent = err.message;
+                errorMsg.style.display = 'block';
+            }
+        }
+    }
+};
