@@ -408,13 +408,29 @@ window.App = {
         const canAddEmployee = allowedViews.includes('hr');
         if (addEmployeeBtn) addEmployeeBtn.style.setProperty('display', canAddEmployee ? '' : 'none', 'important');
         
-        const crmAddCustomerBtn = document.querySelector('#view-crm .header-actions button');
+        const crmAddCustomerBtn = document.getElementById('crm-add-customer-btn');
         const canAddCustomer = allowedViews.includes('crm');
         if (crmAddCustomerBtn) crmAddCustomerBtn.style.setProperty('display', canAddCustomer ? '' : 'none', 'important');
         
-        const financeHeaderBtn = document.querySelector('#view-finance .header-actions button');
+        const financeHeaderBtn = document.getElementById('finance-add-transaction-btn');
         const canAddTransaction = allowedViews.includes('finance');
         if (financeHeaderBtn) financeHeaderBtn.style.setProperty('display', canAddTransaction ? '' : 'none', 'important');
+
+        // Toggle amoCRM Sync buttons based on configuration and permission
+        const amocrmSubdomain = data.settings.amocrmSubdomain;
+        const amocrmToken = data.settings.amocrmToken;
+        const isAmoCRMConfigured = !!(amocrmSubdomain && amocrmToken);
+
+        const amocrmSyncBtn = document.getElementById('btn-amocrm-sync');
+        if (amocrmSyncBtn) {
+            amocrmSyncBtn.style.setProperty('display', (canAddCustomer && isAmoCRMConfigured) ? '' : 'none', 'important');
+        }
+
+        const amocrmSyncReceiptsBtn = document.getElementById('btn-amocrm-sync-receipts');
+        const canViewReceipts = allowedViews.includes('receipts');
+        if (amocrmSyncReceiptsBtn) {
+            amocrmSyncReceiptsBtn.style.setProperty('display', (canViewReceipts && isAmoCRMConfigured) ? '' : 'none', 'important');
+        }
         
         if (this.currentView === 'erp' && window.ERP && typeof window.ERP.render === 'function') {
             window.ERP.render();
@@ -546,6 +562,7 @@ window.App = {
                 }
                 
                 this.applySettings();
+                this.applyPermissions();
 
                 // Supabase-ni qayta ishga tushirish
                 if (sbChanged) {

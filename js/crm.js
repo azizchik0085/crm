@@ -559,9 +559,11 @@ window.CRM = {
         }
     },
 
-    syncAmoCRMLeads: async function() {
-        const btn = document.getElementById('btn-amocrm-sync');
+    syncAmoCRMLeads: async function(clickedBtn) {
+        const btn = clickedBtn || document.getElementById('btn-amocrm-sync');
+        let originalHTML = '<i class="fas fa-sync"></i> amoCRM Sinx';
         if (btn) {
+            originalHTML = btn.innerHTML;
             btn.disabled = true;
             btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sinxronizatsiya...';
         }
@@ -575,17 +577,22 @@ window.CRM = {
                 alert(result.message || 'Sinxronizatsiya orqa fonda boshlandi!');
                 // Re-enable and refresh after a short delay
                 setTimeout(async () => {
-                    await this.render();
-                    if (btn) {
-                        btn.disabled = false;
-                        btn.innerHTML = '<i class="fas fa-sync"></i> amoCRM Sinx';
+                    try {
+                        await this.render();
+                    } catch (renderErr) {
+                        console.error("CRM render error during sync:", renderErr);
+                    } finally {
+                        if (btn) {
+                            btn.disabled = false;
+                            btn.innerHTML = originalHTML;
+                        }
                     }
                 }, 3000);
             } else {
                 alert(result.detail || 'Sinxronizatsiya boshlashda xatolik yuz berdi.');
                 if (btn) {
                     btn.disabled = false;
-                    btn.innerHTML = '<i class="fas fa-sync"></i> amoCRM Sinx';
+                    btn.innerHTML = originalHTML;
                 }
             }
         } catch (e) {
@@ -593,7 +600,7 @@ window.CRM = {
             alert("Serverga ulanishda xatolik yuz berdi.");
             if (btn) {
                 btn.disabled = false;
-                btn.innerHTML = '<i class="fas fa-sync"></i> amoCRM Sinx';
+                btn.innerHTML = originalHTML;
             }
         }
     }

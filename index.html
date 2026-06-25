@@ -312,10 +312,10 @@
                         <p>Sotuvlar voronkasi va mijozlar ma'lumotlari</p>
                     </div>
                     <div class="header-actions">
-                        <button class="btn btn-secondary" onclick="CRM.syncAmoCRMLeads()" id="btn-amocrm-sync">
+                        <button class="btn btn-secondary" onclick="CRM.syncAmoCRMLeads(this)" id="btn-amocrm-sync">
                             <i class="fas fa-sync"></i> amoCRM Sinx
                         </button>
-                        <button class="btn btn-primary" onclick="CRM.openAddCustomerModal()">
+                        <button class="btn btn-primary" onclick="CRM.openAddCustomerModal()" id="crm-add-customer-btn">
                             <i class="fas fa-plus"></i> Yangi Mijoz
                         </button>
                     </div>
@@ -460,7 +460,7 @@
                         <p>Kirim-chiqim operatsiyalari va tahlillar</p>
                     </div>
                     <div class="header-actions">
-                        <button class="btn btn-primary" onclick="showModal('transaction-modal')">
+                        <button class="btn btn-primary" onclick="showModal('transaction-modal')" id="finance-add-transaction-btn">
                             <i class="fas fa-plus"></i> Tranzaksiya qo'shish
                         </button>
                     </div>
@@ -491,7 +491,7 @@
                         <p>Kassada urilgan va yopilgan sotuv cheklari tarixi</p>
                     </div>
                     <div class="header-actions" style="display: flex; gap: 8px;">
-                        <button class="btn btn-secondary" onclick="CRM.syncAmoCRMLeads()" id="btn-amocrm-sync-receipts">
+                        <button class="btn btn-secondary" onclick="CRM.syncAmoCRMLeads(this)" id="btn-amocrm-sync-receipts">
                             <i class="fas fa-sync"></i> amoCRM Sinx
                         </button>
                         <button class="btn btn-primary" id="receipts-sync-btn" onclick="Receipts.syncWithRegos()">
