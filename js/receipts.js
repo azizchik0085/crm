@@ -4,6 +4,7 @@ window.Receipts = {
     receiptsList: [],
 
     init: function() {
+        this.receiptsList = []; // Har safar tabga o'tganda yangi ma'lumotlarni serverdan yuklash uchun keshni tozalaymiz
         this.setupEventListeners();
         this.render();
     },
@@ -26,44 +27,47 @@ window.Receipts = {
         const container = document.getElementById('receipts-content');
         if (!container) return;
 
-        // Show a loader
-        container.innerHTML = `
-            <div style="display: flex; justify-content: center; align-items: center; padding: 48px; color: var(--text-muted);">
-                <i class="fas fa-spinner fa-spin" style="font-size: 24px; margin-right: 12px;"></i>
-                Yuklanmoqda...
-            </div>
-        `;
-
-        let dataRes;
-        try {
-            dataRes = await DB.getReceipts(searchVal);
-        } catch (e) {
-            console.error("Failed to load receipts:", e);
-            dataRes = [];
-        }
-
-        if (dataRes && dataRes.error === "migration_required") {
+        // Agar keshda cheklar ro'yxati bo'lmasa, serverdan yuklaymiz
+        if (!this.receiptsList || this.receiptsList.length === 0) {
+            // Show a loader
             container.innerHTML = `
-                <div class="card" style="padding: 24px; border: 1px solid rgba(239, 68, 68, 0.2); background: rgba(239, 68, 68, 0.02); margin-top: 16px;">
-                    <div style="display: flex; gap: 16px; align-items: flex-start; text-align: left;">
-                        <div style="width: 40px; height: 40px; border-radius: 50%; background: rgba(239, 68, 68, 0.1); display: flex; align-items: center; justify-content: center; color: var(--danger); flex-shrink: 0;">
-                            <i class="fas fa-exclamation-triangle" style="font-size: 18px;"></i>
-                        </div>
-                        <div style="flex-grow: 1;">
-                            <h3 style="color: var(--text-main); font-size: 16px; margin: 0 0 6px 0;">Supabase-da "receipts" (cheklar) jadvali topilmadi!</h3>
-                            <p style="color: var(--text-muted); font-size: 14px; margin: 0 0 16px 0; line-height: 1.5;">
-                                Cheklar tarixini saqlash va ko'rsatish uchun Supabase bazasida jadval yaratish kerak.
-                                Iltimos, Supabase boshqaruv panelidagi <strong>SQL Editor</strong>-ga kirib, quyidagi SQL kodini nusxalab ishga tushiring (Run qiling):
-                            </p>
-                            <pre style="background: rgba(0,0,0,0.3); padding: 12px; border-radius: 6px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #a5b4fc; overflow-x: auto; max-width: 100%; border: 1px solid var(--border-color); margin: 0;">${dataRes.sql}</pre>
-                        </div>
-                    </div>
+                <div style="display: flex; justify-content: center; align-items: center; padding: 48px; color: var(--text-muted);">
+                    <i class="fas fa-spinner fa-spin" style="font-size: 24px; margin-right: 12px;"></i>
+                    Yuklanmoqda...
                 </div>
             `;
-            return;
-        }
 
-        this.receiptsList = Array.isArray(dataRes) ? dataRes : [];
+            let dataRes;
+            try {
+                dataRes = await DB.getReceipts();
+            } catch (e) {
+                console.error("Failed to load receipts:", e);
+                dataRes = [];
+            }
+
+            if (dataRes && dataRes.error === "migration_required") {
+                container.innerHTML = `
+                    <div class="card" style="padding: 24px; border: 1px solid rgba(239, 68, 68, 0.2); background: rgba(239, 68, 68, 0.02); margin-top: 16px;">
+                        <div style="display: flex; gap: 16px; align-items: flex-start; text-align: left;">
+                            <div style="width: 40px; height: 40px; border-radius: 50%; background: rgba(239, 68, 68, 0.1); display: flex; align-items: center; justify-content: center; color: var(--danger); flex-shrink: 0;">
+                                <i class="fas fa-exclamation-triangle" style="font-size: 18px;"></i>
+                            </div>
+                            <div style="flex-grow: 1;">
+                                <h3 style="color: var(--text-main); font-size: 16px; margin: 0 0 6px 0;">Supabase-da "receipts" (cheklar) jadvali topilmadi!</h3>
+                                <p style="color: var(--text-muted); font-size: 14px; margin: 0 0 16px 0; line-height: 1.5;">
+                                    Cheklar tarixini saqlash va ko'rsatish uchun Supabase bazasida jadval yaratish kerak.
+                                    Iltimos, Supabase boshqaruv panelidagi <strong>SQL Editor</strong>-ga kirib, quyidagi SQL kodini nusxalab ishga tushiring (Run qiling):
+                                </p>
+                                <pre style="background: rgba(0,0,0,0.3); padding: 12px; border-radius: 6px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #a5b4fc; overflow-x: auto; max-width: 100%; border: 1px solid var(--border-color); margin: 0;">${dataRes.sql}</pre>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+
+            this.receiptsList = Array.isArray(dataRes) ? dataRes : [];
+        }
 
         let customers = [];
         try {
@@ -78,27 +82,63 @@ window.Receipts = {
         let filtered = this.receiptsList;
         if (searchVal) {
             const searchValNorm = window.normalizeUzbek ? window.normalizeUzbek(searchVal) : searchVal.toLowerCase();
+            const searchDigits = searchVal.replace(/\D/g, ''); // Faqat raqamlar qidiruv uchun
+
             filtered = filtered.filter(r => {
                 const codeNorm = r.code ? (window.normalizeUzbek ? window.normalizeUzbek(r.code) : r.code.toLowerCase()) : '';
                 const cashierNorm = r.cashier_name ? (window.normalizeUzbek ? window.normalizeUzbek(r.cashier_name) : r.cashier_name.toLowerCase()) : '';
                 const idNorm = r.id ? (window.normalizeUzbek ? window.normalizeUzbek(r.id) : r.id.toLowerCase()) : '';
                 
-                let customerNorm = '';
-                let sellerNorm = '';
-                if (r.items) {
-                    if (r.items.customer_name) {
-                        customerNorm = window.normalizeUzbek ? window.normalizeUzbek(r.items.customer_name) : r.items.customer_name.toLowerCase();
-                    }
-                    if (r.items.seller_name) {
-                        sellerNorm = window.normalizeUzbek ? window.normalizeUzbek(r.items.seller_name) : r.items.seller_name.toLowerCase();
+                // items JSON-ni parse qilamiz
+                let itemsObj = r.items;
+                if (typeof itemsObj === 'string') {
+                    try {
+                        itemsObj = JSON.parse(itemsObj);
+                    } catch (e) {
+                        itemsObj = null;
                     }
                 }
-                
+
+                let customerNameNorm = '';
+                let customerPhone = '';
+                let sellerNorm = '';
+                let productsNorm = '';
+
+                if (itemsObj && !Array.isArray(itemsObj) && typeof itemsObj === 'object') {
+                    if (itemsObj.customer_name) {
+                        customerNameNorm = window.normalizeUzbek ? window.normalizeUzbek(itemsObj.customer_name) : itemsObj.customer_name.toLowerCase();
+                    }
+                    if (itemsObj.customer_phone) {
+                        customerPhone = itemsObj.customer_phone;
+                    }
+                    if (itemsObj.seller_name) {
+                        sellerNorm = window.normalizeUzbek ? window.normalizeUzbek(itemsObj.seller_name) : itemsObj.seller_name.toLowerCase();
+                    }
+                    if (Array.isArray(itemsObj.products)) {
+                        const names = itemsObj.products.map(p => p.name || '').join(' ').toLowerCase();
+                        productsNorm = window.normalizeUzbek ? window.normalizeUzbek(names) : names;
+                    }
+                }
+
+                // Telefon raqamlarini tozalab solishtirish
+                let phoneMatches = false;
+                if (customerPhone) {
+                    const cleanCustPhone = customerPhone.replace(/\D/g, '');
+                    if (searchDigits && cleanCustPhone.includes(searchDigits)) {
+                        phoneMatches = true;
+                    }
+                    if (customerPhone.toLowerCase().includes(searchValNorm)) {
+                        phoneMatches = true;
+                    }
+                }
+
                 return codeNorm.includes(searchValNorm) || 
                        cashierNorm.includes(searchValNorm) || 
                        idNorm.includes(searchValNorm) ||
-                       customerNorm.includes(searchValNorm) ||
-                       sellerNorm.includes(searchValNorm);
+                       customerNameNorm.includes(searchValNorm) ||
+                       sellerNorm.includes(searchValNorm) ||
+                       productsNorm.includes(searchValNorm) ||
+                       phoneMatches;
             });
         }
 
@@ -498,6 +538,7 @@ window.Receipts = {
                     btn.disabled = false;
                     btn.innerHTML = originalText;
                     alert(status.message || "Sinxronizatsiya yakunlandi.");
+                    this.receiptsList = []; // Keshni tozalaymiz
                     this.render();
                 }
             } catch (e) {
