@@ -3127,6 +3127,19 @@ async def amocrm_webhook(request: Request):
 
 # Mount frontend files (HTML, CSS, JS) to run at root url (must be mounted last)
 STATIC_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+
+from fastapi.responses import FileResponse
+
+@app.get("/")
+def read_index():
+    index_path = os.path.join(STATIC_DIR, "index.html")
+    if os.path.exists(index_path):
+        return FileResponse(
+            index_path,
+            headers={"Cache-Control": "no-cache, no-store, must-revalidate, public, max-age=0"}
+        )
+    raise HTTPException(status_code=404, detail="Index file not found")
+
 if os.path.exists(STATIC_DIR):
     app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
 else:
