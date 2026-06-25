@@ -416,20 +416,16 @@ window.App = {
         const canAddTransaction = allowedViews.includes('finance');
         if (financeHeaderBtn) financeHeaderBtn.style.setProperty('display', canAddTransaction ? '' : 'none', 'important');
 
-        // Toggle amoCRM Sync buttons based on configuration and permission
-        const amocrmSubdomain = data.settings.amocrmSubdomain;
-        const amocrmToken = data.settings.amocrmToken;
-        const isAmoCRMConfigured = !!(amocrmSubdomain && amocrmToken);
-
+        // Toggle amoCRM Sync buttons based on permission
         const amocrmSyncBtn = document.getElementById('btn-amocrm-sync');
         if (amocrmSyncBtn) {
-            amocrmSyncBtn.style.setProperty('display', (canAddCustomer && isAmoCRMConfigured) ? '' : 'none', 'important');
+            amocrmSyncBtn.style.setProperty('display', canAddCustomer ? '' : 'none', 'important');
         }
 
         const amocrmSyncReceiptsBtn = document.getElementById('btn-amocrm-sync-receipts');
         const canViewReceipts = allowedViews.includes('receipts');
         if (amocrmSyncReceiptsBtn) {
-            amocrmSyncReceiptsBtn.style.setProperty('display', (canViewReceipts && isAmoCRMConfigured) ? '' : 'none', 'important');
+            amocrmSyncReceiptsBtn.style.setProperty('display', canViewReceipts ? '' : 'none', 'important');
         }
         
         if (this.currentView === 'erp' && window.ERP && typeof window.ERP.render === 'function') {
