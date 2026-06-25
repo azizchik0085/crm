@@ -352,16 +352,19 @@ window.App = {
                 const navSA = document.getElementById('nav-superadmin');
                 if (navSA) navSA.style.setProperty('display', '', 'important');
                 
+                const navSettings = document.querySelector('.nav-item[data-view="settings"]');
+                if (navSettings) navSettings.style.setProperty('display', '', 'important');
+                
                 // Hide all other sidebar navigation items
                 document.querySelectorAll('.nav-item, .bottom-nav-item').forEach(item => {
                     const link = item.tagName === 'A' ? item : item.querySelector('a');
                     const targetView = item.getAttribute('data-view') || (link ? link.getAttribute('data-view') : null);
-                    if (targetView && targetView !== 'superadmin') {
+                    if (targetView && targetView !== 'superadmin' && targetView !== 'settings') {
                         item.style.setProperty('display', 'none', 'important');
                     }
                 });
                 
-                if (this.currentView !== 'superadmin') {
+                if (this.currentView !== 'superadmin' && this.currentView !== 'settings') {
                     this.renderView('superadmin');
                 }
                 return;

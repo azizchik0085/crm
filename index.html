@@ -131,13 +131,18 @@
             </div>
 
             <div class="sidebar-footer">
-                <div style="display:flex; flex-direction:column; gap:2px; max-width: 140px;">
+                <div style="display:flex; flex-direction:column; gap:2px; max-width: 120px;">
                     <span id="company-name-label" style="font-size:13px; font-weight:600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Kompaniya</span>
                     <span style="font-size:10px; color:var(--text-muted);">Boshqaruv paneli</span>
                 </div>
-                <button class="theme-toggle-btn" id="theme-toggle" title="Mavzuni o'zgartirish">
-                    <i class="fas fa-sun"></i>
-                </button>
+                <div style="display: flex; gap: 6px; align-items: center;">
+                    <button class="theme-toggle-btn" id="theme-toggle" title="Mavzuni o'zgartirish" style="width: 36px; height: 36px; border-radius: 8px;">
+                        <i class="fas fa-sun"></i>
+                    </button>
+                    <button class="theme-toggle-btn" id="sidebar-settings-btn" title="Sozlamalar" onclick="App.renderView('settings')" style="width: 36px; height: 36px; border-radius: 8px;">
+                        <i class="fas fa-cog"></i>
+                    </button>
+                </div>
             </div>
         </aside>
 
