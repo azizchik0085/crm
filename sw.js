@@ -1,4 +1,4 @@
-const CACHE_NAME = 'courier-app-cache-v1';
+const CACHE_NAME = 'courier-app-cache-v2';
 const ASSETS = [
   '/courier.html',
   '/css/courier-style.css',
@@ -45,6 +45,16 @@ self.addEventListener('fetch', event => {
   // Skip backend API calls to ensure live data is fetched
   if (event.request.url.includes('/api/')) {
     return;
+  }
+
+  // Only handle Courier PWA assets to avoid caching the main admin site (index.html, app.js, crm.js, etc.)
+  const isCourierAsset = ASSETS.some(asset => {
+    const path = asset.startsWith('http') ? asset : self.location.origin + asset;
+    return event.request.url === path;
+  }) || event.request.url.includes('courier.html') || event.request.url.includes('courier-app.js') || event.request.url.includes('courier-style.css');
+
+  if (!isCourierAsset) {
+    return; // Fallback to normal network request
   }
 
   event.respondWith(
