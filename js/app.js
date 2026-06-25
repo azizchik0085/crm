@@ -450,7 +450,6 @@ window.App = {
             const amocrmSyncReceiptsBtn = document.getElementById('btn-amocrm-sync-receipts');
             if (amocrmSyncReceiptsBtn) amocrmSyncReceiptsBtn.style.setProperty('display', 'inline-flex', 'important');
         }
-    }
     },
 
     setupNavigation: function() {
