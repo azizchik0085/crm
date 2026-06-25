@@ -443,7 +443,7 @@
                 <i class="fas fa-box" style="color: var(--info); font-size: 20px;"></i>
                 <div>
                     <div class="stat-value" id="stat-preparing" style="color: var(--info);">0</div>
-                    <div class="stat-label">Tayyorlanmoqda</div>
+                    <div class="stat-label">Yig'ilmoqda</div>
                 </div>
             </div>
             <div class="stat-badge">
@@ -476,7 +476,7 @@
             <!-- TOP RIGHT: PREPARING / PENDING -->
             <div class="right-section">
                 <div class="column-header">
-                    <h2><i class="fas fa-box-open" style="color: var(--info);"></i> Oshxona / Ombor (Tayyorlash)</h2>
+                    <h2><i class="fas fa-box-open" style="color: var(--info);"></i> Do'kon / Ombor (Yig'ish)</h2>
                     <span class="count-bubble" id="count-prep">0</span>
                 </div>
                 <div class="list-scroll" id="list-preparing">
@@ -632,7 +632,7 @@
                     prepListEl.innerHTML = `
                         <div class="empty-state" style="padding: 24px;">
                             <i class="fas fa-clipboard-list empty-icon" style="font-size: 32px;"></i>
-                            <h3>Tayyorlanayotgan buyurtmalar yo'q</h3>
+                            <h3>Yig'ilayotgan buyurtmalar yo'q</h3>
                         </div>
                     `;
                 } else {
@@ -641,7 +641,7 @@
                         const elapsed = getTimeDifference(d.created_at);
                         const isPrep = d.deliveryStatus === 'preparing';
                         const statusClass = isPrep ? 'pill-preparing' : 'pill-pending';
-                        const statusText = isPrep ? '<i class="fas fa-spinner fa-spin"></i> Tayyorlanmoqda' : '<i class="far fa-clock"></i> Kutilyapti';
+                        const statusText = isPrep ? '<i class="fas fa-spinner fa-spin"></i> Yig\'ilmoqda' : '<i class="far fa-clock"></i> Kutilyapti';
                         
                         return `
                             <div class="mini-card">
