@@ -1191,10 +1191,15 @@
                     
                     <!-- Xaridlar tarixi -->
                     <div id="customer-purchase-history" style="margin-top: 16px; border-top: 1px solid var(--border-color); padding-top: 16px;">
-                        <h4 style="margin-bottom: 12px; display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text-main);">
-                            <i class="fas fa-shopping-cart" style="color: var(--accent);"></i>
-                            <span>Xaridlar tarixi</span>
-                        </h4>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                            <h4 style="margin: 0; display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text-main);">
+                                <i class="fas fa-shopping-cart" style="color: var(--accent);"></i>
+                                <span>Xaridlar tarixi</span>
+                            </h4>
+                            <button type="button" id="btn-customer-regos-sync" class="btn btn-secondary btn-sm" style="padding: 4px 10px; font-size: 11px; display: inline-flex; align-items: center; gap: 6px; border-radius: 8px;" onclick="CRM.syncCustomerReceiptsFromRegos()">
+                                <i class="fas fa-sync"></i> Regos-dan yangilash
+                            </button>
+                        </div>
                         <div id="customer-purchase-list" style="max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;">
                             <!-- Dinamik ravishda xaridlar ro'yxati joylashtiriladi -->
                         </div>
@@ -1457,7 +1462,7 @@
     <script src="js/storage.js?v=4"></script>
     <script src="js/db.js?v=5"></script>
     <script src="js/telephony.js?v=4"></script>
-    <script src="js/crm.js?v=7"></script>
+    <script src="js/crm.js?v=8"></script>
     <script src="js/chats.js?v=4"></script>
     <script src="js/erp.js?v=7"></script>
     <script src="js/finance.js?v=4"></script>
