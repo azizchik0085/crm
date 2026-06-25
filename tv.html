@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmartCore Live Dostavkalar Monitori</title>
+    
+    <!-- Google Fonts & FontAwesome -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --bg-main: #060913;
+            --bg-card: rgba(15, 23, 42, 0.45);
+            --border-color: rgba(255, 255, 255, 0.08);
+            --text-main: #F8FAFC;
+            --text-muted: #94A3B8;
+            --accent: #6366F1;
+            --success: #10B981;
+            --warning: #F59E0B;
+            --danger: #EF4444;
+            --info: #06B6D4;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.12) 0px, transparent 50%),
+                radial-gradient(at 100% 0%, rgba(16, 185, 129, 0.08) 0px, transparent 50%),
+                radial-gradient(at 50% 100%, rgba(6, 182, 212, 0.08) 0px, transparent 50%);
+        }
+
+        /* HEADER */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 40px;
+            background: rgba(15, 23, 42, 0.2);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border-color);
+            height: 90px;
+        }
+
+        .header-title-box {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .logo-icon {
+            font-size: 32px;
+            color: var(--accent);
+            animation: pulse-glow 2s infinite;
+        }
+
+        .header-title-box h1 {
+            font-size: 26px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            background: linear-gradient(135deg, #FFF 0%, #94A3B8 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .stats-container {
+            display: flex;
+            gap: 24px;
+        }
+
+        .stat-badge {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 8px 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .stat-value {
+            font-size: 20px;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .stat-label {
+            font-size: 13px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        .clock-box {
+            font-size: 24px;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--text-main);
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border-color);
+            padding: 8px 18px;
+            border-radius: 12px;
+        }
+
+        /* MAIN CONTENT GRID */
+        main {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 58% 42%;
+            gap: 30px;
+            padding: 30px 40px;
+            height: calc(100vh - 90px);
+            min-height: 0; /* allows grid items to shrink */
+        }
+
+        .column {
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+
+        .column-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .column-header h2 {
+            font-size: 20px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .count-bubble {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 2px 10px;
+            font-size: 13px;
+            font-weight: 600;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* LIST CONTAINER */
+        .list-scroll {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            padding-right: 10px;
+        }
+
+        /* Scrollbar styles */
+        .list-scroll::-webkit-scrollbar {
+            width: 8px;
+        }
+        .list-scroll::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .list-scroll::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+        }
+
+        /* CARDS */
+        .delivery-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 24px;
+            backdrop-filter: blur(12px);
+            transition: border-color 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .delivery-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            background: var(--accent);
+        }
+
+        .delivery-card.status-shipped::before {
+            background: var(--warning);
+        }
+
+        .delivery-card.status-waiting::before {
+            background: var(--danger);
+            animation: pulse-status 1.5s infinite;
+        }
+
+        .delivery-card.status-delivered::before {
+            background: var(--success);
+        }
+
+        .card-header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 16px;
+        }
+
+        .code-box {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+            font-size: 16px;
+            color: var(--accent);
+            background: rgba(99, 102, 241, 0.1);
+            padding: 4px 10px;
+            border-radius: 8px;
+            border: 1px solid rgba(99, 102, 241, 0.2);
+        }
+
+        .time-badge {
+            font-size: 13px;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .address-box {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--text-main);
+            margin-bottom: 16px;
+            line-height: 1.4;
+        }
+
+        .meta-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            border-top: 1px solid var(--border-color);
+            padding-top: 16px;
+        }
+
+        .meta-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .meta-icon {
+            width: 38px;
+            height: 38px;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            color: var(--text-muted);
+        }
+
+        .meta-content {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .meta-label {
+            font-size: 11px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        .meta-value {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-main);
+        }
+
+        /* RIGHT PANEL SUB-SECTIONS */
+        .right-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+
+        .right-section:first-child {
+            margin-bottom: 30px;
+            height: 48%;
+        }
+
+        .right-section:last-child {
+            height: 48%;
+        }
+
+        /* MINI CARDS (Preparing / Delivered) */
+        .mini-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 16px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            backdrop-filter: blur(8px);
+        }
+
+        .mini-info h3 {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--text-main);
+            margin-bottom: 4px;
+        }
+
+        .mini-info p {
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        .status-pill {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .pill-pending {
+            background: rgba(245, 158, 11, 0.1);
+            color: var(--warning);
+            border: 1px solid rgba(245, 158, 11, 0.2);
+        }
+
+        .pill-preparing {
+            background: rgba(6, 182, 212, 0.1);
+            color: var(--info);
+            border: 1px solid rgba(6, 182, 212, 0.2);
+        }
+
+        .pill-arrived {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            animation: glow-green 2s infinite;
+        }
+
+        .pill-completed {
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--success);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        /* EMPTY STATE */
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            flex: 1;
+            color: var(--text-muted);
+            text-align: center;
+            padding: 40px;
+            border: 1.5px dashed var(--border-color);
+            border-radius: 24px;
+            background: rgba(255, 255, 255, 0.01);
+        }
+
+        .empty-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+            color: rgba(255, 255, 255, 0.15);
+        }
+
+        .empty-state h3 {
+            font-size: 18px;
+            color: var(--text-main);
+            margin-bottom: 6px;
+        }
+
+        /* ANIMATIONS */
+        @keyframes pulse-glow {
+            0% { transform: scale(1); filter: drop-shadow(0 0 2px rgba(99, 102, 241, 0.4)); }
+            50% { transform: scale(1.05); filter: drop-shadow(0 0 10px rgba(99, 102, 241, 0.8)); }
+            100% { transform: scale(1); filter: drop-shadow(0 0 2px rgba(99, 102, 241, 0.4)); }
+        }
+
+        @keyframes pulse-status {
+            0% { opacity: 0.6; }
+            50% { opacity: 1; }
+            100% { opacity: 0.6; }
+        }
+
+        @keyframes glow-green {
+            0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- HEADER -->
+    <header>
+        <div class="header-title-box">
+            <i class="fas fa-shipping-fast logo-icon"></i>
+            <div>
+                <h1>Live Dostavkalar Monitori</h1>
+                <p style="font-size: 13px; color: var(--text-muted); font-weight: 500;">Buyurtmalar yetkazilishi monitoring tizimi</p>
+            </div>
+        </div>
+
+        <div class="stats-container">
+            <div class="stat-badge">
+                <i class="fas fa-route" style="color: var(--warning); font-size: 20px;"></i>
+                <div>
+                    <div class="stat-value" id="stat-transit" style="color: var(--warning);">0</div>
+                    <div class="stat-label">Yo'lda</div>
+                </div>
+            </div>
+            <div class="stat-badge">
+                <i class="fas fa-box" style="color: var(--info); font-size: 20px;"></i>
+                <div>
+                    <div class="stat-value" id="stat-preparing" style="color: var(--info);">0</div>
+                    <div class="stat-label">Tayyorlanmoqda</div>
+                </div>
+            </div>
+            <div class="stat-badge">
+                <i class="fas fa-check-circle" style="color: var(--success); font-size: 20px;"></i>
+                <div>
+                    <div class="stat-value" id="stat-delivered" style="color: var(--success);">0</div>
+                    <div class="stat-label">Yetkazildi (Bugun)</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="clock-box" id="tv-clock">00:00:00</div>
+    </header>
+
+    <!-- MAIN GRID -->
+    <main>
+        <!-- COLUMN 1: IN TRANSIT (Yo'lda) -->
+        <div class="column">
+            <div class="column-header">
+                <h2><i class="fas fa-truck-moving" style="color: var(--warning);"></i> Kuryerlar Yo'lda (Dastavka)</h2>
+                <span class="count-bubble" id="count-transit">0</span>
+            </div>
+            <div class="list-scroll" id="list-transit">
+                <!-- TV Cards injected here -->
+            </div>
+        </div>
+
+        <!-- COLUMN 2: PREPARING & RECENTLY COMPLETED -->
+        <div class="column">
+            <!-- TOP RIGHT: PREPARING / PENDING -->
+            <div class="right-section">
+                <div class="column-header">
+                    <h2><i class="fas fa-box-open" style="color: var(--info);"></i> Oshxona / Ombor (Tayyorlash)</h2>
+                    <span class="count-bubble" id="count-prep">0</span>
+                </div>
+                <div class="list-scroll" id="list-preparing">
+                    <!-- Mini Cards here -->
+                </div>
+            </div>
+
+            <!-- BOTTOM RIGHT: RECENTLY ARRIVED / DELIVERED -->
+            <div class="right-section">
+                <div class="column-header">
+                    <h2><i class="fas fa-clipboard-check" style="color: var(--success);"></i> Yaqinda Manzilga Yetganlar</h2>
+                    <span class="count-bubble" id="count-completed">0</span>
+                </div>
+                <div class="list-scroll" id="list-completed">
+                    <!-- Arrived / Completed Mini Cards -->
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Scripting for live updates -->
+    <script>
+        // Utility formatting functions
+        function formatMoney(amount, currency = "so'm") {
+            return new Intl.NumberFormat('uz-UZ', { style: 'decimal' }).format(amount) + " " + currency;
+        }
+
+        function getTimeDifference(pastDateISO) {
+            if (!pastDateISO) return '';
+            const diffMs = Date.now() - new Date(pastDateISO).getTime();
+            const diffMin = Math.floor(diffMs / 60000);
+            
+            if (diffMin < 1) return 'Hozirgina';
+            if (diffMin < 60) return `${diffMin} daqiqa oldin`;
+            const hours = Math.floor(diffMin / 60);
+            const remainingMin = diffMin % 60;
+            return `${hours} soat ${remainingMin} daq oldin`;
+        }
+
+        // Live Clock
+        function updateClock() {
+            const clockEl = document.getElementById('tv-clock');
+            if (clockEl) {
+                const now = new Date();
+                clockEl.textContent = now.toLocaleTimeString('uz-UZ', { hour12: false });
+            }
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        // Main live update logic
+        async function fetchAndRenderMonitor() {
+            try {
+                const response = await fetch('/api/receipts');
+                if (!response.ok) throw new Error("HTTP error " + response.status);
+                const receipts = await response.json();
+                
+                if (!Array.isArray(receipts)) return;
+
+                // Process receipts that have delivery info
+                const deliveries = receipts.map(r => {
+                    let items = r.items;
+                    if (typeof items === 'string') {
+                        try { items = JSON.parse(items); } catch(e) { items = {}; }
+                    }
+                    
+                    const deliveryStatus = (items && items.delivery && items.delivery.status) || null;
+                    return {
+                        id: r.id,
+                        code: r.code || 'CH-' + String(r.id).substring(0, 8),
+                        total_amount: r.total_amount || 0,
+                        created_at: r.created_at,
+                        delivery: items ? items.delivery : null,
+                        deliveryStatus: deliveryStatus
+                    };
+                }).filter(d => d.deliveryStatus !== null);
+
+                // Filter into columns
+                const inTransit = deliveries.filter(d => d.deliveryStatus === 'shipped');
+                const preparing = deliveries.filter(d => d.deliveryStatus === 'pending' || d.deliveryStatus === 'preparing');
+                
+                // Completed/Arrived inside last 4 hours
+                const fourHoursAgo = Date.now() - (4 * 3600 * 1000);
+                const recentlyCompleted = deliveries.filter(d => 
+                    (d.deliveryStatus === 'delivered' || d.deliveryStatus === 'waiting_cash_confirm') &&
+                    new Date(d.created_at).getTime() > fourHoursAgo
+                );
+
+                // Delivered stats count today
+                const todayStr = new Date().toDateString();
+                const deliveredTodayCount = deliveries.filter(d => 
+                    d.deliveryStatus === 'delivered' && 
+                    new Date(d.created_at).toDateString() === todayStr
+                ).length;
+
+                // Update Header Stats
+                document.getElementById('stat-transit').textContent = inTransit.length;
+                document.getElementById('stat-preparing').textContent = preparing.filter(p => p.deliveryStatus === 'preparing').length;
+                document.getElementById('stat-delivered').textContent = deliveredTodayCount;
+
+                // Update Section Counts
+                document.getElementById('count-transit').textContent = inTransit.length;
+                document.getElementById('count-prep').textContent = preparing.length;
+                document.getElementById('count-completed').textContent = recentlyCompleted.length;
+
+                // Render In Transit Column
+                const transitListEl = document.getElementById('list-transit');
+                if (inTransit.length === 0) {
+                    transitListEl.innerHTML = `
+                        <div class="empty-state">
+                            <i class="fas fa-truck-loading empty-icon"></i>
+                            <h3>Hozircha yo'lda buyurtmalar yo'q</h3>
+                            <p>Kuryerga topshirilgan buyurtmalar shu yerda ko'rinadi.</p>
+                        </div>
+                    `;
+                } else {
+                    transitListEl.innerHTML = inTransit.map(d => {
+                        const dev = d.delivery || {};
+                        const transitTime = getTimeDifference(dev.shipped_at || d.created_at);
+                        const cost = formatMoney(d.total_amount);
+                        
+                        return `
+                            <div class="delivery-card status-shipped">
+                                <div class="card-header-row">
+                                    <span class="code-box">${d.code}</span>
+                                    <span class="time-badge"><i class="far fa-clock"></i> ${transitTime}</span>
+                                </div>
+                                <div class="address-box">${dev.address || 'Manzil kiritilmagan'}</div>
+                                <div class="meta-grid">
+                                    <div class="meta-item">
+                                        <div class="meta-icon"><i class="fas fa-user-ninja"></i></div>
+                                        <div class="meta-content">
+                                            <span class="meta-label">Kuryer</span>
+                                            <span class="meta-value">${dev.courier_name || 'Noma\'lum'}</span>
+                                        </div>
+                                    </div>
+                                    <div class="meta-item">
+                                        <div class="meta-icon"><i class="fas fa-coins"></i></div>
+                                        <div class="meta-content">
+                                            <span class="meta-label">Jami Summa</span>
+                                            <span class="meta-value" style="color: var(--success); font-family: 'JetBrains Mono', monospace; font-size:16px;">${cost}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                }
+
+                // Render Preparing Column
+                const prepListEl = document.getElementById('list-preparing');
+                if (preparing.length === 0) {
+                    prepListEl.innerHTML = `
+                        <div class="empty-state" style="padding: 24px;">
+                            <i class="fas fa-clipboard-list empty-icon" style="font-size: 32px;"></i>
+                            <h3>Tayyorlanayotgan buyurtmalar yo'q</h3>
+                        </div>
+                    `;
+                } else {
+                    prepListEl.innerHTML = preparing.map(d => {
+                        const dev = d.delivery || {};
+                        const elapsed = getTimeDifference(d.created_at);
+                        const isPrep = d.deliveryStatus === 'preparing';
+                        const statusClass = isPrep ? 'pill-preparing' : 'pill-pending';
+                        const statusText = isPrep ? '<i class="fas fa-spinner fa-spin"></i> Tayyorlanmoqda' : '<i class="far fa-clock"></i> Kutilyapti';
+                        
+                        return `
+                            <div class="mini-card">
+                                <div class="mini-info">
+                                    <h3>${d.code} &bull; ${dev.customer_name || 'Mijoz nomi yo\'q'}</h3>
+                                    <p><i class="fas fa-map-marker-alt"></i> ${dev.address || 'Manzil kiritilmagan'} &bull; ${elapsed}</p>
+                                </div>
+                                <span class="status-pill ${statusClass}">${statusText}</span>
+                            </div>
+                        `;
+                    }).join('');
+                }
+
+                // Render Completed/Arrived Column
+                const completedListEl = document.getElementById('list-completed');
+                if (recentlyCompleted.length === 0) {
+                    completedListEl.innerHTML = `
+                        <div class="empty-state" style="padding: 24px;">
+                            <i class="fas fa-check-double empty-icon" style="font-size: 32px;"></i>
+                            <h3>Yaqinda yetkazilganlar yo'q</h3>
+                        </div>
+                    `;
+                } else {
+                    completedListEl.innerHTML = recentlyCompleted.map(d => {
+                        const dev = d.delivery || {};
+                        const elapsed = getTimeDifference(dev.delivered_at || d.created_at);
+                        const isWaiting = d.deliveryStatus === 'waiting_cash_confirm';
+                        
+                        const statusClass = isWaiting ? 'pill-arrived' : 'pill-completed';
+                        const statusText = isWaiting 
+                            ? '<i class="fas fa-hourglass-half"></i> Manzilga yetdi' 
+                            : '<i class="fas fa-check-circle"></i> Yetkazildi';
+                        
+                        return `
+                            <div class="mini-card" style="border-color: rgba(16, 185, 129, 0.15);">
+                                <div class="mini-info">
+                                    <h3>${d.code} &bull; Kuryer: ${dev.courier_name || 'Noma\'lum'}</h3>
+                                    <p><i class="fas fa-map-marker-alt"></i> ${dev.address || 'Manzil kiritilmagan'} &bull; ${elapsed}</p>
+                                </div>
+                                <span class="status-pill ${statusClass}">${statusText}</span>
+                            </div>
+                        `;
+                    }).join('');
+                }
+
+            } catch (err) {
+                console.error("Monitor status fetch failed:", err);
+            }
+        }
+
+        // Poll every 5 seconds
+        setInterval(fetchAndRenderMonitor, 5000);
+        fetchAndRenderMonitor();
+    </script>
+</body>
+</html>
