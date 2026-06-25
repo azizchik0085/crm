@@ -316,127 +316,141 @@ window.App = {
     },
 
     applyPermissions: async function() {
-        const activeUserId = localStorage.getItem('activeUserId') || 'admin';
-        
-        let activeRole = 'admin';
-        let activeUserName = 'Administrator';
-        
         try {
-            if (activeUserId !== 'admin') {
-                const employees = await DB.getEmployees();
-                const currentEmp = employees.find(e => e.id === activeUserId);
-                if (currentEmp) {
-                    activeRole = (currentEmp.role || '').toLowerCase();
-                    activeUserName = currentEmp.name;
-                }
-            }
-        } catch (err) {
-            console.error("Failed to load active employee role:", err);
-        }
-        
-        // Extract role name
-        let activeRoleName = activeRole;
-        if (window.HR && typeof window.HR.parseRoleAndPlan === 'function') {
-            activeRoleName = window.HR.parseRoleAndPlan(activeRole).role;
-        } else {
-            const parts = activeRole.split(';');
-            activeRoleName = parts[0].trim();
-        }
-
-        const data = AppStorage.load();
-        const customRoles = data.settings.roles || [];
-        
-        // Find if this role exists in custom roles list
-        const foundRole = customRoles.find(r => {
-            const name = typeof r === 'string' ? r : r.name;
-            return name.toLowerCase() === activeRoleName.toLowerCase();
-        });
-        
-        let allowedViews = ['dashboard'];
-        
-        if (activeUserId === 'admin') {
-            allowedViews = ['dashboard', 'crm', 'telephony', 'erp', 'finance', 'chats', 'hr', 'settings', 'receipts', 'seniklar', 'kassa'];
-        } else if (foundRole && foundRole.permissions) {
-            allowedViews = ['dashboard', ...foundRole.permissions];
-        } else {
-            // Fallback to legacy hardcoded permissions if not found in custom roles
-            const isSupervisor = activeRoleName.includes('direktor') || activeRoleName.includes('admin') || activeRoleName.includes('dasturchi') || activeRoleName.includes('boshliq');
-            const isSales = activeRoleName.includes('sotuv') || activeRoleName.includes('operator') || activeRoleName.includes('call') || activeRoleName.includes('aloqa');
-            const isWarehouse = activeRoleName.includes('ombor') || activeRoleName.includes('logist') || activeRoleName.includes('tovar');
-            const isAccountant = activeRoleName.includes('buxgalter') || activeRoleName.includes('kassir') || activeRoleName.includes('moliya') || activeRoleName.includes('auditor');
-            const isHR = activeRoleName.includes('hr') || activeRoleName.includes('kadr') || activeRoleName.includes('recruiter');
+            const activeUserId = localStorage.getItem('activeUserId') || 'admin';
             
-            if (isSupervisor) {
-                allowedViews = ['dashboard', 'crm', 'telephony', 'erp', 'finance', 'chats', 'hr', 'settings', 'receipts', 'seniklar', 'kassa'];
-            } else if (isSales) {
-                allowedViews = ['dashboard', 'crm', 'telephony', 'chats', 'erp', 'receipts', 'seniklar', 'kassa'];
-            } else if (isWarehouse) {
-                allowedViews = ['dashboard', 'erp', 'receipts', 'seniklar', 'kassa'];
-            } else if (isAccountant) {
-                allowedViews = ['dashboard', 'finance', 'erp', 'receipts', 'seniklar', 'kassa'];
-            } else if (isHR) {
-                allowedViews = ['dashboard', 'hr'];
-            } else {
-                allowedViews = ['dashboard', 'chats'];
+            let activeRole = 'admin';
+            let activeUserName = 'Administrator';
+            
+            try {
+                if (activeUserId !== 'admin') {
+                    const employees = await DB.getEmployees();
+                    const currentEmp = employees.find(e => e.id === activeUserId);
+                    if (currentEmp) {
+                        activeRole = (currentEmp.role || '').toLowerCase();
+                        activeUserName = currentEmp.name;
+                    }
+                }
+            } catch (err) {
+                console.error("Failed to load active employee role:", err);
             }
-        }
-        
-        document.querySelectorAll('.nav-item, .bottom-nav-item').forEach(item => {
-            const link = item.tagName === 'A' ? item : item.querySelector('a');
-            const targetView = item.getAttribute('data-view') || (link ? link.getAttribute('data-view') : null);
-            if (targetView) {
-                if (allowedViews.includes(targetView)) {
-                    item.style.setProperty('display', '', 'important');
+            
+            // Extract role name safely
+            let activeRoleName = activeRole || '';
+            if (window.HR && typeof window.HR.parseRoleAndPlan === 'function') {
+                try {
+                    activeRoleName = window.HR.parseRoleAndPlan(activeRole).role || '';
+                } catch (hrErr) {
+                    console.error("HR parseRoleAndPlan failed:", hrErr);
+                }
+            } else {
+                const parts = (activeRole || '').split(';');
+                activeRoleName = parts[0] ? parts[0].trim() : '';
+            }
+
+            const data = AppStorage.load();
+            const customRoles = data.settings.roles || [];
+            
+            // Find if this role exists in custom roles list safely
+            const foundRole = customRoles.find(r => {
+                const name = typeof r === 'string' ? r : (r ? r.name : '');
+                return name && typeof name === 'string' && name.toLowerCase() === activeRoleName.toLowerCase();
+            });
+            
+            let allowedViews = ['dashboard'];
+            
+            if (activeUserId === 'admin') {
+                allowedViews = ['dashboard', 'crm', 'telephony', 'erp', 'finance', 'chats', 'hr', 'settings', 'receipts', 'seniklar', 'kassa'];
+            } else if (foundRole && foundRole.permissions) {
+                allowedViews = ['dashboard', ...foundRole.permissions];
+            } else {
+                // Fallback to legacy hardcoded permissions if not found in custom roles
+                const isSupervisor = activeRoleName.includes('direktor') || activeRoleName.includes('admin') || activeRoleName.includes('dasturchi') || activeRoleName.includes('boshliq');
+                const isSales = activeRoleName.includes('sotuv') || activeRoleName.includes('operator') || activeRoleName.includes('call') || activeRoleName.includes('aloqa');
+                const isWarehouse = activeRoleName.includes('ombor') || activeRoleName.includes('logist') || activeRoleName.includes('tovar');
+                const isAccountant = activeRoleName.includes('buxgalter') || activeRoleName.includes('kassir') || activeRoleName.includes('moliya') || activeRoleName.includes('auditor');
+                const isHR = activeRoleName.includes('hr') || activeRoleName.includes('kadr') || activeRoleName.includes('recruiter');
+                
+                if (isSupervisor) {
+                    allowedViews = ['dashboard', 'crm', 'telephony', 'erp', 'finance', 'chats', 'hr', 'settings', 'receipts', 'seniklar', 'kassa'];
+                } else if (isSales) {
+                    allowedViews = ['dashboard', 'crm', 'telephony', 'chats', 'erp', 'receipts', 'seniklar', 'kassa'];
+                } else if (isWarehouse) {
+                    allowedViews = ['dashboard', 'erp', 'receipts', 'seniklar', 'kassa'];
+                } else if (isAccountant) {
+                    allowedViews = ['dashboard', 'finance', 'erp', 'receipts', 'seniklar', 'kassa'];
+                } else if (isHR) {
+                    allowedViews = ['dashboard', 'hr'];
                 } else {
-                    item.style.setProperty('display', 'none', 'important');
+                    allowedViews = ['dashboard', 'chats'];
                 }
             }
-        });
-        
-        if (!allowedViews.includes(this.currentView)) {
-            this.renderView(allowedViews[0]);
+            
+            document.querySelectorAll('.nav-item, .bottom-nav-item').forEach(item => {
+                const link = item.tagName === 'A' ? item : item.querySelector('a');
+                const targetView = item.getAttribute('data-view') || (link ? link.getAttribute('data-view') : null);
+                if (targetView) {
+                    if (allowedViews.includes(targetView)) {
+                        item.style.setProperty('display', '', 'important');
+                    } else {
+                        item.style.setProperty('display', 'none', 'important');
+                    }
+                }
+            });
+            
+            if (!allowedViews.includes(this.currentView)) {
+                this.renderView(allowedViews[0]);
+            }
+            
+            const addProductBtn = document.getElementById('erp-add-product-btn');
+            const addEmployeeBtn = document.getElementById('hr-add-employee-btn');
+            const syncRegosBtn = document.getElementById('erp-sync-regos-btn');
+            
+            const canAddProduct = allowedViews.includes('erp');
+            if (addProductBtn) addProductBtn.style.setProperty('display', canAddProduct ? '' : 'none', 'important');
+            if (syncRegosBtn) syncRegosBtn.style.setProperty('display', canAddProduct ? '' : 'none', 'important');
+            
+            const canAddEmployee = allowedViews.includes('hr');
+            if (addEmployeeBtn) addEmployeeBtn.style.setProperty('display', canAddEmployee ? '' : 'none', 'important');
+            
+            const crmAddCustomerBtn = document.getElementById('crm-add-customer-btn');
+            const canAddCustomer = allowedViews.includes('crm');
+            if (crmAddCustomerBtn) crmAddCustomerBtn.style.setProperty('display', canAddCustomer ? '' : 'none', 'important');
+            
+            const financeHeaderBtn = document.getElementById('finance-add-transaction-btn');
+            const canAddTransaction = allowedViews.includes('finance');
+            if (financeHeaderBtn) financeHeaderBtn.style.setProperty('display', canAddTransaction ? '' : 'none', 'important');
+            
+            // Toggle amoCRM Sync buttons based on permission
+            const amocrmSyncBtn = document.getElementById('btn-amocrm-sync');
+            if (amocrmSyncBtn) {
+                amocrmSyncBtn.style.setProperty('display', canAddCustomer ? 'inline-flex' : 'none', 'important');
+            }
+            
+            const amocrmSyncReceiptsBtn = document.getElementById('btn-amocrm-sync-receipts');
+            const canViewReceipts = allowedViews.includes('receipts');
+            if (amocrmSyncReceiptsBtn) {
+                amocrmSyncReceiptsBtn.style.setProperty('display', canViewReceipts ? 'inline-flex' : 'none', 'important');
+            }
+            
+            if (this.currentView === 'erp' && window.ERP && typeof window.ERP.render === 'function') {
+                window.ERP.render();
+            } else if (this.currentView === 'hr' && window.HR && typeof window.HR.render === 'function') {
+                window.HR.render();
+            } else if (this.currentView === 'receipts' && window.Receipts && typeof window.Receipts.render === 'function') {
+                window.Receipts.render();
+            } else if (this.currentView === 'kassa' && window.Kassa && typeof window.Kassa.render === 'function') {
+                window.Kassa.render();
+            }
+        } catch (globalErr) {
+            console.error("Critical error in applyPermissions, running fallback visibility:", globalErr);
+            // Fallback: show the buttons if there is an error so they don't disappear!
+            const amocrmSyncBtn = document.getElementById('btn-amocrm-sync');
+            if (amocrmSyncBtn) amocrmSyncBtn.style.setProperty('display', 'inline-flex', 'important');
+            const amocrmSyncReceiptsBtn = document.getElementById('btn-amocrm-sync-receipts');
+            if (amocrmSyncReceiptsBtn) amocrmSyncReceiptsBtn.style.setProperty('display', 'inline-flex', 'important');
         }
-        
-        const addProductBtn = document.getElementById('erp-add-product-btn');
-        const addEmployeeBtn = document.getElementById('hr-add-employee-btn');
-        const syncRegosBtn = document.getElementById('erp-sync-regos-btn');
-        
-        const canAddProduct = allowedViews.includes('erp');
-        if (addProductBtn) addProductBtn.style.setProperty('display', canAddProduct ? '' : 'none', 'important');
-        if (syncRegosBtn) syncRegosBtn.style.setProperty('display', canAddProduct ? '' : 'none', 'important');
-        
-        const canAddEmployee = allowedViews.includes('hr');
-        if (addEmployeeBtn) addEmployeeBtn.style.setProperty('display', canAddEmployee ? '' : 'none', 'important');
-        
-        const crmAddCustomerBtn = document.getElementById('crm-add-customer-btn');
-        const canAddCustomer = allowedViews.includes('crm');
-        if (crmAddCustomerBtn) crmAddCustomerBtn.style.setProperty('display', canAddCustomer ? '' : 'none', 'important');
-        
-        const financeHeaderBtn = document.getElementById('finance-add-transaction-btn');
-        const canAddTransaction = allowedViews.includes('finance');
-        if (financeHeaderBtn) financeHeaderBtn.style.setProperty('display', canAddTransaction ? '' : 'none', 'important');
-
-        // Toggle amoCRM Sync buttons based on permission
-        const amocrmSyncBtn = document.getElementById('btn-amocrm-sync');
-        if (amocrmSyncBtn) {
-            amocrmSyncBtn.style.setProperty('display', canAddCustomer ? '' : 'none', 'important');
-        }
-
-        const amocrmSyncReceiptsBtn = document.getElementById('btn-amocrm-sync-receipts');
-        const canViewReceipts = allowedViews.includes('receipts');
-        if (amocrmSyncReceiptsBtn) {
-            amocrmSyncReceiptsBtn.style.setProperty('display', canViewReceipts ? '' : 'none', 'important');
-        }
-        
-        if (this.currentView === 'erp' && window.ERP && typeof window.ERP.render === 'function') {
-            window.ERP.render();
-        } else if (this.currentView === 'hr' && window.HR && typeof window.HR.render === 'function') {
-            window.HR.render();
-        } else if (this.currentView === 'receipts' && window.Receipts && typeof window.Receipts.render === 'function') {
-            window.Receipts.render();
-        } else if (this.currentView === 'kassa' && window.Kassa && typeof window.Kassa.render === 'function') {
-            window.Kassa.render();
-        }
+    }
     },
 
     setupNavigation: function() {
