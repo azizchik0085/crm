@@ -225,6 +225,9 @@ window.App = {
         if (loginScreen) loginScreen.style.display = 'none';
         if (appContainer) appContainer.style.display = 'flex';
         
+        const savedView = localStorage.getItem('activeView');
+        this.currentView = savedView || 'dashboard';
+        
         await this.updateProfileCard(activeUserId);
         this.applyPermissions();
         this.renderView(this.currentView || 'dashboard');
@@ -637,6 +640,7 @@ window.App = {
 
     renderView: function(viewName) {
         this.currentView = viewName;
+        localStorage.setItem('activeView', viewName);
         
         // Hamma sahifalarni yashirish
         document.querySelectorAll('.view-section').forEach(sec => {
