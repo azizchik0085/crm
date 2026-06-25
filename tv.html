@@ -320,7 +320,7 @@
             padding: 16px 20px;
             display: flex;
             justify-content: space-between;
-            align-items: center;
+            align-items: flex-start;
             backdrop-filter: blur(8px);
         }
 
@@ -504,6 +504,14 @@
             return new Intl.NumberFormat('uz-UZ', { style: 'decimal' }).format(amount) + " " + currency;
         }
 
+        function formatProductsList(products) {
+            if (!Array.isArray(products) || products.length === 0) return 'Mahsulot kiritilmagan';
+            return products.map(p => {
+                const qty = p.quantity !== undefined ? p.quantity : 1;
+                return `${p.name} (${qty} ta)`;
+            }).join(', ');
+        }
+
         function getTimeDifference(pastDateISO) {
             if (!pastDateISO) return '';
             const diffMs = Date.now() - new Date(pastDateISO).getTime();
@@ -544,13 +552,20 @@
                     }
                     
                     const deliveryStatus = (items && items.delivery && items.delivery.status) || null;
+                    const customerName = (items && (items.customer_name || (items.delivery && items.delivery.customer_name))) || 'Mijoz nomi yo\'q';
+                    const customerPhone = (items && (items.customer_phone || (items.delivery && items.delivery.customer_phone))) || '';
+                    const products = (items && items.products) || [];
+                    
                     return {
                         id: r.id,
                         code: r.code || 'CH-' + String(r.id).substring(0, 8),
                         total_amount: r.total_amount || 0,
                         created_at: r.created_at,
                         delivery: items ? items.delivery : null,
-                        deliveryStatus: deliveryStatus
+                        deliveryStatus: deliveryStatus,
+                        customerName: customerName,
+                        customerPhone: customerPhone,
+                        products: products
                     };
                 }).filter(d => d.deliveryStatus !== null);
 
@@ -605,6 +620,14 @@
                                     <span class="time-badge"><i class="far fa-clock"></i> ${transitTime}</span>
                                 </div>
                                 <div class="address-box">${dev.address || 'Manzil kiritilmagan'}</div>
+                                <div style="font-size: 15px; margin-bottom: 12px; color: var(--text-main); display: flex; align-items: center; gap: 8px;">
+                                    <i class="fas fa-user" style="color: var(--accent);"></i> 
+                                    <strong>${d.customerName}</strong>
+                                    ${d.customerPhone ? `<span style="color: var(--text-muted); font-family: 'JetBrains Mono', monospace;">(${d.customerPhone})</span>` : ''}
+                                </div>
+                                <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px; border-top: 1px dashed rgba(255,255,255,0.06); padding-top: 8px;">
+                                    <strong style="color: var(--accent);"><i class="fas fa-shopping-basket"></i> Mahsulotlar:</strong> ${formatProductsList(d.products)}
+                                </div>
                                 <div class="meta-grid">
                                     <div class="meta-item">
                                         <div class="meta-icon"><i class="fas fa-user-ninja"></i></div>
@@ -645,9 +668,13 @@
                         
                         return `
                             <div class="mini-card">
-                                <div class="mini-info">
-                                    <h3>${d.code} &bull; ${dev.customer_name || 'Mijoz nomi yo\'q'}</h3>
-                                    <p><i class="fas fa-map-marker-alt"></i> ${dev.address || 'Manzil kiritilmagan'} &bull; ${elapsed}</p>
+                                <div class="mini-info" style="flex: 1; padding-right: 12px;">
+                                    <h3 style="font-size: 16px; margin-bottom: 4px;">${d.code} &bull; <span style="color: var(--accent);">${d.customerName}</span></h3>
+                                    <p style="margin-bottom: 4px;"><i class="fas fa-map-marker-alt"></i> ${dev.address || 'Manzil kiritilmagan'} &bull; ${elapsed}</p>
+                                    ${d.customerPhone ? `<p style="margin-bottom: 4px; font-family: 'JetBrains Mono', monospace;"><i class="fas fa-phone-alt"></i> ${d.customerPhone}</p>` : ''}
+                                    <p style="font-size: 12px; color: var(--text-muted); border-top: 1px dashed rgba(255,255,255,0.06); padding-top: 4px; margin-top: 4px;">
+                                        <strong>Mahsulotlar:</strong> ${formatProductsList(d.products)}
+                                    </p>
                                 </div>
                                 <span class="status-pill ${statusClass}">${statusText}</span>
                             </div>
@@ -677,9 +704,13 @@
                         
                         return `
                             <div class="mini-card" style="border-color: rgba(16, 185, 129, 0.15);">
-                                <div class="mini-info">
-                                    <h3>${d.code} &bull; Kuryer: ${dev.courier_name || 'Noma\'lum'}</h3>
-                                    <p><i class="fas fa-map-marker-alt"></i> ${dev.address || 'Manzil kiritilmagan'} &bull; ${elapsed}</p>
+                                <div class="mini-info" style="flex: 1; padding-right: 12px;">
+                                    <h3 style="font-size: 16px; margin-bottom: 4px;">${d.code} &bull; <span style="color: var(--success);">${d.customerName}</span></h3>
+                                    <p style="margin-bottom: 4px;"><i class="fas fa-map-marker-alt"></i> ${dev.address || 'Manzil kiritilmagan'} &bull; ${elapsed}</p>
+                                    <p style="margin-bottom: 4px;"><i class="fas fa-user-ninja"></i> Kuryer: ${dev.courier_name || 'Noma\'lum'} ${d.customerPhone ? `&bull; <span style="font-family: 'JetBrains Mono', monospace;"><i class="fas fa-phone-alt"></i> ${d.customerPhone}</span>` : ''}</p>
+                                    <p style="font-size: 12px; color: var(--text-muted); border-top: 1px dashed rgba(255,255,255,0.06); padding-top: 4px; margin-top: 4px;">
+                                        <strong>Mahsulotlar:</strong> ${formatProductsList(d.products)}
+                                    </p>
                                 </div>
                                 <span class="status-pill ${statusClass}">${statusText}</span>
                             </div>
