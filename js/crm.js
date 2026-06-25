@@ -626,8 +626,8 @@ window.CRM = {
         btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Yangilanmoqda...`;
 
         try {
-            // Regos-dan oxirgi 180 kunlik cheklarni yangilash uchun so'rov yuboramiz
-            const response = await fetch('/api/integration/regos/sync-receipts?days=180', {
+            // Regos-dan oxirgi 30 kunlik cheklarni yangilash uchun so'rov yuboramiz
+            const response = await fetch('/api/integration/regos/sync-receipts?days=30', {
                 method: 'POST'
             });
             const data = await response.json();
