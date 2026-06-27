@@ -1554,12 +1554,12 @@ window.SuperAdmin = {
                 const isActive = company.status === 'active';
                 const statusBadge = isActive 
                     ? '<span class="badge" style="background: rgba(16, 185, 129, 0.1); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.2); padding: 4px 8px; border-radius: 4px; font-size: 12px; display: inline-flex; align-items: center; gap: 4px;"><i class="fas fa-check-circle"></i> Faol</span>'
-                    : '<span class="badge" style="background: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.2); padding: 4px 8px; border-radius: 4px; font-size: 12px; display: inline-flex; align-items: center; gap: 4px;"><i class="fas fa-times-circle"></i> O\'chirilgan</span>';
+                    : '<span class="badge" style="background: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.2); padding: 4px 8px; border-radius: 4px; font-size: 12px; display: inline-flex; align-items: center; gap: 4px;"><i class="fas fa-ban"></i> Faolsiz</span>';
 
                 const viewBtn = `<button class="btn btn-secondary btn-sm" onclick="SuperAdmin.viewCompany('${company.id}')" style="margin-right: 8px; font-size: 12px; padding: 4px 8px; border-radius: 6px; cursor: pointer; border-color: rgba(255,255,255,0.15);"><i class="fas fa-eye"></i> Ko'rish</button>`;
 
                 const toggleBtn = isActive
-                    ? `<button class="btn btn-secondary btn-sm" onclick="SuperAdmin.toggleStatus('${company.id}', 'disabled')" style="border-color: var(--danger); color: var(--danger); font-size: 12px; padding: 4px 8px; border-radius: 6px; cursor: pointer;"><i class="fas fa-ban"></i> O'chirish</button>`
+                    ? `<button class="btn btn-secondary btn-sm" onclick="SuperAdmin.toggleStatus('${company.id}', 'disabled')" style="border-color: var(--danger); color: var(--danger); font-size: 12px; padding: 4px 8px; border-radius: 6px; cursor: pointer;"><i class="fas fa-ban"></i> Faolsizlantirish</button>`
                     : `<button class="btn btn-primary btn-sm" onclick="SuperAdmin.toggleStatus('${company.id}', 'active')" style="font-size: 12px; padding: 4px 8px; border-radius: 6px; cursor: pointer;"><i class="fas fa-check"></i> Faollashtirish</button>`;
 
                 tr.innerHTML = `
@@ -1578,7 +1578,10 @@ window.SuperAdmin = {
     },
 
     toggleStatus: async function(companyId, newStatus) {
-        if (!confirm(`Kompaniya holatini o'zgartirishni xohlaysizmi?`)) return;
+        const msg = newStatus === 'active' 
+            ? "Ushbu kompaniyani faollashtirishni xohlaysizmi?" 
+            : "Ushbu kompaniyani faolsizlantirishni xohlaysizmi?\n\nDiqqat: Faolsizlantirilgan kompaniya foydalanuvchilari tizimga kira olmaydilar va so'rovlar bloklanadi!";
+        if (!confirm(msg)) return;
         try {
             const response = await fetch('/api/companies/toggle', {
                 method: 'POST',

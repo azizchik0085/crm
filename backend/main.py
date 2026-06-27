@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from contextvars import ContextVar
 import requests
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -23,6 +24,8 @@ app.add_middleware(
 
 active_company_id: ContextVar[str] = ContextVar("active_company_id", default=None)
 
+_company_status_cache = {}
+
 @app.middleware("http")
 async def company_id_middleware(request: Request, call_next):
     company_id = request.cookies.get("company_id") or request.headers.get("x-company-id") or request.query_params.get("company_id")
@@ -34,6 +37,27 @@ async def company_id_middleware(request: Request, call_next):
             except Exception:
                 pass
                 
+    if company_id and company_id != "admin":
+        path = request.url.path
+        if path.startswith("/api/") and not path.startswith("/api/companies") and not path.startswith("/api/debug"):
+            status = _company_status_cache.get(company_id)
+            if not status:
+                try:
+                    res = supabase_req("GET", f"companies?id=eq.{company_id}&select=status", use_central=True)
+                    if res and isinstance(res, list) and len(res) > 0:
+                        status = res[0].get("status", "active")
+                    else:
+                        status = "active"
+                except Exception:
+                    status = "active"
+                _company_status_cache[company_id] = status
+            
+            if status == "disabled":
+                return JSONResponse(
+                    status_code=403,
+                    content={"detail": "Kompaniya faoliyati to'xtatilgan. Iltimos, ma'murga murojaat qiling."}
+                )
+
     token = active_company_id.set(company_id)
     try:
         response = await call_next(request)
@@ -1387,7 +1411,11 @@ def toggle_company(payload: dict):
         raise HTTPException(status_code=400, detail="Noto'g'ri so'rov parametrlari.")
         
     update_payload = {"status": status}
-    supabase_req("POST", f"companies?id=eq.{company_id}", json_data=update_payload)
+    supabase_req("PATCH", f"companies?id=eq.{company_id}", json_data=update_payload, use_central=True)
+    
+    # Update status in local cache immediately
+    _company_status_cache[company_id] = status
+    
     return {"status": "success", "message": f"Kompaniya holati {status} ga o'zgartirildi."}
 
 @app.get("/api/companies/{company_id}/details")
