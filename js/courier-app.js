@@ -4,8 +4,9 @@
 (function() {
     const originalFetch = window.fetch;
     window.fetch = function(url, options) {
-        options = options || {};
-        options.headers = options.headers || {};
+        let newOptions = options || {};
+        let headers = {};
+        
         // Courier uses activeCourier.company_id
         let companyId = localStorage.getItem('activeCourierCompanyId');
         if (!companyId) {
@@ -20,18 +21,34 @@
                 } catch(e){}
             }
         }
-        if (companyId) {
-            options.headers['X-Company-ID'] = companyId;
-            options.headers['x-company-id'] = companyId;
-            
-            if (typeof url === 'string' && url.startsWith('/api/')) {
-                const separator = url.includes('?') ? '&' : '?';
-                if (!url.includes('company_id=')) {
-                    url = url + separator + 'company_id=' + encodeURIComponent(companyId);
+        
+        if (newOptions.headers) {
+            if (typeof newOptions.headers.set === 'function') {
+                newOptions.headers.set('X-Company-ID', companyId || '');
+                newOptions.headers.set('x-company-id', companyId || '');
+            } else {
+                headers = { ...newOptions.headers };
+                if (companyId) {
+                    headers['X-Company-ID'] = companyId;
+                    headers['x-company-id'] = companyId;
                 }
+                newOptions.headers = headers;
+            }
+        } else {
+            if (companyId) {
+                headers['X-Company-ID'] = companyId;
+                headers['x-company-id'] = companyId;
+                newOptions.headers = headers;
             }
         }
-        return originalFetch(url, options);
+        
+        if (companyId && typeof url === 'string' && (url.startsWith('/api/') || url.includes('/api/'))) {
+            const separator = url.includes('?') ? '&' : '?';
+            if (!url.includes('company_id=')) {
+                url = url + separator + 'company_id=' + encodeURIComponent(companyId);
+            }
+        }
+        return originalFetch(url, newOptions);
     };
 })();
 

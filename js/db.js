@@ -4,27 +4,44 @@
 (function() {
     const originalFetch = window.fetch;
     window.fetch = function(url, options) {
-        options = options || {};
-        options.headers = options.headers || {};
-        let companyId = localStorage.getItem('activeCompanyId');
+        let newOptions = options || {};
+        let headers = {};
         
-        if (!companyId) {
-            const urlParams = new URLSearchParams(window.location.search);
-            companyId = urlParams.get('company_id');
-        }
-        
-        if (companyId) {
-            options.headers['X-Company-ID'] = companyId;
-            options.headers['x-company-id'] = companyId;
-            
-            if (typeof url === 'string' && url.startsWith('/api/')) {
-                const separator = url.includes('?') ? '&' : '?';
-                if (!url.includes('company_id=')) {
-                    url = url + separator + 'company_id=' + encodeURIComponent(companyId);
+        if (newOptions.headers) {
+            if (typeof newOptions.headers.set === 'function') {
+                newOptions.headers.set('X-Company-ID', localStorage.getItem('activeCompanyId') || '');
+                newOptions.headers.set('x-company-id', localStorage.getItem('activeCompanyId') || '');
+            } else {
+                headers = { ...newOptions.headers };
+                const companyId = localStorage.getItem('activeCompanyId');
+                if (companyId) {
+                    headers['X-Company-ID'] = companyId;
+                    headers['x-company-id'] = companyId;
                 }
+                newOptions.headers = headers;
+            }
+        } else {
+            const companyId = localStorage.getItem('activeCompanyId');
+            if (companyId) {
+                headers['X-Company-ID'] = companyId;
+                headers['x-company-id'] = companyId;
+                newOptions.headers = headers;
             }
         }
-        return originalFetch(url, options);
+        
+        let companyIdForUrl = localStorage.getItem('activeCompanyId');
+        if (!companyIdForUrl) {
+            const urlParams = new URLSearchParams(window.location.search);
+            companyIdForUrl = urlParams.get('company_id');
+        }
+        
+        if (companyIdForUrl && typeof url === 'string' && (url.startsWith('/api/') || url.includes('/api/'))) {
+            const separator = url.includes('?') ? '&' : '?';
+            if (!url.includes('company_id=')) {
+                url = url + separator + 'company_id=' + encodeURIComponent(companyIdForUrl);
+            }
+        }
+        return originalFetch(url, newOptions);
     };
 })();
 
