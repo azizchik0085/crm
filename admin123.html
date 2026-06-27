@@ -1048,6 +1048,36 @@
                         <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.02); padding-bottom: 6px;"><span style="color: var(--text-muted);">REGOS Endpoint:</span><span id="v-settings-regos-url" style="font-family: 'JetBrains Mono'; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 350px;">-</span></div>
                         <div style="display: flex; justify-content: space-between; padding-bottom: 2px;"><span style="color: var(--text-muted);">amoCRM Subdomain:</span><span id="v-settings-amo-sub" style="font-family: 'JetBrains Mono';">-</span></div>
                     </div>
+                <!-- 5. Subscription Limits & Modules Form -->
+                <div class="card" style="margin: 20px 0 0 0; background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); padding: 20px;">
+                    <h4 style="margin: 0 0 12px 0; color: #818cf8; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;"><i class="fas fa-sliders-h"></i> Kompaniya Cheklovlari & Modullari</h4>
+                    <form id="superadmin-company-limits-form" onsubmit="SuperAdmin.saveCompanySettings(event)" style="display: flex; flex-direction: column; gap: 12px;">
+                        <input type="hidden" id="edit-limits-comp-id">
+                        
+                        <div class="form-group" style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
+                            <label for="edit-limits-max-employees" style="font-size: 13px; color: var(--text-main); margin: 0;">Maksimal xodimlar soni:</label>
+                            <input type="number" id="edit-limits-max-employees" class="form-control" min="1" required style="width: 80px; height: 32px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); color: var(--text-main); text-align: center; border-radius: 6px;">
+                        </div>
+                        
+                        <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 8px;">
+                            <label style="display: flex; align-items: center; justify-content: space-between; font-size: 13px; color: var(--text-main); cursor: pointer; user-select: none;">
+                                <span><i class="fas fa-users-cog" style="color: #818cf8; width: 20px;"></i> CRM Tizimi modulini yoqish</span>
+                                <input type="checkbox" id="edit-limits-enable-crm" style="width: 18px; height: 18px; accent-color: var(--accent); cursor: pointer;">
+                            </label>
+                            
+                            <label style="display: flex; align-items: center; justify-content: space-between; font-size: 13px; color: var(--text-main); cursor: pointer; user-select: none;">
+                                <span><i class="fas fa-warehouse" style="color: #fbbf24; width: 20px;"></i> Omborxona modulini yoqish</span>
+                                <input type="checkbox" id="edit-limits-enable-warehouse" style="width: 18px; height: 18px; accent-color: var(--accent); cursor: pointer;">
+                            </label>
+                            
+                            <label style="display: flex; align-items: center; justify-content: space-between; font-size: 13px; color: var(--text-main); cursor: pointer; user-select: none;">
+                                <span><i class="fas fa-shipping-fast" style="color: #10b981; width: 20px;"></i> Kassa modulini yoqish</span>
+                                <input type="checkbox" id="edit-limits-enable-kassa" style="width: 18px; height: 18px; accent-color: var(--accent); cursor: pointer;">
+                            </label>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary btn-sm" style="margin-top: 10px; height: 36px; font-size: 13px; background: var(--accent-gradient); font-weight: 600;"><i class="fas fa-save"></i> Sozlamalarni Saqlash</button>
+                    </form>
                 </div>
             </div>
             <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 12px; border-top: 1px solid var(--border-color); padding-top: 15px; margin-top: 15px;">

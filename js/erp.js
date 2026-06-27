@@ -502,6 +502,27 @@ window.HR = {
         const settings = AppStorage.load().settings;
         const currency = settings.currency;
 
+        // Enable/Disable Add Employee button based on limit
+        const maxEmployeesLimit = settings.maxEmployees || 100;
+        const addEmpBtn = document.getElementById('hr-add-employee-btn');
+        if (addEmpBtn) {
+            if (employees.length >= maxEmployeesLimit) {
+                addEmpBtn.style.opacity = '0.5';
+                addEmpBtn.style.cursor = 'not-allowed';
+                addEmpBtn.title = `Limit to'lgan (${maxEmployeesLimit} ta)`;
+                addEmpBtn.onclick = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    alert(`Kompaniyangiz uchun xodimlar limiti (${maxEmployeesLimit} ta) to'lgan. Yangi xodim qo'shish uchun administratorga murojaat qiling.`);
+                };
+            } else {
+                addEmpBtn.style.opacity = '';
+                addEmpBtn.style.cursor = '';
+                addEmpBtn.title = '';
+                addEmpBtn.onclick = () => showModal('employee-modal');
+            }
+        }
+
         const filtered = employees.filter(e => {
             const parsed = this.parseRoleAndPlan(e.role);
             return e.name.toLowerCase().includes(searchVal) || 
@@ -550,9 +571,15 @@ window.HR = {
         }
         
         const canWriteHR = activeUserId === 'admin' || userPerms.includes('hr');
+        const maxEmployees = settings.maxEmployees || 100;
+        const totalEmployeesCount = employees.length;
 
         let html = `
-            <div class="hr-grid" style="margin-top: 24px;">
+            <div style="grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; background: rgba(99, 102, 241, 0.05); border: 1px solid rgba(99, 102, 241, 0.15); border-radius: 8px; padding: 12px 16px; margin-bottom: 8px; width: 100%; box-sizing: border-box;">
+                <span style="font-size: 13px; font-weight: 500; color: var(--text-main);"><i class="fas fa-users" style="color:#818cf8; margin-right: 6px;"></i> Kompaniya xodimlari limiti:</span>
+                <span style="font-family: 'JetBrains Mono'; font-size: 14px; font-weight: 700; color: ${totalEmployeesCount >= maxEmployees ? 'var(--danger)' : 'var(--success)'};">${totalEmployeesCount} / ${maxEmployees}</span>
+            </div>
+            <div class="hr-grid" style="margin-top: 12px; width: 100%;">
         `;
 
         if (filtered.length === 0) {

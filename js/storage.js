@@ -18,6 +18,10 @@ const DEFAULT_DATA = {
         aiAutoReply: false,
         regosEndpoint: '',
         regosToken: '',
+        maxEmployees: 100,
+        enableCrm: true,
+        enableWarehouse: true,
+        enableKassa: true,
         roles: [
             { name: "Sotuvchi", permissions: ["crm", "telephony", "chats", "erp", "receipts", "seniklar", "kassa"] },
             { name: "Omborchi", permissions: ["erp", "receipts", "seniklar", "kassa"] },

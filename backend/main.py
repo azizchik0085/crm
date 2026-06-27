@@ -504,6 +504,30 @@ def get_employees(request: Request):
 def save_employee(employee: dict, request: Request):
     company_id = get_company_id(request)
     if company_id:
+        settings = get_company_settings(company_id)
+        max_employees = int(settings.get("max_employees", 100))
+        
+        emp_id = employee.get("id")
+        is_update = False
+        if emp_id:
+            try:
+                existing = supabase_req("GET", f"employees?id=eq.{emp_id}&company_id=eq.{company_id}")
+                if existing and isinstance(existing, list) and len(existing) > 0:
+                    is_update = True
+            except Exception:
+                pass
+                
+        if not is_update:
+            try:
+                existing_count_res = supabase_req("GET", f"employees?company_id=eq.{company_id}&select=id")
+                existing_count = len(existing_count_res) if isinstance(existing_count_res, list) else 0
+                if existing_count >= max_employees:
+                    raise HTTPException(status_code=400, detail=f"Kompaniyangiz uchun xodimlar limiti ({max_employees} ta) to'lgan. Limitni oshirish uchun platforma administratoriga murojaat qiling.")
+            except HTTPException as he:
+                raise he
+            except Exception:
+                pass
+                
         employee["company_id"] = company_id
     return supabase_req("POST", "employees?on_conflict=id", json_data=employee)
 
@@ -867,7 +891,11 @@ def get_company_settings(company_id: str):
             "telegram_token": "", "instagram_token": "", "ai_provider": "local",
             "telephony_provider": "sarkor", "gemini_api_key": "", "openai_api_key": "",
             "groq_api_key": "", "ai_auto_reply": False, "regos_endpoint": "", "regos_token": "",
-            "amocrm_subdomain": "", "amocrm_token": ""
+            "amocrm_subdomain": "", "amocrm_token": "",
+            "max_employees": 100,
+            "enable_crm": True,
+            "enable_warehouse": True,
+            "enable_kassa": True
         }
     if company_id in _settings_cache:
         return _settings_cache[company_id]
@@ -876,7 +904,11 @@ def get_company_settings(company_id: str):
         "telegram_token": "", "instagram_token": "", "ai_provider": "local",
         "telephony_provider": "sarkor", "gemini_api_key": "", "openai_api_key": "",
         "groq_api_key": "", "ai_auto_reply": False, "regos_endpoint": "", "regos_token": "",
-        "amocrm_subdomain": "", "amocrm_token": ""
+        "amocrm_subdomain": "", "amocrm_token": "",
+        "max_employees": 100,
+        "enable_crm": True,
+        "enable_warehouse": True,
+        "enable_kassa": True
     }
     
     # 1. Try loading from Supabase database
@@ -1272,6 +1304,21 @@ def get_company_details(company_id: str):
     except Exception as e:
         print(f"Error fetching company details: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/companies/{company_id}/settings")
+def update_company_admin_settings(company_id: str, payload: dict):
+    company_id = "".join(c for c in company_id if c.isalnum()).lower()
+    if not company_id:
+        raise HTTPException(status_code=400, detail="Kompaniya kodi xato.")
+        
+    company_settings = get_company_settings(company_id)
+    company_settings["max_employees"] = int(payload.get("max_employees", 100))
+    company_settings["enable_crm"] = bool(payload.get("enable_crm", True))
+    company_settings["enable_warehouse"] = bool(payload.get("enable_warehouse", True))
+    company_settings["enable_kassa"] = bool(payload.get("enable_kassa", True))
+    
+    save_company_settings(company_id, company_settings)
+    return {"status": "success", "settings": company_settings}
 
 @app.get("/api/settings")
 def get_settings(request: Request):

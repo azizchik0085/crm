@@ -58,6 +58,12 @@ window.App = {
                     data.settings.amocrmSubdomain = backendSettings.amocrm_subdomain || data.settings.amocrmSubdomain;
                     data.settings.amocrmToken = backendSettings.amocrm_token || data.settings.amocrmToken;
                     
+                    // Subscription settings
+                    data.settings.maxEmployees = backendSettings.max_employees !== undefined ? backendSettings.max_employees : (data.settings.maxEmployees || 100);
+                    data.settings.enableCrm = backendSettings.enable_crm !== undefined ? backendSettings.enable_crm : (data.settings.enableCrm !== false);
+                    data.settings.enableWarehouse = backendSettings.enable_warehouse !== undefined ? backendSettings.enable_warehouse : (data.settings.enableWarehouse !== false);
+                    data.settings.enableKassa = backendSettings.enable_kassa !== undefined ? backendSettings.enable_kassa : (data.settings.enableKassa !== false);
+                    
                     if (backendSettings.roles && backendSettings.roles.length > 0) {
                         data.settings.roles = backendSettings.roles;
                     }
@@ -384,6 +390,7 @@ window.App = {
                     }
                 });
                 
+                this.allowedViews = ['superadmin', 'settings'];
                 if (this.currentView !== 'superadmin' && this.currentView !== 'settings') {
                     this.renderView('superadmin');
                 }
@@ -461,6 +468,19 @@ window.App = {
                 }
             }
             
+            // Filter allowedViews based on company subscription modules
+            const enableCrm = data.settings.enableCrm !== false;
+            const enableWarehouse = data.settings.enableWarehouse !== false;
+            const enableKassa = data.settings.enableKassa !== false;
+            
+            allowedViews = allowedViews.filter(view => {
+                if (view === 'crm' && !enableCrm) return false;
+                if (view === 'erp' && !enableWarehouse) return false;
+                if (view === 'seniklar' && !enableWarehouse) return false;
+                if (view === 'kassa' && !enableKassa) return false;
+                return true;
+            });
+            
             document.querySelectorAll('.nav-item, .bottom-nav-item').forEach(item => {
                 const link = item.tagName === 'A' ? item : item.querySelector('a');
                 const targetView = item.getAttribute('data-view') || (link ? link.getAttribute('data-view') : null);
@@ -473,6 +493,7 @@ window.App = {
                 }
             });
             
+            this.allowedViews = allowedViews;
             if (!allowedViews.includes(this.currentView)) {
                 this.renderView(allowedViews[0]);
             }
@@ -711,6 +732,9 @@ window.App = {
     },
 
     renderView: function(viewName) {
+        if (this.allowedViews && !this.allowedViews.includes(viewName)) {
+            viewName = this.allowedViews[0] || 'dashboard';
+        }
         this.currentView = viewName;
         localStorage.setItem('activeView', viewName);
         
@@ -1561,7 +1585,49 @@ window.SuperAdmin = {
             document.getElementById('v-settings-regos-url').textContent = data.settings.regos_endpoint || '-';
             document.getElementById('v-settings-amo-sub').textContent = data.settings.amocrm_subdomain || '-';
             
+            // 5. Fill limits form
+            document.getElementById('edit-limits-comp-id').value = companyId;
+            document.getElementById('edit-limits-max-employees').value = data.settings.max_employees || 100;
+            document.getElementById('edit-limits-enable-crm').checked = data.settings.enable_crm !== false;
+            document.getElementById('edit-limits-enable-warehouse').checked = data.settings.enable_warehouse !== false;
+            document.getElementById('edit-limits-enable-kassa').checked = data.settings.enable_kassa !== false;
+            
             showModal('superadmin-view-company-modal');
+        } catch (err) {
+            alert("Xatolik: " + err.message);
+        }
+    },
+
+    saveCompanySettings: async function(event) {
+        event.preventDefault();
+        const companyId = document.getElementById('edit-limits-comp-id').value;
+        const maxEmployees = parseInt(document.getElementById('edit-limits-max-employees').value) || 100;
+        const enableCrm = document.getElementById('edit-limits-enable-crm').checked;
+        const enableWarehouse = document.getElementById('edit-limits-enable-warehouse').checked;
+        const enableKassa = document.getElementById('edit-limits-enable-kassa').checked;
+        
+        try {
+            const response = await fetch(`/api/companies/${companyId}/settings`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    max_employees: maxEmployees,
+                    enable_crm: enableCrm,
+                    enable_warehouse: enableWarehouse,
+                    enable_kassa: enableKassa
+                })
+            });
+            
+            if (!response.ok) {
+                const errData = await response.json();
+                throw new Error(errData.detail || "Sozlamalarni saqlashda xatolik yuz berdi.");
+            }
+            
+            alert("Kompaniya sozlamalari va cheklovlari muvaffaqiyatli saqlandi!");
+            closeModal('superadmin-view-company-modal');
+            await this.loadCompanies();
         } catch (err) {
             alert("Xatolik: " + err.message);
         }
