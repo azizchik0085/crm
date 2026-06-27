@@ -771,6 +771,8 @@ window.App = {
                             regos_token: regosToken,
                             amocrm_subdomain: amocrmSubdomain,
                             amocrm_token: amocrmToken,
+                            supabase_url: sbUrl,
+                            supabase_key: sbKey,
                             roles: data.settings.roles || [],
                             amocrm_operators_map: amocrmOperatorsMap
                         })

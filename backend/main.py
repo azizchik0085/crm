@@ -3,6 +3,7 @@ import time
 import json
 import asyncio
 from datetime import datetime, timezone
+from contextvars import ContextVar
 import requests
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
@@ -20,6 +21,26 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+active_company_id: ContextVar[str] = ContextVar("active_company_id", default=None)
+
+@app.middleware("http")
+async def company_id_middleware(request: Request, call_next):
+    company_id = request.headers.get("x-company-id") or request.query_params.get("company_id")
+    if not company_id:
+        referer = request.headers.get("referer", "")
+        if "company_id=" in referer:
+            try:
+                company_id = referer.split("company_id=")[1].split("&")[0]
+            except Exception:
+                pass
+                
+    token = active_company_id.set(company_id)
+    try:
+        response = await call_next(request)
+        return response
+    finally:
+        active_company_id.reset(token)
+
 # Supabase Credentials
 SUPABASE_URL = "https://zuklkmppdencjzegamfm.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp1a2xrbXBwZGVuY2p6ZWdhbWZtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5MzQ2NjAsImV4cCI6MjA5NzUxMDY2MH0.i18GcUTO8v9ilBYMlQMwvnz7RLkrR1q5fJB91do3ypk"
@@ -34,21 +55,35 @@ def get_company_id(request: Request = None, company_id: str = None):
     if company_id:
         return company_id
     if request:
-        # Check headers or query params
         cid = request.headers.get("x-company-id") or request.query_params.get("company_id")
         if cid:
             return cid
-        # Check if json body has it (if it is a post request)
-        # Note: we don't read body here to avoid blocking body consumption, we do it in route handlers or parameters
     return None
 
 # Helper to proxy requests to Supabase REST API
-def supabase_req(method, path, json_data=None, params=None):
-    url = f"{SUPABASE_URL}/rest/v1/{path}"
+def supabase_req(method, path, json_data=None, params=None, company_id=None, use_central=False):
+    target_url = SUPABASE_URL
+    target_key = SUPABASE_KEY
     
-    # Copy default headers
-    req_headers = headers.copy()
-    if "on_conflict" in path or (params and "on_conflict" in params):
+    if company_id is None:
+        company_id = active_company_id.get()
+        
+    if company_id and not use_central:
+        settings = get_company_settings(company_id, use_central=True)
+        custom_url = settings.get("supabase_url") or settings.get("supabaseUrl")
+        custom_key = settings.get("supabase_key") or settings.get("supabaseKey")
+        if custom_url and custom_key:
+            target_url = custom_url.strip().rstrip("/")
+            target_key = custom_key.strip()
+            
+    url = f"{target_url}/rest/v1/{path}"
+    
+    req_headers = {
+        "apikey": target_key,
+        "Authorization": f"Bearer {target_key}",
+        "Content-Type": "application/json"
+    }
+    if method == "POST" and ("on_conflict" in path or (params and "on_conflict" in params)):
         req_headers["Prefer"] = "resolution=merge-duplicates"
         
     try:
@@ -61,7 +96,7 @@ def supabase_req(method, path, json_data=None, params=None):
         print(f"Supabase request error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-def supabase_get_all(path, params=None):
+def supabase_get_all(path, params=None, company_id=None, use_central=False):
     all_data = []
     limit = 1000
     offset = 0
@@ -72,11 +107,29 @@ def supabase_get_all(path, params=None):
     if "?" in path:
         base_path, query_params = path.split("?", 1)
         
-    while True:
-        url = f"{SUPABASE_URL}/rest/v1/{base_path}"
+    target_url = SUPABASE_URL
+    target_key = SUPABASE_KEY
+    
+    if company_id is None:
+        company_id = active_company_id.get()
         
-        req_headers = headers.copy()
-        req_headers["Range"] = f"{offset}-{offset + limit - 1}"
+    if company_id and not use_central:
+        settings = get_company_settings(company_id, use_central=True)
+        custom_url = settings.get("supabase_url") or settings.get("supabaseUrl")
+        custom_key = settings.get("supabase_key") or settings.get("supabaseKey")
+        if custom_url and custom_key:
+            target_url = custom_url.strip().rstrip("/")
+            target_key = custom_key.strip()
+            
+    while True:
+        url = f"{target_url}/rest/v1/{base_path}"
+        
+        req_headers = {
+            "apikey": target_key,
+            "Authorization": f"Bearer {target_key}",
+            "Content-Type": "application/json",
+            "Range": f"{offset}-{offset + limit - 1}"
+        }
         
         req_params = params.copy() if params else {}
         # Parse query params
@@ -181,7 +234,7 @@ def sync_regos_employees_helper(company_id: str = None):
             path = "employees?select=*"
             if company_id:
                 path += f"&company_id=eq.{company_id}"
-            existing_employees = supabase_get_all(path)
+            existing_employees = supabase_get_all(path, company_id=company_id)
             existing_map = {e["id"]: e for e in existing_employees}
         except Exception as e_get:
             print(f"Failed to fetch existing employees: {e_get}")
@@ -240,12 +293,12 @@ def sync_regos_employees_helper(company_id: str = None):
                     del_path = f"employees?id=eq.{old_id}"
                     if company_id:
                         del_path += f"&company_id=eq.{company_id}"
-                    supabase_req("DELETE", del_path)
+                    supabase_req("DELETE", del_path, company_id=company_id)
                 except Exception as e_del:
                     print(f"Failed to delete orphaned employee {old_id}: {e_del}")
             
         if synced_employees:
-            supabase_req("POST", "employees?on_conflict=id", json_data=synced_employees)
+            supabase_req("POST", "employees?on_conflict=id", json_data=synced_employees, company_id=company_id)
             
         return {
             "status": "success", 
@@ -950,20 +1003,21 @@ SETTINGS_FILE = os.path.join(os.path.dirname(__file__), "settings.json")
 
 _settings_cache = {}
 
-def get_company_settings(company_id: str):
+def get_company_settings(company_id: str, use_central: bool = False):
     if not company_id:
         return {
             "telegram_token": "", "instagram_token": "", "ai_provider": "local",
             "telephony_provider": "sarkor", "gemini_api_key": "", "openai_api_key": "",
             "groq_api_key": "", "ai_auto_reply": False, "regos_endpoint": "", "regos_token": "",
             "amocrm_subdomain": "", "amocrm_token": "",
+            "supabase_url": "", "supabase_key": "",
             "max_employees": 100,
             "enable_crm": True,
             "enable_warehouse": True,
             "enable_kassa": True,
             "amocrm_operators_map": {}
         }
-    if company_id in _settings_cache:
+    if company_id in _settings_cache and not use_central:
         return _settings_cache[company_id]
         
     default_keys = {
@@ -971,6 +1025,7 @@ def get_company_settings(company_id: str):
         "telephony_provider": "sarkor", "gemini_api_key": "", "openai_api_key": "",
         "groq_api_key": "", "ai_auto_reply": False, "regos_endpoint": "", "regos_token": "",
         "amocrm_subdomain": "", "amocrm_token": "",
+        "supabase_url": "", "supabase_key": "",
         "max_employees": 100,
         "enable_crm": True,
         "enable_warehouse": True,
@@ -980,14 +1035,15 @@ def get_company_settings(company_id: str):
     
     # 1. Try loading from Supabase database
     try:
-        res = supabase_req("GET", f"receipts?id=eq.settings_{company_id}&select=items")
+        res = supabase_req("GET", f"receipts?id=eq.settings_{company_id}&select=items", use_central=True)
         if res and isinstance(res, list) and len(res) > 0:
             db_settings = res[0].get("items")
             if db_settings and isinstance(db_settings, dict):
                 for k, v in default_keys.items():
                     if k not in db_settings:
                         db_settings[k] = v
-                _settings_cache[company_id] = db_settings
+                if not use_central:
+                    _settings_cache[company_id] = db_settings
                 return db_settings
     except Exception as e:
         print(f"Failed to load settings for {company_id} from Supabase: {e}")
@@ -1001,7 +1057,8 @@ def get_company_settings(company_id: str):
                 for k, v in default_keys.items():
                     if k not in data:
                         data[k] = v
-                _settings_cache[company_id] = data
+                if not use_central:
+                    _settings_cache[company_id] = data
                 return data
         except Exception:
             pass
@@ -1015,7 +1072,8 @@ def get_company_settings(company_id: str):
                 for k, v in default_keys.items():
                     if k not in data:
                         data[k] = v
-                _settings_cache[company_id] = data
+                if not use_central:
+                    _settings_cache[company_id] = data
                 return data
         except Exception:
             pass
@@ -1035,7 +1093,7 @@ def save_company_settings(company_id: str, settings: dict):
     except Exception as e:
         print(f"Failed to save settings for {company_id} locally: {e}")
         
-    # 2. Save to Supabase
+    # 2. Save to Supabase (Always central to preserve credentials mapping!)
     try:
         payload = {
             "id": f"settings_{company_id}",
@@ -1046,7 +1104,7 @@ def save_company_settings(company_id: str, settings: dict):
             "cashier_name": "System",
             "code": "SETTINGS"
         }
-        supabase_req("POST", "receipts?on_conflict=id", json_data=payload)
+        supabase_req("POST", "receipts?on_conflict=id", json_data=payload, use_central=True)
     except Exception as e:
         print(f"Failed to save settings for {company_id} to Supabase: {e}")
 
@@ -1413,6 +1471,8 @@ def update_settings(settings: dict, request: Request):
     company_settings["regos_token"] = settings.get("regos_token", "")
     company_settings["amocrm_subdomain"] = settings.get("amocrm_subdomain", "")
     company_settings["amocrm_token"] = settings.get("amocrm_token", "")
+    company_settings["supabase_url"] = settings.get("supabase_url", "")
+    company_settings["supabase_key"] = settings.get("supabase_key", "")
     if "roles" in settings:
         company_settings["roles"] = settings.get("roles")
     if "amocrm_operators_map" in settings:
@@ -2827,34 +2887,20 @@ def run_sync_in_background(days: int, company_id: str = None):
         end_iso = datetime.fromtimestamp(now_ts, tz=timezone.utc).isoformat().replace("+", "%2B")
         
         existing_receipts = {}  # id -> is_new_format (bool)
-        limit = 1000
-        offset = 0
-        while True:
+        try:
             path = f"receipts?select=id,items&created_at=gte.{start_iso}&created_at=lte.{end_iso}"
             if company_id:
                 path += f"&company_id=eq.{company_id}"
-            url = f"{SUPABASE_URL}/rest/v1/{path}"
-            req_headers = headers.copy()
-            req_headers["Range"] = f"{offset}-{offset + limit - 1}"
-            try:
-                res = requests.get(url, headers=req_headers, timeout=15)
-                res.raise_for_status()
-                chunk = res.json() if res.text else []
-                if not chunk:
-                    break
-                for r in chunk:
-                    if isinstance(r, dict) and "id" in r:
-                        items_val = r.get("items")
-                        is_new = False
-                        if isinstance(items_val, dict) and "products" in items_val and "seller_name" in items_val:
-                            is_new = True
-                        existing_receipts[r["id"]] = is_new
-                if len(chunk) < limit:
-                    break
-                offset += limit
-            except Exception as e:
-                print(f"Background Sync: Error fetching existing IDs: {e}")
-                break
+            chunk = supabase_get_all(path, company_id=company_id)
+            for r in chunk:
+                if isinstance(r, dict) and "id" in r:
+                    items_val = r.get("items")
+                    is_new = False
+                    if isinstance(items_val, dict) and "products" in items_val and "seller_name" in items_val:
+                        is_new = True
+                    existing_receipts[r["id"]] = is_new
+        except Exception as e:
+            print(f"Background Sync: Error fetching existing IDs: {e}")
                 
         print(f"Background Sync: Found {len(existing_receipts)} existing receipts in DB for the range. Filtering duplicates...")
         
