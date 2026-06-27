@@ -25,7 +25,7 @@ active_company_id: ContextVar[str] = ContextVar("active_company_id", default=Non
 
 @app.middleware("http")
 async def company_id_middleware(request: Request, call_next):
-    company_id = request.headers.get("x-company-id") or request.query_params.get("company_id")
+    company_id = request.cookies.get("company_id") or request.headers.get("x-company-id") or request.query_params.get("company_id")
     if not company_id:
         referer = request.headers.get("referer", "")
         if "company_id=" in referer:
@@ -55,7 +55,7 @@ def get_company_id(request: Request = None, company_id: str = None):
     if company_id:
         return company_id
     if request:
-        cid = request.headers.get("x-company-id") or request.query_params.get("company_id")
+        cid = request.cookies.get("company_id") or request.headers.get("x-company-id") or request.query_params.get("company_id")
         if cid:
             return cid
         referer = request.headers.get("referer", "")

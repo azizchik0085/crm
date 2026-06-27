@@ -28,6 +28,10 @@ window.App = {
     chartInstance: null,
 
     init: async function() {
+        const cachedCompanyId = localStorage.getItem('activeCompanyId');
+        if (cachedCompanyId) {
+            document.cookie = "company_id=" + cachedCompanyId + "; path=/; max-age=31536000; SameSite=Lax";
+        }
         await this.loadSettingsFromBackend();
         this.applySettings();
         this.setupNavigation();
@@ -411,6 +415,9 @@ window.App = {
                 localStorage.setItem('activeUserRole', data.user.role);
                 localStorage.setItem('activeUserName', data.user.name);
                 
+                // Set native browser cookie for robust backend routing (bypasses script caches)
+                document.cookie = "company_id=" + data.user.company_id + "; path=/; max-age=31536000; SameSite=Lax";
+                
                 if (companyInput) companyInput.value = '';
                 usernameInput.value = '';
                 passwordInput.value = '';
@@ -434,6 +441,9 @@ window.App = {
         localStorage.removeItem('activeUserRole');
         localStorage.removeItem('activeUserName');
         localStorage.removeItem('activeView');
+        
+        // Clear native browser cookie
+        document.cookie = "company_id=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
         
         const companyInput = document.getElementById('login-company');
         const usernameInput = document.getElementById('login-username');
