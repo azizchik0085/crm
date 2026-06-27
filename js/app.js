@@ -658,33 +658,32 @@ window.App = {
     setupSettingsForm: function() {
         const form = document.getElementById('settings-form');
         if (form) {
-            form.onsubmit = async (e) => {
-                e.preventDefault();
-                const name = document.getElementById('settings-company-name').value;
-                const currency = document.getElementById('settings-currency').value;
-                
-                const sbUrl = document.getElementById('settings-sb-url').value.trim();
-                const sbKey = document.getElementById('settings-sb-key').value.trim();
+             form.onsubmit = async (e) => {
+                 e.preventDefault();
+                 const data = AppStorage.load();
+                 const name = document.getElementById('settings-company-name').value;
+                 const currency = document.getElementById('settings-currency').value;
+                 
+                 const sbUrl = document.getElementById('settings-sb-url')?.value.trim() || data.settings.supabaseUrl || '';
+                 const sbKey = document.getElementById('settings-sb-key')?.value.trim() || data.settings.supabaseKey || '';
 
-                const sipServer = document.getElementById('settings-sip-server').value.trim();
-                const sipUser = document.getElementById('settings-sip-user').value.trim();
-                const sipPassword = document.getElementById('settings-sip-password').value.trim();
-                const sipWss = document.getElementById('settings-sip-wss').value.trim();
-                const telegramToken = document.getElementById('settings-telegram-token').value.trim();
-                const instagramToken = document.getElementById('settings-instagram-token').value.trim();
-                const instagramUsername = document.getElementById('settings-instagram-username').value.trim();
-                const aiProvider = document.getElementById('settings-ai-provider').value;
-                const telephonyProvider = document.getElementById('settings-telephony-provider').value;
-                const geminiApiKey = document.getElementById('settings-gemini-key')?.value.trim() || '';
-                const openaiApiKey = document.getElementById('settings-openai-key')?.value.trim() || '';
-                const groqApiKey = document.getElementById('settings-groq-key')?.value.trim() || '';
-                const aiAutoReply = !!document.getElementById('settings-ai-auto-reply')?.checked;
-                const regosEndpoint = document.getElementById('settings-regos-endpoint')?.value.trim() || '';
-                const regosToken = document.getElementById('settings-regos-token')?.value.trim() || '';
-                const amocrmSubdomain = document.getElementById('settings-amocrm-subdomain')?.value.trim() || '';
-                const amocrmToken = document.getElementById('settings-amocrm-token')?.value.trim() || '';
-                
-                const data = AppStorage.load();
+                 const sipServer = document.getElementById('settings-sip-server').value.trim();
+                 const sipUser = document.getElementById('settings-sip-user').value.trim();
+                 const sipPassword = document.getElementById('settings-sip-password').value.trim();
+                 const sipWss = document.getElementById('settings-sip-wss').value.trim();
+                 const telegramToken = document.getElementById('settings-telegram-token').value.trim();
+                 const instagramToken = document.getElementById('settings-instagram-token').value.trim();
+                 const instagramUsername = document.getElementById('settings-instagram-username').value.trim();
+                 const aiProvider = document.getElementById('settings-ai-provider').value;
+                 const telephonyProvider = document.getElementById('settings-telephony-provider').value;
+                 const geminiApiKey = document.getElementById('settings-gemini-key')?.value.trim() || '';
+                 const openaiApiKey = document.getElementById('settings-openai-key')?.value.trim() || '';
+                 const groqApiKey = document.getElementById('settings-groq-key')?.value.trim() || '';
+                 const aiAutoReply = !!document.getElementById('settings-ai-auto-reply')?.checked;
+                 const regosEndpoint = document.getElementById('settings-regos-endpoint')?.value.trim() || '';
+                 const regosToken = document.getElementById('settings-regos-token')?.value.trim() || '';
+                 const amocrmSubdomain = document.getElementById('settings-amocrm-subdomain')?.value.trim() || '';
+                 const amocrmToken = document.getElementById('settings-amocrm-token')?.value.trim() || '';
                 
                 // Sozlamalar o'zgarganligini aniqlash
                 const sbChanged = data.settings.supabaseUrl !== sbUrl || data.settings.supabaseKey !== sbKey;
