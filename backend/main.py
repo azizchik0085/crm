@@ -377,7 +377,7 @@ def get_regos_sales_report(request: Request, start_date: int = None, end_date: i
     from datetime import timezone, timedelta
     
     company_id = get_company_id(request)
-    settings = get_company_settings(company_id) if company_id else settings_state
+    settings = get_company_settings(company_id, bypass_cache=True) if company_id else settings_state
     regos_endpoint = settings.get("regos_endpoint", "")
     regos_token = settings.get("regos_token", "")
     
@@ -573,7 +573,7 @@ def get_regos_warehouses(request: Request):
     company_id = get_company_id(request)
     if not company_id:
         return []
-    settings = get_company_settings(company_id)
+    settings = get_company_settings(company_id, bypass_cache=True)
     regos_endpoint = settings.get("regos_endpoint", "")
     regos_token = settings.get("regos_token", "")
     
@@ -2552,7 +2552,7 @@ def sync_regos_inventory_helper(company_id: str = None):
     return {"status": "success", "count": sync_count}
 
 def fetch_and_save_regos_receipt(cheque_uuid: str, company_id: str = None):
-    settings = get_company_settings(company_id) if company_id else settings_state
+    settings = get_company_settings(company_id, bypass_cache=True) if company_id else settings_state
     regos_endpoint = settings.get("regos_endpoint", "")
     regos_token = settings.get("regos_token", "")
     
@@ -2694,7 +2694,7 @@ def save_parsed_receipt(cheque: dict, company_id: str = None):
         rows = cheque.get("rows") or cheque.get("items") or cheque.get("goods") or []
         if not rows and c_uuid:
             try:
-                settings = get_company_settings(company_id) if company_id else settings_state
+                settings = get_company_settings(company_id, bypass_cache=True) if company_id else settings_state
                 regos_endpoint = settings.get("regos_endpoint", "")
                 regos_token = settings.get("regos_token", "")
                 if regos_endpoint and regos_token:
@@ -2803,7 +2803,7 @@ def run_sync_in_background(days: int, company_id: str = None):
     sync_progress["message"] = "REGOS API-dan cheklar ro'yxati olinmoqda..."
     
     try:
-        settings = get_company_settings(company_id) if company_id else settings_state
+        settings = get_company_settings(company_id, bypass_cache=True) if company_id else settings_state
         regos_endpoint = settings.get("regos_endpoint", "")
         regos_token = settings.get("regos_token", "")
         
