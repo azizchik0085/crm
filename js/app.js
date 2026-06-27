@@ -222,11 +222,26 @@ window.App = {
             return;
         }
         
+        const activeUserRole = localStorage.getItem('activeUserRole');
+        const isSuperAdminPortal = !!window.IS_SUPERADMIN_PORTAL;
+        
+        // Seanslar xavfsizligini ta'minlash: Portallar va rollar mosligini tekshirish
+        if (isSuperAdminPortal) {
+            if (activeUserRole !== 'superadmin') {
+                this.logout();
+                return;
+            }
+        } else {
+            if (activeUserRole === 'superadmin') {
+                this.logout();
+                return;
+            }
+        }
+        
         if (loginScreen) loginScreen.style.display = 'none';
         if (appContainer) appContainer.style.display = 'flex';
         
         const savedView = localStorage.getItem('activeView');
-        const activeUserRole = localStorage.getItem('activeUserRole');
         
         if (activeUserRole === 'superadmin') {
             this.currentView = 'superadmin';
@@ -238,7 +253,7 @@ window.App = {
         this.applyPermissions();
         this.renderView(this.currentView);
     },
-
+ 
     updateProfileCard: async function(activeUserId) {
         const nameLabel = document.getElementById('active-user-name');
         const roleLabel = document.getElementById('active-user-role');
@@ -266,7 +281,7 @@ window.App = {
             avatarLabel.textContent = activeUserName.charAt(0).toUpperCase();
         }
     },
-
+ 
     handleLoginSubmit: async function(event) {
         event.preventDefault();
         const companyInput = document.getElementById('login-company');
@@ -279,6 +294,7 @@ window.App = {
         const companyId = companyInput ? companyInput.value.trim() : '';
         const login = usernameInput.value.trim();
         const password = passwordInput.value.trim();
+        const isSuperAdminPortal = !!window.IS_SUPERADMIN_PORTAL;
         
         if (errorMsg) errorMsg.style.display = 'none';
         
@@ -289,9 +305,10 @@ window.App = {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    company_id: companyId,
+                    company_id: isSuperAdminPortal ? 'admin' : companyId,
                     login: login,
-                    password: password
+                    password: password,
+                    is_superadmin_portal: isSuperAdminPortal
                 })
             });
             

@@ -3051,9 +3051,12 @@ def auth_login(payload: dict):
     login = payload.get("login")
     password = payload.get("password")
     company_id = payload.get("company_id")
+    is_superadmin_portal = payload.get("is_superadmin_portal", False)
     
     # 1. Super Admin check
     if login == "admin" and password == "admin":
+        if not is_superadmin_portal:
+            raise HTTPException(status_code=403, detail="Super Admin tizimga bu yerdan kira olmaydi. Maxsus URL orqali kiring.")
         return {
             "status": "success",
             "user": {
@@ -3063,6 +3066,9 @@ def auth_login(payload: dict):
                 "company_id": "admin"
             }
         }
+        
+    if is_superadmin_portal:
+        raise HTTPException(status_code=403, detail="Faqat Super Admin ushbu portaldan kira oladi.")
         
     if not login or not password or not company_id:
         raise HTTPException(status_code=400, detail="Kompaniya kodi, login va parol kiritilishi shart.")
@@ -3463,6 +3469,16 @@ async def amocrm_webhook(request: Request):
 STATIC_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
 from fastapi.responses import FileResponse
+
+@app.get("/admin123")
+def read_admin():
+    admin_path = os.path.join(STATIC_DIR, "admin123.html")
+    if os.path.exists(admin_path):
+        return FileResponse(
+            admin_path,
+            headers={"Cache-Control": "no-cache, no-store, must-revalidate, public, max-age=0"}
+        )
+    raise HTTPException(status_code=404, detail="Admin index file not found")
 
 @app.get("/")
 def read_index():
