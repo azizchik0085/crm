@@ -2874,23 +2874,10 @@ def run_sync_in_background(days: int, company_id: str = None):
             print(f"POS connection check failed: {e_pos_check}")
             pos_online = False
             
-        saved_count = 0
-        processed_receipts = []
-        for idx, cheque in enumerate(cheques_list):
-            if not isinstance(cheque, dict):
-                continue
-            
+        def fetch_cheque_details(cheque):
             c_uuid = cheque.get("uuid") or cheque.get("id")
             if not c_uuid:
-                continue
-                
-            if c_uuid in existing_receipts and existing_receipts[c_uuid]:
-                continue
-                
-            if idx % 50 == 0 or idx == len(cheques_list) - 1:
-                sync_progress["processed"] = idx
-                sync_progress["message"] = f"Cheklar qayta ishlanmoqda: {idx}/{len(cheques_list)}..."
-                
+                return None
             try:
                 cheque_details = None
                 if pos_online:
@@ -2903,29 +2890,25 @@ def run_sync_in_background(days: int, company_id: str = None):
                         pos_resp = requests.post(pos_url, headers=regos_headers, json=pos_payload, timeout=3)
                         if pos_resp.status_code == 200:
                             pos_json = pos_resp.json()
-                            if isinstance(pos_json, dict) and not pos_json.get("ok") and pos_json.get("result", {}).get("error") == 5054:
-                                pos_online = False
-                            else:
-                                if isinstance(pos_json, list) and len(pos_json) > 0:
-                                    cheque_details = pos_json[0]
-                                elif isinstance(pos_json, dict):
-                                    if "result" in pos_json and isinstance(pos_json["result"], list) and len(pos_json["result"]) > 0:
-                                        cheque_details = pos_json["result"][0]
-                                    elif "cheque" in pos_json:
-                                        cheque_details = pos_json["cheque"]
-                                    elif "doccheque" in pos_json:
-                                        cheque_details = pos_json["doccheque"]
-                                    elif pos_json.get("ok"):
-                                        res = pos_json.get("result")
-                                        if isinstance(res, list) and len(res) > 0:
-                                            cheque_details = res[0]
-                                        elif isinstance(res, dict):
-                                            cheque_details = res
-                                    else:
-                                        cheque_details = pos_json
-                    except Exception as pos_ex:
-                        print(f"POS details query failed for {c_uuid}: {pos_ex}")
-                        pos_online = False
+                            if isinstance(pos_json, list) and len(pos_json) > 0:
+                                cheque_details = pos_json[0]
+                            elif isinstance(pos_json, dict):
+                                if "result" in pos_json and isinstance(pos_json["result"], list) and len(pos_json["result"]) > 0:
+                                    cheque_details = pos_json["result"][0]
+                                elif "cheque" in pos_json:
+                                    cheque_details = pos_json["cheque"]
+                                elif "doccheque" in pos_json:
+                                    cheque_details = pos_json["doccheque"]
+                                elif pos_json.get("ok"):
+                                    res = pos_json.get("result")
+                                    if isinstance(res, list) and len(res) > 0:
+                                        cheque_details = res[0]
+                                    elif isinstance(res, dict):
+                                        cheque_details = res
+                                else:
+                                    cheque_details = pos_json
+                    except Exception:
+                        pass
                         
                 target_cheque = cheque_details if (cheque_details and isinstance(cheque_details, dict) and ("rows" in cheque_details or "payments" in cheque_details)) else cheque
                 
@@ -2988,14 +2971,15 @@ def run_sync_in_background(days: int, company_id: str = None):
                         else:
                             ops_url = f"{endpoint}/docchequeoperation/get"
                         ops_payload = {"doc_sale_uuid": c_uuid}
-                        ops_resp = requests.post(ops_url, headers=regos_headers, json=ops_payload, timeout=5)
+                        ops_resp = requests.post(ops_url, headers=regos_headers, json=ops_payload, timeout=4)
                         if ops_resp.status_code == 200:
                             ops_data = ops_resp.json()
                             ops_list = ops_data.get("result")
                             if isinstance(ops_list, list):
                                 rows = ops_list
-                    except Exception as e_ops:
-                        print(f"Background Sync: failed to fetch operations/items for receipt {c_uuid}: {e_ops}")
+                    except Exception:
+                        pass
+                        
                 items_list = []
                 if isinstance(rows, list):
                     for row in rows:
@@ -3030,7 +3014,7 @@ def run_sync_in_background(days: int, company_id: str = None):
                     if isinstance(customer, dict):
                         cust_name = (customer.get("full_name") or "").strip()
                         cust_phone = (customer.get("main_phone") or "").strip()
-
+                        
                 seller = target_cheque.get("seller")
                 seller_name = ""
                 if isinstance(seller, dict):
@@ -3039,14 +3023,14 @@ def run_sync_in_background(days: int, company_id: str = None):
                     seller_name = seller
                 if not seller_name:
                     seller_name = target_cheque.get("seller_name") or ""
-
+                    
                 items_payload = {
                     "customer_name": cust_name,
                     "customer_phone": cust_phone,
                     "seller_name": seller_name,
                     "products": items_list
                 }
-
+                
                 receipt_payload = {
                     "id": c_uuid,
                     "code": c_code,
@@ -3059,25 +3043,63 @@ def run_sync_in_background(days: int, company_id: str = None):
                 }
                 if company_id:
                     receipt_payload["company_id"] = company_id
-                processed_receipts.append(receipt_payload)
+                return receipt_payload
+            except Exception as ex:
+                print(f"Failed to process cheque {c_uuid}: {ex}")
+                return None
+
+        # Filter new cheques beforehand
+        new_cheques = []
+        for cheque in cheques_list:
+            if not isinstance(cheque, dict):
+                continue
+            c_uuid = cheque.get("uuid") or cheque.get("id")
+            if not c_uuid:
+                continue
+            if c_uuid in existing_receipts and existing_receipts[c_uuid]:
+                continue
+            new_cheques.append(cheque)
+
+        saved_count = 0
+        processed_receipts = []
+        
+        if new_cheques:
+            from concurrent.futures import ThreadPoolExecutor, as_completed
+            
+            sync_progress["total"] = len(new_cheques)
+            sync_progress["processed"] = 0
+            sync_progress["message"] = f"Jami {len(new_cheques)} ta yangi cheklar yuklanmoqda..."
+            
+            with ThreadPoolExecutor(max_workers=12) as executor:
+                future_to_cheque = {executor.submit(fetch_cheque_details, c): c for c in new_cheques}
                 
-                # Flush to database in batches of 100 to provide real-time updates and prevent memory exhaustion
-                if len(processed_receipts) >= 100:
-                    sync_progress["message"] = f"Cheklar saqlanmoqda: {idx}/{len(cheques_list)}..."
+                for idx, future in enumerate(as_completed(future_to_cheque)):
                     try:
-                        supabase_req("POST", "receipts?on_conflict=id", json_data=processed_receipts)
-                        saved_count += len(processed_receipts)
-                    except Exception as ex:
-                        print(f"Background Sync: batch upsert failed, doing single inserts... Error: {ex}")
-                        for payload in processed_receipts:
-                            try:
-                                supabase_req("POST", "receipts?on_conflict=id", json_data=payload)
-                                saved_count += 1
-                            except Exception as single_ex:
-                                print(f"Background Sync: Fallback insert failed for {payload['id']}: {single_ex}")
-                    processed_receipts = []
-            except Exception as e_row:
-                print(f"Background Sync: error parsing receipt {c_uuid}: {e_row}")
+                        res_payload = future.result()
+                        if res_payload:
+                            processed_receipts.append(res_payload)
+                    except Exception as exc:
+                        print(f"Cheque generated an exception: {exc}")
+                        
+                    if idx % 20 == 0 or idx == len(new_cheques) - 1:
+                        sync_progress["processed"] = idx + 1
+                        sync_progress["message"] = f"Cheklar yuklanmoqda: {idx + 1}/{len(new_cheques)}..."
+                        
+                    # Flush to database in batches of 100
+                    if len(processed_receipts) >= 100:
+                        sync_progress["message"] = f"Cheklar saqlanmoqda: {idx + 1}/{len(new_cheques)}..."
+                        try:
+                            supabase_req("POST", "receipts?on_conflict=id", json_data=processed_receipts)
+                            saved_count += len(processed_receipts)
+                        except Exception as ex:
+                            print(f"Background Sync: batch upsert failed, doing single inserts... Error: {ex}")
+                            for payload in processed_receipts:
+                                try:
+                                    supabase_req("POST", "receipts?on_conflict=id", json_data=payload)
+                                    saved_count += 1
+                                except Exception as single_ex:
+                                    print(f"Background Sync: Fallback insert failed for {payload['id']}: {single_ex}")
+                        processed_receipts = []
                 
         # 4. Flush remaining processed receipts
         if processed_receipts:
