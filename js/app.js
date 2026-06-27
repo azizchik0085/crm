@@ -188,24 +188,27 @@ window.App = {
         if (amocrmTokenInput) amocrmTokenInput.value = data.settings.amocrmToken || '';
 
         // Webhook manzillarini joriy domen bo'yicha dinamik to'ldirish
+        const companyId = localStorage.getItem('activeCompanyId') || '';
+        const suffix = companyId ? `?company_id=${companyId}` : '';
+
         const sipuniWebhookInput = document.getElementById('settings-sipuni-webhook');
         if (sipuniWebhookInput) {
-            sipuniWebhookInput.value = window.location.origin + '/api/integration/sipuni/webhook';
+            sipuniWebhookInput.value = window.location.origin + '/api/integration/sipuni/webhook' + suffix;
         }
 
         const instagramWebhookInput = document.getElementById('settings-instagram-webhook');
         if (instagramWebhookInput) {
-            instagramWebhookInput.value = window.location.origin + '/api/integration/instagram/webhook';
+            instagramWebhookInput.value = window.location.origin + '/api/integration/instagram/webhook' + suffix;
         }
 
         const regosWebhookInput = document.getElementById('settings-regos-webhook');
         if (regosWebhookInput) {
-            regosWebhookInput.value = window.location.origin + '/api/integration/regos/webhook';
+            regosWebhookInput.value = window.location.origin + '/api/integration/regos/webhook' + suffix;
         }
 
         const amocrmWebhookInput = document.getElementById('settings-amocrm-webhook');
         if (amocrmWebhookInput) {
-            amocrmWebhookInput.value = window.location.origin + '/api/integration/amocrm/webhook';
+            amocrmWebhookInput.value = window.location.origin + '/api/integration/amocrm/webhook' + suffix;
         }
 
         this.onAIProviderChange();

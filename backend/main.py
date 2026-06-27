@@ -150,9 +150,11 @@ def delete_product(id: str, request: Request):
 
 # --- EMPLOYEES ENDPOINTS ---
 @app.post("/api/integration/regos/sync-employees")
-def sync_regos_employees():
-    regos_endpoint = settings_state.get("regos_endpoint", "")
-    regos_token = settings_state.get("regos_token", "")
+def sync_regos_employees(request: Request):
+    company_id = get_company_id(request)
+    settings = get_company_settings(company_id) if company_id else settings_state
+    regos_endpoint = settings.get("regos_endpoint", "")
+    regos_token = settings.get("regos_token", "")
     
     if not regos_endpoint or not regos_token:
         raise HTTPException(status_code=400, detail="REGOS API sozlanmagan. Sozlamalardan Endpoint va Access Tokenni kiritib saqlang.")
@@ -178,12 +180,15 @@ def sync_regos_employees():
             
         # Fetch existing employees to preserve custom data (salary, kpi, role plan)
         try:
-            existing_employees = supabase_get_all("employees?select=*")
+            path = "employees?select=*"
+            if company_id:
+                path += f"&company_id=eq.{company_id}"
+            existing_employees = supabase_get_all(path)
             existing_map = {e["id"]: e for e in existing_employees}
         except Exception as e_get:
             print(f"Failed to fetch existing employees: {e_get}")
             existing_map = {}
-
+ 
         synced_employees = []
         synced_ids = set()
         for u in users_list:
@@ -226,13 +231,18 @@ def sync_regos_employees():
                 "status": status,
                 "login": u.get("login")
             }
+            if company_id:
+                employee["company_id"] = company_id
             synced_employees.append(employee)
             
         # Clean up only the orphaned REGOS employees (not all of them)
         for old_id in list(existing_map.keys()):
             if old_id.startswith("regos_") and old_id not in synced_ids:
                 try:
-                    supabase_req("DELETE", f"employees?id=eq.{old_id}")
+                    del_path = f"employees?id=eq.{old_id}"
+                    if company_id:
+                        del_path += f"&company_id=eq.{company_id}"
+                    supabase_req("DELETE", del_path)
                 except Exception as e_del:
                     print(f"Failed to delete orphaned employee {old_id}: {e_del}")
             
@@ -282,13 +292,15 @@ def save_sales_report_cache(cache):
 sales_report_cache = load_sales_report_cache()
 
 @app.get("/api/integration/regos/sales-report")
-def get_regos_sales_report(start_date: int = None, end_date: int = None):
+def get_regos_sales_report(request: Request, start_date: int = None, end_date: int = None):
     import base64
     import gzip
     from datetime import timezone, timedelta
     
-    regos_endpoint = settings_state.get("regos_endpoint", "")
-    regos_token = settings_state.get("regos_token", "")
+    company_id = get_company_id(request)
+    settings = get_company_settings(company_id) if company_id else settings_state
+    regos_endpoint = settings.get("regos_endpoint", "")
+    regos_token = settings.get("regos_token", "")
     
     if not regos_endpoint or not regos_token:
         raise HTTPException(status_code=400, detail="REGOS API sozlanmagan. Iltimos, sozlamalar sahifasida Endpoint va Access Tokenni kiritib saqlang.")
@@ -2169,9 +2181,16 @@ def simulate_instagram_message(payload: dict):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/integration/regos/sync")
-def sync_regos_inventory():
-    regos_endpoint = settings_state.get("regos_endpoint", "")
-    regos_token = settings_state.get("regos_token", "")
+def sync_regos_inventory(request: Request):
+    company_id = get_company_id(request)
+    if not company_id:
+        raise HTTPException(status_code=400, detail="Kompaniya kodi aniqlanmadi.")
+    return sync_regos_inventory_helper(company_id)
+
+def sync_regos_inventory_helper(company_id: str = None):
+    settings = get_company_settings(company_id) if company_id else settings_state
+    regos_endpoint = settings.get("regos_endpoint", "")
+    regos_token = settings.get("regos_token", "")
     
     if not regos_endpoint or not regos_token:
         raise HTTPException(status_code=400, detail="REGOS API sozlanmagan. Iltimos, sozlamalar sahifasida Endpoint va Access Tokenni kiritib saqlang.")
@@ -2234,7 +2253,10 @@ def sync_regos_inventory():
     # 1. Fetch existing products from Supabase to check for SKU conflicts
     existing_products = []
     try:
-        existing_products = supabase_req("GET", "inventory?select=id,sku")
+        path = "inventory?select=id,sku"
+        if company_id:
+            path += f"&company_id=eq.{company_id}"
+        existing_products = supabase_req("GET", path)
     except Exception as e:
         print(f"Failed to fetch existing products for SKU checks: {e}")
         
@@ -2315,6 +2337,8 @@ def sync_regos_inventory():
             "stock": stock,
             "category": category
         }
+        if company_id:
+            product_payload["company_id"] = company_id
         processed_products.append(product_payload)
         
     # 3. Bulk upsert in chunks of 500
@@ -2325,7 +2349,7 @@ def sync_regos_inventory():
         try:
             supabase_req("POST", "inventory?on_conflict=id", json_data=chunk)
             sync_count += len(chunk)
-            print(f"Successfully synced chunk {i // chunk_size + 1}/{len(processed_products) // chunk_size + 1 if len(processed_products) % chunk_size == 0 else len(processed_products) // chunk_size + 1} ({len(chunk)} items)")
+            print(f"Successfully synced chunk {i // chunk_size + 1} ({len(chunk)} items)")
         except Exception as ex:
             print(f"Bulk upsert failed for chunk starting at index {i}: {ex}. Falling back to single inserts...")
             for product_payload in chunk:
@@ -2337,9 +2361,10 @@ def sync_regos_inventory():
                 
     return {"status": "success", "count": sync_count}
 
-def fetch_and_save_regos_receipt(cheque_uuid: str):
-    regos_endpoint = settings_state.get("regos_endpoint", "")
-    regos_token = settings_state.get("regos_token", "")
+def fetch_and_save_regos_receipt(cheque_uuid: str, company_id: str = None):
+    settings = get_company_settings(company_id) if company_id else settings_state
+    regos_endpoint = settings.get("regos_endpoint", "")
+    regos_token = settings.get("regos_token", "")
     
     if not regos_endpoint or not regos_token:
         print("REGOS API is not configured. Cannot fetch receipt details.")
@@ -2385,7 +2410,7 @@ def fetch_and_save_regos_receipt(cheque_uuid: str):
                         cheque = resp_data
     except Exception as e:
         print(f"Failed to fetch REGOS receipt {cheque_uuid} from POS API: {e}")
-
+ 
     # 2. If POS failed or register is logged out, fall back to Cloud url
     if not cheque:
         try:
@@ -2413,13 +2438,13 @@ def fetch_and_save_regos_receipt(cheque_uuid: str):
                         cheque = resp_data
         except Exception as e:
             print(f"Failed to fetch REGOS receipt {cheque_uuid} from Cloud API fallback: {e}")
-
+ 
     if cheque and isinstance(cheque, dict):
-        save_parsed_receipt(cheque)
+        save_parsed_receipt(cheque, company_id)
     else:
         print(f"Could not retrieve receipt data for {cheque_uuid} from either POS or Cloud APIs.")
 
-def save_parsed_receipt(cheque: dict):
+def save_parsed_receipt(cheque: dict, company_id: str = None):
     try:
         c_uuid = cheque.get("uuid") or cheque.get("id")
         if not c_uuid:
@@ -2479,8 +2504,9 @@ def save_parsed_receipt(cheque: dict):
         rows = cheque.get("rows") or cheque.get("items") or cheque.get("goods") or []
         if not rows and c_uuid:
             try:
-                regos_endpoint = settings_state.get("regos_endpoint", "")
-                regos_token = settings_state.get("regos_token", "")
+                settings = get_company_settings(company_id) if company_id else settings_state
+                regos_endpoint = settings.get("regos_endpoint", "")
+                regos_token = settings.get("regos_token", "")
                 if regos_endpoint and regos_token:
                     endpoint = regos_endpoint.strip().rstrip("/")
                     if not endpoint.startswith(("http://", "https://")):
@@ -2564,6 +2590,8 @@ def save_parsed_receipt(cheque: dict):
             "items": items_payload,
             "created_at": c_time_str
         }
+        if company_id:
+            receipt_payload["company_id"] = company_id
         
         supabase_req("POST", "receipts?on_conflict=id", json_data=receipt_payload)
         print(f"Successfully saved receipt {c_code} (UUID: {c_uuid}) to database.")
@@ -2573,7 +2601,7 @@ def save_parsed_receipt(cheque: dict):
 # Global state for tracking REGOS synchronization progress
 sync_progress = {"running": False, "processed": 0, "total": 0, "message": ""}
 
-def run_sync_in_background(days: int):
+def run_sync_in_background(days: int, company_id: str = None):
     global sync_progress
     if sync_progress["running"]:
         print("Sync is already running. Skipping.")
@@ -2585,8 +2613,9 @@ def run_sync_in_background(days: int):
     sync_progress["message"] = "REGOS API-dan cheklar ro'yxati olinmoqda..."
     
     try:
-        regos_endpoint = settings_state.get("regos_endpoint", "")
-        regos_token = settings_state.get("regos_token", "")
+        settings = get_company_settings(company_id) if company_id else settings_state
+        regos_endpoint = settings.get("regos_endpoint", "")
+        regos_token = settings.get("regos_token", "")
         
         if not regos_endpoint or not regos_token:
             sync_progress["running"] = False
@@ -2686,6 +2715,8 @@ def run_sync_in_background(days: int):
         offset = 0
         while True:
             path = f"receipts?select=id,items&created_at=gte.{start_iso}&created_at=lte.{end_iso}"
+            if company_id:
+                path += f"&company_id=eq.{company_id}"
             url = f"{SUPABASE_URL}/rest/v1/{path}"
             req_headers = headers.copy()
             req_headers["Range"] = f"{offset}-{offset + limit - 1}"
@@ -2910,6 +2941,8 @@ def run_sync_in_background(days: int):
                     "items": items_payload,
                     "created_at": c_time_str
                 }
+                if company_id:
+                    receipt_payload["company_id"] = company_id
                 processed_receipts.append(receipt_payload)
                 
                 # Flush to database in batches of 100 to provide real-time updates and prevent memory exhaustion
@@ -2993,12 +3026,13 @@ def delete_receipt(id: str, request: Request):
 from fastapi import BackgroundTasks
 
 @app.post("/api/integration/regos/sync-receipts")
-def sync_regos_receipts(background_tasks: BackgroundTasks, days: int = 360):
+def sync_regos_receipts(background_tasks: BackgroundTasks, request: Request, days: int = 360):
     global sync_progress
     if sync_progress["running"]:
         raise HTTPException(status_code=400, detail="Sinxronizatsiya jarayoni allaqachon bajarilmoqda.")
         
-    background_tasks.add_task(run_sync_in_background, days)
+    company_id = get_company_id(request)
+    background_tasks.add_task(run_sync_in_background, days, company_id)
     return {
         "status": "processing",
         "message": f"Sinxronizatsiya orqa fonda boshlandi ({days} kunlik). Cheklar asta-sekin paydo bo'ladi."
@@ -3025,6 +3059,8 @@ async def regos_webhook(request: Request):
         print(f"Error reading REGOS webhook JSON: {e}")
         data = {}
         
+    company_id = get_company_id(request)
+    
     action = data.get("action")
     webhook_data = data.get("data") or {}
     
@@ -3037,12 +3073,12 @@ async def regos_webhook(request: Request):
     if action == "DocChequeClosed" and isinstance(webhook_data, dict) and "uuid" in webhook_data:
         cheque_uuid = webhook_data.get("uuid")
         print(f"Webhook identified DocChequeClosed for UUID: {cheque_uuid}")
-        threading.Thread(target=fetch_and_save_regos_receipt, args=(cheque_uuid,)).start()
+        threading.Thread(target=fetch_and_save_regos_receipt, args=(cheque_uuid, company_id)).start()
     elif isinstance(data, dict) and ("items" in data or "rows" in data or "total_amount" in data):
         print("Webhook identified direct full receipt payload")
-        threading.Thread(target=save_parsed_receipt, args=(data,)).start()
+        threading.Thread(target=save_parsed_receipt, args=(data, company_id)).start()
         
-    threading.Thread(target=sync_regos_inventory).start()
+    threading.Thread(target=sync_regos_inventory_helper, args=(company_id,)).start()
     
     return {"status": "success", "message": "Webhook processed successfully"}
 
@@ -3318,7 +3354,7 @@ def get_amocrm_contacts_map(subdomain, token):
     return contact_map
 
 # Background task for full sync
-def run_amocrm_sync_background(subdomain, token):
+def run_amocrm_sync_background(subdomain, token, company_id: str = None):
     print("amoCRM Background Sync: started.")
     user_map = get_amocrm_users(subdomain, token)
     status_map = get_amocrm_status_map(subdomain, token)
@@ -3371,6 +3407,8 @@ def run_amocrm_sync_background(subdomain, token):
                         "value": price,
                         "source": "amocrm"
                     }
+                    if company_id:
+                        customer["company_id"] = company_id
                     synced_customers.append(customer)
                 
                 links = data.get("_links", {})
@@ -3399,18 +3437,21 @@ def run_amocrm_sync_background(subdomain, token):
         print(f"amoCRM Background Sync failed saving to Supabase: {e}")
 
 @app.post("/api/integration/amocrm/sync")
-def sync_amocrm_leads(background_tasks: BackgroundTasks):
-    subdomain = settings_state.get("amocrm_subdomain", "")
-    token = settings_state.get("amocrm_token", "")
+def sync_amocrm_leads(background_tasks: BackgroundTasks, request: Request):
+    company_id = get_company_id(request)
+    settings = get_company_settings(company_id) if company_id else settings_state
+    subdomain = settings.get("amocrm_subdomain", "")
+    token = settings.get("amocrm_token", "")
     if not subdomain or not token:
         raise HTTPException(status_code=400, detail="amoCRM sozlanmagan. Iltimos, sozlamalar sahifasida Subdomain va Tokenni saqlang.")
         
-    background_tasks.add_task(run_amocrm_sync_background, subdomain, token)
+    background_tasks.add_task(run_amocrm_sync_background, subdomain, token, company_id)
     return {"status": "success", "message": "Sinxronizatsiya orqa fonda boshlandi."}
 
 @app.post("/api/integration/amocrm/webhook")
 async def amocrm_webhook(request: Request):
     try:
+        data_company_id = get_company_id(request)
         form_data = await request.form()
         form_dict = dict(form_data)
         print(f"Received amoCRM webhook: {form_dict}")
@@ -3422,8 +3463,9 @@ async def amocrm_webhook(request: Request):
                 break
                 
         if lead_id:
-            subdomain = settings_state.get("amocrm_subdomain")
-            token = settings_state.get("amocrm_token")
+            settings = get_company_settings(data_company_id) if data_company_id else settings_state
+            subdomain = settings.get("amocrm_subdomain")
+            token = settings.get("amocrm_token")
             if subdomain and token:
                 lead = fetch_amocrm_lead_details(subdomain, token, lead_id)
                 if lead:
@@ -3458,6 +3500,8 @@ async def amocrm_webhook(request: Request):
                             "value": price,
                             "source": "amocrm"
                         }
+                        if data_company_id:
+                            customer["company_id"] = data_company_id
                         supabase_req("POST", "customers?on_conflict=id", json_data=customer)
                         print(f"Webhook successfully synced customer from amoCRM: {customer}")
     except Exception as e:
