@@ -3719,6 +3719,18 @@ STATIC_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
 from fastapi.responses import FileResponse
 
+@app.get("/api/debug-sync-log")
+def read_debug_sync_log():
+    try:
+        log_path = os.path.join(os.path.dirname(__file__), "sync_debug.log")
+        if os.path.exists(log_path):
+            with open(log_path, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+                return {"log": lines[-50:]}
+        return {"log": "No log file found."}
+    except Exception as e:
+        return {"error": str(e)}
+
 @app.get("/admin123")
 def read_admin():
     admin_path = os.path.join(STATIC_DIR, "admin123.html")
