@@ -1194,6 +1194,73 @@ def toggle_company(payload: dict):
     supabase_req("POST", f"companies?id=eq.{company_id}", json_data=update_payload)
     return {"status": "success", "message": f"Kompaniya holati {status} ga o'zgartirildi."}
 
+@app.get("/api/companies/{company_id}/details")
+def get_company_details(company_id: str):
+    company_id = "".join(c for c in company_id if c.isalnum()).lower()
+    try:
+        # 1. Fetch company info
+        comp_list = supabase_req("GET", f"companies?id=eq.{company_id}")
+        if not comp_list:
+            raise HTTPException(status_code=404, detail="Kompaniya topilmadi.")
+        company = comp_list[0]
+        
+        # 2. Fetch admin employee info
+        emps = supabase_req("GET", f"employees?company_id=eq.{company_id}&role=eq.admin")
+        admin = emps[0] if emps else None
+        
+        # 3. Fetch settings
+        settings = get_company_settings(company_id)
+        
+        # 4. Fetch counts
+        def get_count(table):
+            try:
+                res = supabase_req("GET", f"{table}?company_id=eq.{company_id}&select=id")
+                return len(res) if isinstance(res, list) else 0
+            except Exception:
+                return 0
+                
+        cust_count = get_count("customers")
+        prod_count = get_count("inventory")
+        emp_count = get_count("employees")
+        trans_count = get_count("transactions")
+        call_count = get_count("calls")
+        msg_count = get_count("messages")
+        
+        # For receipts, filter out settings
+        receipts = []
+        try:
+            res = supabase_req("GET", f"receipts?company_id=eq.{company_id}&id=not.like.settings_*&select=total_amount")
+            if isinstance(res, list):
+                receipts = res
+        except Exception:
+            pass
+            
+        receipt_count = len(receipts)
+        total_sales = sum(float(r.get("total_amount") or 0) for r in receipts)
+        
+        return {
+            "company": company,
+            "admin": {
+                "name": admin.get("name") if admin else "Noma'lum",
+                "login": admin.get("login") if admin else "Noma'lum",
+                "password": admin.get("password") if admin else "Noma'lum"
+            } if admin else None,
+            "stats": {
+                "customers": cust_count,
+                "products": prod_count,
+                "employees": emp_count,
+                "transactions": trans_count,
+                "calls": call_count,
+                "messages": msg_count,
+                "receipts": receipt_count,
+                "total_sales": total_sales
+            },
+            "settings": settings
+        }
+    except Exception as e:
+        print(f"Error fetching company details: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/api/settings")
 def get_settings(request: Request):
     company_id = get_company_id(request)

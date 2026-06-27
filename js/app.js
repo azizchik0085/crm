@@ -1388,6 +1388,8 @@ window.SuperAdmin = {
                     ? '<span class="badge" style="background: rgba(16, 185, 129, 0.1); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.2); padding: 4px 8px; border-radius: 4px; font-size: 12px; display: inline-flex; align-items: center; gap: 4px;"><i class="fas fa-check-circle"></i> Faol</span>'
                     : '<span class="badge" style="background: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.2); padding: 4px 8px; border-radius: 4px; font-size: 12px; display: inline-flex; align-items: center; gap: 4px;"><i class="fas fa-times-circle"></i> O\'chirilgan</span>';
 
+                const viewBtn = `<button class="btn btn-secondary btn-sm" onclick="SuperAdmin.viewCompany('${company.id}')" style="margin-right: 8px; font-size: 12px; padding: 4px 8px; border-radius: 6px; cursor: pointer; border-color: rgba(255,255,255,0.15);"><i class="fas fa-eye"></i> Ko'rish</button>`;
+
                 const toggleBtn = isActive
                     ? `<button class="btn btn-secondary btn-sm" onclick="SuperAdmin.toggleStatus('${company.id}', 'disabled')" style="border-color: var(--danger); color: var(--danger); font-size: 12px; padding: 4px 8px; border-radius: 6px; cursor: pointer;"><i class="fas fa-ban"></i> O'chirish</button>`
                     : `<button class="btn btn-primary btn-sm" onclick="SuperAdmin.toggleStatus('${company.id}', 'active')" style="font-size: 12px; padding: 4px 8px; border-radius: 6px; cursor: pointer;"><i class="fas fa-check"></i> Faollashtirish</button>`;
@@ -1397,7 +1399,7 @@ window.SuperAdmin = {
                     <td>${company.name}</td>
                     <td>${createdDate}</td>
                     <td>${statusBadge}</td>
-                    <td style="text-align: right;">${toggleBtn}</td>
+                    <td style="text-align: right;">${viewBtn}${toggleBtn}</td>
                 `;
                 tbody.appendChild(tr);
             });
@@ -1476,6 +1478,87 @@ window.SuperAdmin = {
                 errorMsg.textContent = err.message;
                 errorMsg.style.display = 'block';
             }
+        }
+    },
+
+    activeCompanyPassword: '',
+    isPasswordVisible: false,
+
+    viewCompany: async function(companyId) {
+        this.isPasswordVisible = false;
+        const pwLabel = document.getElementById('v-admin-password');
+        if (pwLabel) pwLabel.textContent = '••••••';
+        const pwBtn = document.getElementById('toggle-admin-pw-btn');
+        if (pwBtn) pwBtn.innerHTML = '<i class="fas fa-eye"></i>';
+
+        try {
+            const response = await fetch(`/api/companies/${companyId}/details`);
+            if (!response.ok) throw new Error("Kompaniya tafsilotlarini yuklashda xatolik.");
+            
+            const data = await response.json();
+            
+            // 1. Fill basic info
+            document.getElementById('view-company-modal-title').textContent = `${data.company.name} - Tafsilotlar`;
+            document.getElementById('v-comp-id').textContent = data.company.id;
+            document.getElementById('v-comp-name').textContent = data.company.name;
+            document.getElementById('v-comp-created').textContent = data.company.created_at ? new Date(data.company.created_at).toLocaleString('uz-UZ') : 'Noma\'lum';
+            
+            const isActive = data.company.status === 'active';
+            const statusEl = document.getElementById('v-comp-status');
+            if (statusEl) {
+                statusEl.innerHTML = isActive 
+                    ? '<span class="badge" style="background: rgba(16, 185, 129, 0.1); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.2); padding: 2px 6px; border-radius: 4px; font-size: 11px;"><i class="fas fa-check-circle"></i> Faol</span>'
+                    : '<span class="badge" style="background: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.2); padding: 2px 6px; border-radius: 4px; font-size: 11px;"><i class="fas fa-times-circle"></i> O\'chirilgan</span>';
+            }
+            
+            // 2. Fill Admin info
+            if (data.admin) {
+                document.getElementById('v-admin-name').textContent = data.admin.name;
+                document.getElementById('v-admin-login').textContent = data.admin.login;
+                this.activeCompanyPassword = data.admin.password;
+            } else {
+                document.getElementById('v-admin-name').textContent = 'Noma\'lum';
+                document.getElementById('v-admin-login').textContent = 'Noma\'lum';
+                this.activeCompanyPassword = '';
+            }
+            
+            // 3. Fill stats
+            document.getElementById('s-cust-count').textContent = data.stats.customers;
+            document.getElementById('s-prod-count').textContent = data.stats.products;
+            document.getElementById('s-emp-count').textContent = data.stats.employees;
+            document.getElementById('s-receipt-count').textContent = data.stats.receipts;
+            document.getElementById('s-call-count').textContent = data.stats.calls;
+            document.getElementById('s-trans-count').textContent = data.stats.transactions;
+            
+            const totalSalesFormatted = new Intl.NumberFormat('uz-UZ', { style: 'decimal' }).format(data.stats.total_sales) + " so'm";
+            document.getElementById('s-total-sales').textContent = totalSalesFormatted;
+            
+            // 4. Fill settings
+            document.getElementById('v-settings-tg').textContent = data.settings.telegram_token || '-';
+            document.getElementById('v-settings-ig').textContent = data.settings.instagram_username || '-';
+            document.getElementById('v-settings-ai-prov').textContent = data.settings.ai_provider || 'local';
+            document.getElementById('v-settings-ai-auto').textContent = data.settings.ai_auto_reply ? 'Yoqilgan' : 'O\'chirilgan';
+            document.getElementById('v-settings-regos-url').textContent = data.settings.regos_endpoint || '-';
+            document.getElementById('v-settings-amo-sub').textContent = data.settings.amocrm_subdomain || '-';
+            
+            showModal('superadmin-view-company-modal');
+        } catch (err) {
+            alert("Xatolik: " + err.message);
+        }
+    },
+
+    togglePasswordVisibility: function() {
+        const pwLabel = document.getElementById('v-admin-password');
+        const pwBtn = document.getElementById('toggle-admin-pw-btn');
+        if (!pwLabel) return;
+        
+        this.isPasswordVisible = !this.isPasswordVisible;
+        if (this.isPasswordVisible) {
+            pwLabel.textContent = this.activeCompanyPassword || 'Parol yo\'q';
+            if (pwBtn) pwBtn.innerHTML = '<i class="fas fa-eye-slash"></i>';
+        } else {
+            pwLabel.textContent = '••••••';
+            if (pwBtn) pwBtn.innerHTML = '<i class="fas fa-eye"></i>';
         }
     }
 };

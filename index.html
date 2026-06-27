@@ -965,6 +965,97 @@
         </div>
     </div>
 
+    <!-- Super Admin Kompaniya tafsilotlarini ko'rish modal oynasi -->
+    <div class="modal" id="superadmin-view-company-modal">
+        <div class="modal-content" style="max-width: 800px; width: 90%;">
+            <div class="modal-header">
+                <h3 id="view-company-modal-title">Kompaniya Tafsilotlari</h3>
+                <button class="close-modal-btn" onclick="closeModal('superadmin-view-company-modal')">&times;</button>
+            </div>
+            <div class="modal-body" style="max-height: 70vh; overflow-y: auto; padding-right: 8px; color: var(--text-main);">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; margin-bottom: 20px;">
+                    
+                    <!-- 1. Basic info card -->
+                    <div class="card" style="margin: 0; background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); padding: 20px;">
+                        <h4 style="margin: 0 0 12px 0; color: #818cf8; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;"><i class="fas fa-info-circle"></i> Asosiy Ma'lumotlar</h4>
+                        <div style="display: flex; flex-direction: column; gap: 8px; font-size: 13px;">
+                            <div style="display: flex; justify-content: space-between;"><span style="color: var(--text-muted);">Kompaniya Kodi:</span><strong id="v-comp-id" style="font-family: 'JetBrains Mono';"></strong></div>
+                            <div style="display: flex; justify-content: space-between;"><span style="color: var(--text-muted);">Kompaniya Nomi:</span><strong id="v-comp-name"></strong></div>
+                            <div style="display: flex; justify-content: space-between;"><span style="color: var(--text-muted);">Yaratilgan Sana:</span><strong id="v-comp-created"></strong></div>
+                            <div style="display: flex; justify-content: space-between; align-items: center;"><span style="color: var(--text-muted);">Holati:</span><span id="v-comp-status"></span></div>
+                        </div>
+                    </div>
+                    
+                    <!-- 2. Admin account card -->
+                    <div class="card" style="margin: 0; background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); padding: 20px;">
+                        <h4 style="margin: 0 0 12px 0; color: #818cf8; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;"><i class="fas fa-user-shield"></i> Kompaniya Admini</h4>
+                        <div style="display: flex; flex-direction: column; gap: 8px; font-size: 13px;" id="v-admin-container">
+                            <div style="display: flex; justify-content: space-between;"><span style="color: var(--text-muted);">Admin Ismi:</span><strong id="v-admin-name"></strong></div>
+                            <div style="display: flex; justify-content: space-between;"><span style="color: var(--text-muted);">Admin Logini:</span><strong id="v-admin-login" style="font-family: 'JetBrains Mono';"></strong></div>
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <span style="color: var(--text-muted);">Admin Paroli:</span>
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <strong id="v-admin-password" style="font-family: 'JetBrains Mono';">••••••</strong>
+                                    <button class="btn btn-secondary btn-sm" id="toggle-admin-pw-btn" onclick="SuperAdmin.togglePasswordVisibility()" style="padding: 2px 6px; font-size: 10px; height: auto; border-color: rgba(255,255,255,0.15);"><i class="fas fa-eye"></i></button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 3. Statistics Grid -->
+                <div class="card" style="margin: 0 0 20px 0; background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); padding: 20px;">
+                    <h4 style="margin: 0 0 12px 0; color: #818cf8; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;"><i class="fas fa-chart-bar"></i> Faollik Statistikasi</h4>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px;">
+                        <div style="background: rgba(255,255,255,0.01); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; text-align: center;">
+                            <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">Mijozlar</div>
+                            <strong id="s-cust-count" style="font-size: 18px; color: var(--text-main);">0</strong>
+                        </div>
+                        <div style="background: rgba(255,255,255,0.01); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; text-align: center;">
+                            <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">Mahsulotlar</div>
+                            <strong id="s-prod-count" style="font-size: 18px; color: var(--text-main);">0</strong>
+                        </div>
+                        <div style="background: rgba(255,255,255,0.01); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; text-align: center;">
+                            <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">Xodimlar</div>
+                            <strong id="s-emp-count" style="font-size: 18px; color: var(--text-main);">0</strong>
+                        </div>
+                        <div style="background: rgba(255,255,255,0.01); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; text-align: center;">
+                            <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">Cheklar (Sotuvlar)</div>
+                            <strong id="s-receipt-count" style="font-size: 18px; color: var(--text-main);">0</strong>
+                        </div>
+                        <div style="background: rgba(99, 102, 241, 0.05); border: 1px solid rgba(99, 102, 241, 0.2); border-radius: 8px; padding: 12px; text-align: center; grid-column: span 2;">
+                            <div style="font-size: 11px; color: #a5b4fc; margin-bottom: 4px;">Umumiy Sotuv Summasi</div>
+                            <strong id="s-total-sales" style="font-size: 18px; color: #818cf8;">0 so'm</strong>
+                        </div>
+                        <div style="background: rgba(255,255,255,0.01); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; text-align: center;">
+                            <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">Qo'ng'iroqlar</div>
+                            <strong id="s-call-count" style="font-size: 18px; color: var(--text-main);">0</strong>
+                        </div>
+                        <div style="background: rgba(255,255,255,0.01); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; text-align: center;">
+                            <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">Tranzaksiyalar</div>
+                            <strong id="s-trans-count" style="font-size: 18px; color: var(--text-main);">0</strong>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 4. Settings Card -->
+                <div class="card" style="margin: 0; background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); padding: 20px;">
+                    <h4 style="margin: 0 0 12px 0; color: #818cf8; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;"><i class="fas fa-cogs"></i> Integratsiya va API Sozlamalari</h4>
+                    <div style="display: flex; flex-direction: column; gap: 8px; font-size: 13px;">
+                        <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.02); padding-bottom: 6px;"><span style="color: var(--text-muted);">Telegram Bot Token:</span><span id="v-settings-tg" style="font-family: 'JetBrains Mono'; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 350px;">-</span></div>
+                        <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.02); padding-bottom: 6px;"><span style="color: var(--text-muted);">Instagram Username:</span><span id="v-settings-ig" style="font-weight: 600;">-</span></div>
+                        <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.02); padding-bottom: 6px;"><span style="color: var(--text-muted);">AI Provayder / Auto Reply:</span><span><span id="v-settings-ai-prov">-</span> / <span id="v-settings-ai-auto">-</span></span></div>
+                        <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.02); padding-bottom: 6px;"><span style="color: var(--text-muted);">REGOS Endpoint:</span><span id="v-settings-regos-url" style="font-family: 'JetBrains Mono'; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 350px;">-</span></div>
+                        <div style="display: flex; justify-content: space-between; padding-bottom: 2px;"><span style="color: var(--text-muted);">amoCRM Subdomain:</span><span id="v-settings-amo-sub" style="font-family: 'JetBrains Mono';">-</span></div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 12px; border-top: 1px solid var(--border-color); padding-top: 15px; margin-top: 15px;">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('superadmin-view-company-modal')">Yopish</button>
+            </div>
+        </div>
+    </div>
+
     <!-- 1. CRM Yangi mijoz qo'shish modal oynasi -->
     <div class="modal" id="crm-modal">
         <div class="modal-content">
