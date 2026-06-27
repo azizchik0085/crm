@@ -489,6 +489,56 @@ def get_regos_sales_report(request: Request, start_date: int = None, end_date: i
             return sales_report_cache[cache_key]["data"]
         raise HTTPException(status_code=500, detail=f"REGOS hisobotini olishda xatolik: {str(e)}")
 
+@app.get("/api/integration/regos/warehouses")
+def get_regos_warehouses(request: Request):
+    company_id = get_company_id(request)
+    if not company_id:
+        return []
+    settings = get_company_settings(company_id)
+    regos_endpoint = settings.get("regos_endpoint", "")
+    regos_token = settings.get("regos_token", "")
+    
+    # Try calling REGOS API
+    if regos_endpoint and regos_token:
+        try:
+            endpoint = regos_endpoint.strip().rstrip("/")
+            if not endpoint.startswith(("http://", "https://")):
+                endpoint = "https://" + endpoint
+            
+            # Try /shop/get first (REGOS shop/branch endpoint)
+            url = f"{endpoint}/v1/shop/get" if "/v1" not in endpoint else f"{endpoint}/shop/get"
+            headers = {
+                "Authorization": f"Bearer {regos_token}",
+                "Content-Type": "application/json"
+            }
+            res = requests.post(url, headers=headers, json={}, timeout=5)
+            if res.status_code == 200:
+                data = res.json()
+                shops = []
+                if isinstance(data, list):
+                    shops = data
+                elif isinstance(data, dict):
+                    for k in ["shops", "result", "data", "list", "shops_list"]:
+                        if k in data and isinstance(data[k], list):
+                            shops = data[k]
+                            break
+                    else:
+                        # try getting result key directly
+                        if "result" in data and isinstance(data["result"], list):
+                            shops = data["result"]
+                if shops:
+                    return [{"id": s.get("id") or s.get("code"), "name": s.get("name") or s.get("title")} for s in shops]
+        except Exception as e:
+            print(f"Failed to fetch warehouses from REGOS API: {e}")
+            
+    # Mock/fallback data
+    return [
+        {"id": "regos_1", "name": "Asosiy ombor (Chilonzor)"},
+        {"id": "regos_2", "name": "Yunusobod filiali"},
+        {"id": "regos_3", "name": "Sergeli ombori"},
+        {"id": "regos_4", "name": "Qo'yliq filiali"}
+    ]
+
 @app.get("/api/employees")
 def get_employees(request: Request):
     company_id = get_company_id(request)

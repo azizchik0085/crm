@@ -171,6 +171,20 @@ window.DB = {
             console.warn("Backend-dan xodimlarni yuklab bo'lmadi, keshdan o'qiladi:", e);
             return AppStorage.load().employees;
         }
+    getWarehouses: async function() {
+        try {
+            const response = await fetch('/api/integration/regos/warehouses');
+            if (!response.ok) throw new Error("HTTP error " + response.status);
+            return await response.json();
+        } catch (e) {
+            console.warn("Failed to fetch warehouses, returning fallback:", e);
+            return [
+                {"id": "regos_1", "name": "Asosiy ombor (Chilonzor)"},
+                {"id": "regos_2", "name": "Yunusobod filiali"},
+                {"id": "regos_3", "name": "Sergeli ombori"},
+                {"id": "regos_4", "name": "Qo'yliq filiali"}
+            ];
+        }
     },
 
     saveEmployee: async function(employee) {

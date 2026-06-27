@@ -451,29 +451,53 @@ window.ERP = {
 };
 
 window.HR = {
-    init: function() {
+    warehouses: [],
+
+    init: async function() {
         this.setupEventListeners();
+        try {
+            this.warehouses = await DB.getWarehouses();
+            this.populateWarehouseSelects();
+        } catch(e) {
+            console.error("Failed to load warehouses:", e);
+        }
         this.updateRoleSelects();
         this.render();
     },
 
+    populateWarehouseSelects: function() {
+        const addSelect = document.getElementById('emp-warehouse');
+        const editSelect = document.getElementById('edit-emp-warehouse');
+        
+        let optionsHtml = '<option value="">Filialga biriktirilmagan</option>';
+        this.warehouses.forEach(w => {
+            optionsHtml += `<option value="${w.id}">${w.name}</option>`;
+        });
+        
+        if (addSelect) addSelect.innerHTML = optionsHtml;
+        if (editSelect) editSelect.innerHTML = optionsHtml;
+    },
+
     parseRoleAndPlan: function(roleStr) {
-        if (!roleStr) return { role: '', plan: 0 };
+        if (!roleStr) return { role: '', plan: 0, warehouse: '' };
         const parts = roleStr.split(';');
         const roleName = parts[0].trim();
         let plan = 0;
+        let warehouse = '';
         for (let i = 1; i < parts.length; i++) {
             const p = parts[i].trim();
             if (p.startsWith('plan=')) {
                 plan = parseFloat(p.substring(5)) || 0;
+            } else if (p.startsWith('warehouse=')) {
+                warehouse = p.substring(10) || '';
             }
         }
-        return { role: roleName, plan: plan };
+        return { role: roleName, plan: plan, warehouse: warehouse };
     },
 
-    serializeRoleAndPlan: function(roleName, plan) {
+    serializeRoleAndPlan: function(roleName, plan, warehouse) {
         const cleanRole = (roleName || '').replace(/;/g, ' ').trim();
-        return `${cleanRole};plan=${plan || 0}`;
+        return `${cleanRole};plan=${plan || 0};warehouse=${warehouse || ''}`;
     },
 
     syncWithRegos: async function() {
@@ -724,6 +748,17 @@ window.HR = {
                         </div>
 
                         <div class="employee-stats" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border-color);">
+                            <div style="grid-column: span 2; border-bottom: 1px dashed var(--border-color); padding-bottom: 8px; margin-bottom: 4px;">
+                                <span style="display:block; font-size:11px; color: var(--text-muted)">Mas'ul filial / ombor</span>
+                                <strong style="color: var(--accent);"><i class="fas fa-store" style="margin-right: 4px;"></i> ${(() => {
+                                    const warehouseId = parsed.warehouse;
+                                    if (warehouseId) {
+                                        const foundW = this.warehouses.find(w => String(w.id) === String(warehouseId));
+                                        if (foundW) return foundW.name;
+                                    }
+                                    return '<span style="color:var(--text-muted); font-weight:normal; font-style:italic;">Biriktirilmagan</span>';
+                                })()}</strong>
+                            </div>
                             <div>
                                 <span style="display:block; font-size:11px; color: var(--text-muted)">Maosh</span>
                                 <strong style="color: var(--text-main)">${formatMoney(e.salary, currency)}</strong>
@@ -779,13 +814,14 @@ window.HR = {
         const kpi = parseInt(document.getElementById('emp-kpi').value) || 0;
         const loginVal = document.getElementById('emp-login').value.trim();
         const passwordVal = document.getElementById('emp-password').value.trim();
+        const warehouseVal = document.getElementById('emp-warehouse')?.value || '';
 
         if (!name || !roleVal || salary <= 0) {
             alert('Iltimos, ism, lavozim va maoshni to\'liq kiriting!');
             return;
         }
 
-        const serializedRole = this.serializeRoleAndPlan(roleVal, plan);
+        const serializedRole = this.serializeRoleAndPlan(roleVal, plan, warehouseVal);
 
         const newEmployee = {
             id: 'e_' + Date.now(),
@@ -858,6 +894,11 @@ window.HR = {
             document.getElementById('edit-emp-kpi').value = e.kpi;
             document.getElementById('edit-emp-login').value = e.login || '';
             document.getElementById('edit-emp-password').value = e.password || '';
+            
+            const editEmpWarehouseSelect = document.getElementById('edit-emp-warehouse');
+            if (editEmpWarehouseSelect) {
+                editEmpWarehouseSelect.value = parsed.warehouse || '';
+            }
 
             showModal('edit-employee-modal');
         } catch (err) {
@@ -875,13 +916,14 @@ window.HR = {
         const kpi = parseInt(document.getElementById('edit-emp-kpi').value) || 0;
         const loginVal = document.getElementById('edit-emp-login').value.trim();
         const passwordVal = document.getElementById('edit-emp-password').value.trim();
+        const warehouseVal = document.getElementById('edit-emp-warehouse')?.value || '';
 
         if (!name || !roleVal || salary <= 0) {
             alert('Iltimos, ism, lavozim va maoshni to\'liq kiriting!');
             return;
         }
 
-        const serializedRole = this.serializeRoleAndPlan(roleVal, plan);
+        const serializedRole = this.serializeRoleAndPlan(roleVal, plan, warehouseVal);
 
         const updatedEmployee = {
             id,
