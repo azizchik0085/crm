@@ -2373,9 +2373,6 @@ def simulate_instagram_message(payload: dict):
 def sync_regos_inventory(request: Request):
     company_id = get_company_id(request)
     
-    with open("backend/sync_debug.log", "a", encoding="utf-8") as f:
-        f.write(f"REGOS Sync request. CompanyID: {company_id}, Headers: {dict(request.headers)}\n")
-        
     if not company_id:
         raise HTTPException(status_code=400, detail="Kompaniya kodi aniqlanmadi.")
     return sync_regos_inventory_helper(company_id)
@@ -3643,10 +3640,6 @@ def sync_amocrm_leads(background_tasks: BackgroundTasks, request: Request):
     settings = get_company_settings(company_id, bypass_cache=True) if company_id else settings_state
     subdomain = settings.get("amocrm_subdomain", "")
     token = settings.get("amocrm_token", "")
-    
-    with open("backend/sync_debug.log", "a", encoding="utf-8") as f:
-        f.write(f"amoCRM Sync request. CompanyID: {company_id}, Subdomain: {subdomain}, HasToken: {bool(token)}, Headers: {dict(request.headers)}\n")
-        
     if not subdomain or not token:
         raise HTTPException(status_code=400, detail="amoCRM sozlanmagan. Iltimos, sozlamalar sahifasida Subdomain va Tokenni saqlang.")
         
@@ -3718,18 +3711,6 @@ async def amocrm_webhook(request: Request):
 STATIC_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
 from fastapi.responses import FileResponse
-
-@app.get("/api/debug-sync-log")
-def read_debug_sync_log():
-    try:
-        log_path = os.path.join(os.path.dirname(__file__), "sync_debug.log")
-        if os.path.exists(log_path):
-            with open(log_path, "r", encoding="utf-8") as f:
-                lines = f.readlines()
-                return {"log": lines[-50:]}
-        return {"log": "No log file found."}
-    except Exception as e:
-        return {"error": str(e)}
 
 @app.get("/admin123")
 def read_admin():
