@@ -6,9 +6,23 @@
     window.fetch = function(url, options) {
         options = options || {};
         options.headers = options.headers || {};
-        const companyId = localStorage.getItem('activeCompanyId');
-        if (companyId && !options.headers['X-Company-ID']) {
+        let companyId = localStorage.getItem('activeCompanyId');
+        
+        if (!companyId) {
+            const urlParams = new URLSearchParams(window.location.search);
+            companyId = urlParams.get('company_id');
+        }
+        
+        if (companyId) {
             options.headers['X-Company-ID'] = companyId;
+            options.headers['x-company-id'] = companyId;
+            
+            if (typeof url === 'string' && url.startsWith('/api/')) {
+                const separator = url.includes('?') ? '&' : '?';
+                if (!url.includes('company_id=')) {
+                    url = url + separator + 'company_id=' + encodeURIComponent(companyId);
+                }
+            }
         }
         return originalFetch(url, options);
     };

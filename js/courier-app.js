@@ -20,8 +20,16 @@
                 } catch(e){}
             }
         }
-        if (companyId && !options.headers['X-Company-ID']) {
+        if (companyId) {
             options.headers['X-Company-ID'] = companyId;
+            options.headers['x-company-id'] = companyId;
+            
+            if (typeof url === 'string' && url.startsWith('/api/')) {
+                const separator = url.includes('?') ? '&' : '?';
+                if (!url.includes('company_id=')) {
+                    url = url + separator + 'company_id=' + encodeURIComponent(companyId);
+                }
+            }
         }
         return originalFetch(url, options);
     };

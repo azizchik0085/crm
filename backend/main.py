@@ -58,6 +58,17 @@ def get_company_id(request: Request = None, company_id: str = None):
         cid = request.headers.get("x-company-id") or request.query_params.get("company_id")
         if cid:
             return cid
+        referer = request.headers.get("referer", "")
+        if "company_id=" in referer:
+            try:
+                cid = referer.split("company_id=")[1].split("&")[0]
+                if cid:
+                    return cid
+            except Exception:
+                pass
+    cid = active_company_id.get()
+    if cid:
+        return cid
     return None
 
 # Helper to proxy requests to Supabase REST API
