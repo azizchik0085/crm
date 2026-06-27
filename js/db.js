@@ -202,6 +202,7 @@ window.DB = {
             console.warn("Backend-dan xodimlarni yuklab bo'lmadi, keshdan o'qiladi:", e);
             return AppStorage.load().employees;
         }
+    },
     getWarehouses: async function() {
         try {
             const response = await fetch('/api/integration/regos/warehouses');
