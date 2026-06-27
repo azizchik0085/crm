@@ -1014,7 +1014,7 @@ SETTINGS_FILE = os.path.join(os.path.dirname(__file__), "settings.json")
 
 _settings_cache = {}
 
-def get_company_settings(company_id: str, use_central: bool = False):
+def get_company_settings(company_id: str, use_central: bool = False, bypass_cache: bool = False):
     if not company_id:
         return {
             "telegram_token": "", "instagram_token": "", "ai_provider": "local",
@@ -1028,7 +1028,7 @@ def get_company_settings(company_id: str, use_central: bool = False):
             "enable_kassa": True,
             "amocrm_operators_map": {}
         }
-    if company_id in _settings_cache and not use_central:
+    if company_id in _settings_cache and not use_central and not bypass_cache:
         return _settings_cache[company_id]
         
     default_keys = {
@@ -2381,7 +2381,7 @@ def sync_regos_inventory(request: Request):
     return sync_regos_inventory_helper(company_id)
 
 def sync_regos_inventory_helper(company_id: str = None):
-    settings = get_company_settings(company_id) if company_id else settings_state
+    settings = get_company_settings(company_id, bypass_cache=True) if company_id else settings_state
     regos_endpoint = settings.get("regos_endpoint", "")
     regos_token = settings.get("regos_token", "")
     
@@ -3640,7 +3640,7 @@ def run_amocrm_sync_background(subdomain, token, company_id: str = None):
 @app.post("/api/integration/amocrm/sync")
 def sync_amocrm_leads(background_tasks: BackgroundTasks, request: Request):
     company_id = get_company_id(request)
-    settings = get_company_settings(company_id) if company_id else settings_state
+    settings = get_company_settings(company_id, bypass_cache=True) if company_id else settings_state
     subdomain = settings.get("amocrm_subdomain", "")
     token = settings.get("amocrm_token", "")
     
