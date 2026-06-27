@@ -584,12 +584,29 @@ def get_regos_warehouses(request: Request):
             if not endpoint.startswith(("http://", "https://")):
                 endpoint = "https://" + endpoint
             
-            # Try /shop/get first (REGOS shop/branch endpoint)
-            url = f"{endpoint}/v1/shop/get" if "/v1" not in endpoint else f"{endpoint}/shop/get"
             headers = {
                 "Authorization": f"Bearer {regos_token}",
                 "Content-Type": "application/json"
             }
+            
+            # 1. Try Stock/Get (Warehouse/Sklad list)
+            try:
+                url_stock = f"{endpoint}/v1/Stock/Get" if "/v1" not in endpoint else f"{endpoint}/Stock/Get"
+                res = requests.post(url_stock, headers=headers, json={}, timeout=5)
+                if res.status_code == 200:
+                    data = res.json()
+                    stocks = []
+                    if isinstance(data, list):
+                        stocks = data
+                    elif isinstance(data, dict):
+                        stocks = data.get("result") or data.get("data") or data.get("items") or []
+                    if stocks and isinstance(stocks, list):
+                        return [{"id": s.get("id") or s.get("code"), "name": s.get("name") or s.get("title")} for s in stocks if isinstance(s, dict)]
+            except Exception as e_stock:
+                print(f"Failed to fetch from Stock/Get: {e_stock}")
+
+            # 2. Fallback to /shop/get
+            url = f"{endpoint}/v1/shop/get" if "/v1" not in endpoint else f"{endpoint}/shop/get"
             res = requests.post(url, headers=headers, json={}, timeout=5)
             if res.status_code == 200:
                 data = res.json()
@@ -602,13 +619,12 @@ def get_regos_warehouses(request: Request):
                             shops = data[k]
                             break
                     else:
-                        # try getting result key directly
                         if "result" in data and isinstance(data["result"], list):
                             shops = data["result"]
                 if shops:
-                    return [{"id": s.get("id") or s.get("code"), "name": s.get("name") or s.get("title")} for s in shops]
+                    return [{"id": s.get("id") or s.get("code"), "name": s.get("name") or s.get("title")} for s in shops if isinstance(s, dict)]
         except Exception as e:
-            print(f"Failed to fetch warehouses from REGOS API: {e}")
+            print(f"Failed to fetch warehouses/shops from REGOS API: {e}")
             
     # Mock/fallback data
     return [
