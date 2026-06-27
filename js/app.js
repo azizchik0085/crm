@@ -1706,6 +1706,8 @@ window.SuperAdmin = {
             document.getElementById('edit-limits-enable-crm').checked = data.settings.enable_crm !== false;
             document.getElementById('edit-limits-enable-warehouse').checked = data.settings.enable_warehouse !== false;
             document.getElementById('edit-limits-enable-kassa').checked = data.settings.enable_kassa !== false;
+            document.getElementById('edit-limits-sb-url').value = data.settings.supabase_url || data.settings.supabaseUrl || '';
+            document.getElementById('edit-limits-sb-key').value = data.settings.supabase_key || data.settings.supabaseKey || '';
             
             showModal('superadmin-view-company-modal');
         } catch (err) {
@@ -1720,6 +1722,8 @@ window.SuperAdmin = {
         const enableCrm = document.getElementById('edit-limits-enable-crm').checked;
         const enableWarehouse = document.getElementById('edit-limits-enable-warehouse').checked;
         const enableKassa = document.getElementById('edit-limits-enable-kassa').checked;
+        const sbUrl = document.getElementById('edit-limits-sb-url').value.trim();
+        const sbKey = document.getElementById('edit-limits-sb-key').value.trim();
         
         try {
             const response = await fetch(`/api/companies/${companyId}/settings`, {
@@ -1731,7 +1735,9 @@ window.SuperAdmin = {
                     max_employees: maxEmployees,
                     enable_crm: enableCrm,
                     enable_warehouse: enableWarehouse,
-                    enable_kassa: enableKassa
+                    enable_kassa: enableKassa,
+                    supabase_url: sbUrl,
+                    supabase_key: sbKey
                 })
             });
             

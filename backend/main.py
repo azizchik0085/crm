@@ -1441,6 +1441,8 @@ def update_company_admin_settings(company_id: str, payload: dict):
     company_settings["enable_crm"] = bool(payload.get("enable_crm", True))
     company_settings["enable_warehouse"] = bool(payload.get("enable_warehouse", True))
     company_settings["enable_kassa"] = bool(payload.get("enable_kassa", True))
+    company_settings["supabase_url"] = payload.get("supabase_url", "")
+    company_settings["supabase_key"] = payload.get("supabase_key", "")
     
     save_company_settings(company_id, company_settings)
     return {"status": "success", "settings": company_settings}
