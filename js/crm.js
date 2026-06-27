@@ -108,13 +108,29 @@ window.CRM = {
         
         // Xodimlar ro'yxatini olib, ID-larni ismlarga o'giramiz
         let employeeIdToName = {};
+        const activeUserId = localStorage.getItem('activeUserId') || 'admin';
+        let loggedInEmployeeName = '';
+        
         try {
             const employeesList = await DB.getEmployees();
             employeesList.forEach(e => {
                 employeeIdToName[e.id] = e.name;
+                if (e.id === activeUserId) {
+                    loggedInEmployeeName = e.name;
+                }
             });
         } catch (e) {
             console.error("Failed to load employees for operator mapping:", e);
+        }
+
+        // Display/hide the filter dropdown based on whether user is admin
+        const operatorFilterContainer = document.getElementById('crm-operator-filter-container');
+        if (operatorFilterContainer) {
+            if (activeUserId === 'admin') {
+                operatorFilterContainer.style.setProperty('display', 'block', 'important');
+            } else {
+                operatorFilterContainer.style.setProperty('display', 'none', 'important');
+            }
         }
 
         // Har bir mijoz uchun operatorni biriktirish/tarjima qilish
@@ -151,8 +167,16 @@ window.CRM = {
         const searchValNorm = window.normalizeUzbek ? window.normalizeUzbek(searchVal) : searchVal.toLowerCase();
         const filteredCustomers = customers.filter(c => {
             // Operator bo'yicha filter
-            if (selectedOperator && c.displayOperator !== selectedOperator) {
-                return false;
+            if (activeUserId !== 'admin') {
+                // Xodim faqat o'ziga biriktirilgan sdelkalarni ko'radi
+                if (loggedInEmployeeName && c.displayOperator !== loggedInEmployeeName) {
+                    return false;
+                }
+            } else {
+                // Admin tanlangan operator bo'yicha filtrlaydi
+                if (selectedOperator && c.displayOperator !== selectedOperator) {
+                    return false;
+                }
             }
             
             const nameNorm = window.normalizeUzbek ? window.normalizeUzbek(c.name) : c.name.toLowerCase();
