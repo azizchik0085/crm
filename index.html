@@ -813,6 +813,19 @@
                             <input type="text" id="settings-amocrm-webhook" class="form-control" readonly style="font-family: 'JetBrains Mono'; font-size: 12px; background: rgba(0,0,0,0.1); cursor: text;">
                             <small style="color: var(--text-muted); font-size: 11px;">Mijoz/Sotuv holatlari o'zgarganda real vaqtda yangilanishi uchun ushbu manzilni amoCRM Webhook sozlamalarida sozlang.</small>
                         </div>
+                        
+                        <!-- amoCRM Operators Mapping -->
+                        <div id="amocrm-operators-mapping-container" style="display: none; margin-top: 20px; border: 1px solid var(--border-color); border-radius: 8px; padding: 15px; background: rgba(255,255,255,0.01); width: 100%; box-sizing: border-box;">
+                            <h5 style="margin: 0 0 10px 0; font-size: 13px; font-weight: 600; color: var(--text-main); display: flex; align-items: center; gap: 6px;">
+                                <i class="fas fa-users" style="color: var(--accent);"></i> amoCRM Operatorlarini Tizim Xodimlariga Biriktirish
+                            </h5>
+                            <p style="font-size: 11px; color: var(--text-muted); margin: 0 0 12px 0;">
+                                amoCRM'dan kelgan har bir operator uchun tizimdagi mos xodimni tanlang. Bitimlar ushbu xodimga biriktiriladi.
+                            </p>
+                            <div id="amocrm-operators-mapping-list" style="display: flex; flex-direction: column; gap: 8px;">
+                                <!-- Dinamik ravishda to'ldiriladi -->
+                            </div>
+                        </div>
                         <div style="margin-top: 24px; display:flex; gap:16px;">
                             <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Sozlamalarni saqlash</button>
                             <button type="button" id="settings-reset-data" class="btn btn-secondary" style="border-color:var(--danger); color:var(--danger);"><i class="fas fa-trash-restore"></i> Tizimni tozalash</button>

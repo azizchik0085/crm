@@ -103,9 +103,33 @@ window.CRM = {
 
         // Supabase yoki keshdan mijozlarni olamiz
         const customers = await DB.getCustomers();
+        const settings = AppStorage.load().settings || {};
+        const amocrmMap = settings.amocrmOperatorsMap || {};
+        
+        // Xodimlar ro'yxatini olib, ID-larni ismlarga o'giramiz
+        let employeeIdToName = {};
+        try {
+            const employeesList = await DB.getEmployees();
+            employeesList.forEach(e => {
+                employeeIdToName[e.id] = e.name;
+            });
+        } catch (e) {
+            console.error("Failed to load employees for operator mapping:", e);
+        }
+
+        // Har bir mijoz uchun operatorni biriktirish/tarjima qilish
+        customers.forEach(c => {
+            c.displayOperator = c.operator || '';
+            if (c.operator && amocrmMap[c.operator]) {
+                const mappedEmpId = amocrmMap[c.operator];
+                if (employeeIdToName[mappedEmpId]) {
+                    c.displayOperator = employeeIdToName[mappedEmpId];
+                }
+            }
+        });
         
         // Operatorlar ro'yxatini shakllantirish va dropdownni to'ldirish
-        const operators = [...new Set(customers.map(c => c.operator).filter(Boolean))].sort();
+        const operators = [...new Set(customers.map(c => c.displayOperator).filter(Boolean))].sort();
         const operatorFilterSelect = document.getElementById('crm-operator-filter');
         if (operatorFilterSelect) {
             const currentSelected = operatorFilterSelect.value;
@@ -127,12 +151,12 @@ window.CRM = {
         const searchValNorm = window.normalizeUzbek ? window.normalizeUzbek(searchVal) : searchVal.toLowerCase();
         const filteredCustomers = customers.filter(c => {
             // Operator bo'yicha filter
-            if (selectedOperator && c.operator !== selectedOperator) {
+            if (selectedOperator && c.displayOperator !== selectedOperator) {
                 return false;
             }
             
             const nameNorm = window.normalizeUzbek ? window.normalizeUzbek(c.name) : c.name.toLowerCase();
-            const operatorNorm = c.operator ? (window.normalizeUzbek ? window.normalizeUzbek(c.operator) : c.operator.toLowerCase()) : '';
+            const operatorNorm = c.displayOperator ? (window.normalizeUzbek ? window.normalizeUzbek(c.displayOperator) : c.displayOperator.toLowerCase()) : '';
             return nameNorm.includes(searchValNorm) || 
                    (c.phone && c.phone.includes(searchVal)) ||
                    (c.phone2 && c.phone2.includes(searchVal)) ||
@@ -190,8 +214,8 @@ window.CRM = {
                         sourceBadge = `<span class="badge" style="background:#6B7280; color:#fff; font-size:10px; padding:2px 6px; border-radius:4px; font-weight: 500;"><i class="fas fa-user"></i> Qo'lda</span>`;
                     }
 
-                    let operatorHtml = c.operator 
-                        ? `<span style="font-size:11px; color:var(--text-muted); display:flex; align-items:center; gap:4px;" title="Mas'ul operator"><i class="fas fa-user-tie" style="color:var(--accent);"></i> ${c.operator}</span>` 
+                    let operatorHtml = c.displayOperator 
+                        ? `<span style="font-size:11px; color:var(--text-muted); display:flex; align-items:center; gap:4px;" title="Mas'ul operator"><i class="fas fa-user-tie" style="color:var(--accent);"></i> ${c.displayOperator}</span>` 
                         : `<span style="font-size:11px; color:var(--text-muted); display:flex; align-items:center; gap:4px; opacity:0.6;"><i class="fas fa-user-tie"></i> Biriktirilmagan</span>`;
 
                     html += `
@@ -302,7 +326,7 @@ window.CRM = {
                         <td><strong><a href="javascript:void(0)" onclick="CRM.openCustomerDetails('${c.id}', event)" style="color: var(--accent); font-weight:600; text-decoration:none;">${c.name}</a></strong></td>
                         <td>${phonesHtml}</td>
                         <td>${sourceBadge}</td>
-                        <td>${c.operator ? `<span style="font-weight:500;"><i class="fas fa-user-tie" style="color: var(--accent); margin-right: 4px;"></i> ${c.operator}</span>` : '<span style="color:var(--text-muted); font-style:italic;">-</span>'}</td>
+                        <td>${c.displayOperator ? `<span style="font-weight:500;"><i class="fas fa-user-tie" style="color: var(--accent); margin-right: 4px;"></i> ${c.displayOperator}</span>` : '<span style="color:var(--text-muted); font-style:italic;">-</span>'}</td>
                         <td><span style="color: var(--success); font-weight: 500;">${formatMoney(c.value, currency)}</span></td>
                         <td><span class="badge ${badgeClass}">${statusName}</span></td>
                         <td style="text-align: right; display:flex; justify-content: flex-end; gap:8px;">

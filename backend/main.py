@@ -895,7 +895,8 @@ def get_company_settings(company_id: str):
             "max_employees": 100,
             "enable_crm": True,
             "enable_warehouse": True,
-            "enable_kassa": True
+            "enable_kassa": True,
+            "amocrm_operators_map": {}
         }
     if company_id in _settings_cache:
         return _settings_cache[company_id]
@@ -908,7 +909,8 @@ def get_company_settings(company_id: str):
         "max_employees": 100,
         "enable_crm": True,
         "enable_warehouse": True,
-        "enable_kassa": True
+        "enable_kassa": True,
+        "amocrm_operators_map": {}
     }
     
     # 1. Try loading from Supabase database
@@ -1348,6 +1350,8 @@ def update_settings(settings: dict, request: Request):
     company_settings["amocrm_token"] = settings.get("amocrm_token", "")
     if "roles" in settings:
         company_settings["roles"] = settings.get("roles")
+    if "amocrm_operators_map" in settings:
+        company_settings["amocrm_operators_map"] = settings.get("amocrm_operators_map", {})
     
     save_company_settings(company_id, company_settings)
     print(f"Settings for company {company_id} updated.")

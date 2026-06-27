@@ -64,6 +64,8 @@ window.App = {
                     data.settings.enableWarehouse = backendSettings.enable_warehouse !== undefined ? backendSettings.enable_warehouse : (data.settings.enableWarehouse !== false);
                     data.settings.enableKassa = backendSettings.enable_kassa !== undefined ? backendSettings.enable_kassa : (data.settings.enableKassa !== false);
                     
+                    data.settings.amocrmOperatorsMap = backendSettings.amocrm_operators_map || {};
+                    
                     if (backendSettings.roles && backendSettings.roles.length > 0) {
                         data.settings.roles = backendSettings.roles;
                     }
@@ -217,7 +219,83 @@ window.App = {
             amocrmWebhookInput.value = window.location.origin + '/api/integration/amocrm/webhook' + suffix;
         }
 
+        this.renderAmoCRMOperatorsMapping();
         this.onAIProviderChange();
+    },
+
+    renderAmoCRMOperatorsMapping: async function() {
+        const container = document.getElementById('amocrm-operators-mapping-container');
+        const listContainer = document.getElementById('amocrm-operators-mapping-list');
+        if (!container || !listContainer) return;
+        
+        try {
+            const customers = await DB.getCustomers();
+            const amocrmLeads = customers.filter(c => c.source === 'amocrm');
+            if (amocrmLeads.length === 0) {
+                container.style.display = 'none';
+                return;
+            }
+            
+            // Extract unique operator names from amoCRM leads
+            const amocrmOps = [...new Set(amocrmLeads.map(c => c.operator).filter(Boolean))].sort();
+            if (amocrmOps.length === 0) {
+                container.style.display = 'none';
+                return;
+            }
+            
+            const employees = await DB.getEmployees();
+            const data = AppStorage.load();
+            const currentMap = data.settings.amocrmOperatorsMap || {};
+            
+            listContainer.innerHTML = '';
+            amocrmOps.forEach(op => {
+                const row = document.createElement('div');
+                row.className = 'amocrm-op-row';
+                row.setAttribute('data-amocrm-op', op);
+                row.style.display = 'flex';
+                row.style.alignItems = 'center';
+                row.style.justifyContent = 'space-between';
+                row.style.gap = '10px';
+                row.style.padding = '6px 0';
+                row.style.borderBottom = '1px solid rgba(255,255,255,0.02)';
+                
+                const label = document.createElement('span');
+                label.style.fontSize = '12px';
+                label.style.fontWeight = '500';
+                label.style.color = 'var(--text-main)';
+                label.textContent = op;
+                
+                const select = document.createElement('select');
+                select.className = 'form-control amocrm-employee-select';
+                select.style.width = '180px';
+                select.style.height = '32px';
+                select.style.padding = '2px 6px';
+                select.style.fontSize = '12px';
+                select.style.backgroundColor = 'rgba(255,255,255,0.03)';
+                select.style.border = '1px solid rgba(255,255,255,0.1)';
+                select.style.color = 'var(--text-main)';
+                select.style.borderRadius = '6px';
+                
+                select.innerHTML = '<option value="">Biriktirilmagan (Unmapped)</option>';
+                employees.forEach(emp => {
+                    const opt = document.createElement('option');
+                    opt.value = emp.id;
+                    opt.textContent = emp.name;
+                    if (currentMap[op] === emp.id) {
+                        opt.selected = true;
+                    }
+                    select.appendChild(opt);
+                });
+                
+                row.appendChild(label);
+                row.appendChild(select);
+                listContainer.appendChild(row);
+            });
+            
+            container.style.display = 'block';
+        } catch (e) {
+            console.error("Failed to render amoCRM operators mapping:", e);
+        }
     },
 
     setupAuth: async function() {
@@ -639,6 +717,40 @@ window.App = {
                 data.settings.amocrmSubdomain = amocrmSubdomain;
                 data.settings.amocrmToken = amocrmToken;
                 
+                // Read amoCRM operators mapping from UI
+                const amocrmOperatorsMap = {};
+                document.querySelectorAll('.amocrm-op-row').forEach(row => {
+                    const op = row.getAttribute('data-amocrm-op');
+                    const empId = row.querySelector('.amocrm-employee-select').value;
+                    if (empId) {
+                        amocrmOperatorsMap[op] = empId;
+                    }
+                });
+                
+                data.settings.companyName = name;
+                data.settings.currency = currency;
+                data.settings.supabaseUrl = sbUrl;
+                data.settings.supabaseKey = sbKey;
+                
+                data.settings.sipServer = sipServer;
+                data.settings.sipUser = sipUser;
+                data.settings.sipPassword = sipPassword;
+                data.settings.sipWssGateway = sipWss;
+                data.settings.telegramToken = telegramToken;
+                data.settings.instagramToken = instagramToken;
+                data.settings.instagramUsername = instagramUsername;
+                data.settings.aiProvider = aiProvider;
+                data.settings.telephonyProvider = telephonyProvider;
+                data.settings.geminiApiKey = geminiApiKey;
+                data.settings.openaiApiKey = openaiApiKey;
+                data.settings.groqApiKey = groqApiKey;
+                data.settings.aiAutoReply = aiAutoReply;
+                data.settings.regosEndpoint = regosEndpoint;
+                data.settings.regosToken = regosToken;
+                data.settings.amocrmSubdomain = amocrmSubdomain;
+                data.settings.amocrmToken = amocrmToken;
+                data.settings.amocrmOperatorsMap = amocrmOperatorsMap;
+                
                 AppStorage.save(data);
 
                 // Sync tokens and roles with backend
@@ -659,7 +771,8 @@ window.App = {
                             regos_token: regosToken,
                             amocrm_subdomain: amocrmSubdomain,
                             amocrm_token: amocrmToken,
-                            roles: data.settings.roles || []
+                            roles: data.settings.roles || [],
+                            amocrm_operators_map: amocrmOperatorsMap
                         })
                     });
                 } catch(err) {
