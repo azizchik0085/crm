@@ -149,15 +149,13 @@ def delete_product(id: str, request: Request):
     return supabase_req("DELETE", path)
 
 # --- EMPLOYEES ENDPOINTS ---
-@app.post("/api/integration/regos/sync-employees")
-def sync_regos_employees(request: Request):
-    company_id = get_company_id(request)
+def sync_regos_employees_helper(company_id: str = None):
     settings = get_company_settings(company_id) if company_id else settings_state
     regos_endpoint = settings.get("regos_endpoint", "")
     regos_token = settings.get("regos_token", "")
     
     if not regos_endpoint or not regos_token:
-        raise HTTPException(status_code=400, detail="REGOS API sozlanmagan. Sozlamalardan Endpoint va Access Tokenni kiritib saqlang.")
+        return {"status": "error", "message": "REGOS API sozlanmagan."}
         
     endpoint = regos_endpoint.strip().rstrip("/")
     if not endpoint.startswith(("http://", "https://")):
@@ -256,7 +254,24 @@ def sync_regos_employees(request: Request):
         }
     except Exception as e:
         print(f"Failed to sync employees from REGOS: {e}")
-        raise HTTPException(status_code=500, detail=f"REGOS'dan xodimlarni yuklashda xatolik: {str(e)}")
+        return {"status": "error", "message": f"REGOS'dan xodimlarni yuklashda xatolik: {str(e)}"}
+
+@app.post("/api/integration/regos/sync-employees")
+def sync_regos_employees(request: Request):
+    company_id = get_company_id(request)
+    if not company_id:
+        raise HTTPException(status_code=400, detail="Kompaniya kodi topilmadi.")
+    
+    settings = get_company_settings(company_id)
+    regos_endpoint = settings.get("regos_endpoint", "")
+    regos_token = settings.get("regos_token", "")
+    if not regos_endpoint or not regos_token:
+        raise HTTPException(status_code=400, detail="REGOS API sozlanmagan. Sozlamalardan Endpoint va Access Tokenni kiritib saqlang.")
+        
+    res = sync_regos_employees_helper(company_id)
+    if res["status"] == "error":
+        raise HTTPException(status_code=500, detail=res["message"])
+    return res
 
 CACHE_FILE = "sales_report_cache.json"
 
@@ -545,7 +560,7 @@ def get_employees(request: Request):
     if not company_id:
         return []
     try:
-        sync_regos_employees(company_id=company_id)
+        sync_regos_employees_helper(company_id=company_id)
     except Exception as e:
         print(f"Soft sync employees failed on GET: {e}")
     return supabase_get_all(f"employees?select=*&company_id=eq.{company_id}")
