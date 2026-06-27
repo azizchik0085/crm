@@ -52,6 +52,12 @@ window.CRM = {
             searchInput.oninput = () => this.render();
         }
 
+        // Operator bo'yicha filter
+        const operatorFilter = document.getElementById('crm-operator-filter');
+        if (operatorFilter) {
+            operatorFilter.onchange = () => this.render();
+        }
+
         // Yangi mijoz qo'shish formasi yuborilishi
         const form = document.getElementById('add-customer-form');
         if (form) {
@@ -98,9 +104,33 @@ window.CRM = {
         // Supabase yoki keshdan mijozlarni olamiz
         const customers = await DB.getCustomers();
         
+        // Operatorlar ro'yxatini shakllantirish va dropdownni to'ldirish
+        const operators = [...new Set(customers.map(c => c.operator).filter(Boolean))].sort();
+        const operatorFilterSelect = document.getElementById('crm-operator-filter');
+        if (operatorFilterSelect) {
+            const currentSelected = operatorFilterSelect.value;
+            operatorFilterSelect.innerHTML = '<option value="">Barcha operatorlar</option>';
+            operators.forEach(op => {
+                const opt = document.createElement('option');
+                opt.value = op;
+                opt.textContent = op;
+                if (op === currentSelected) {
+                    opt.selected = true;
+                }
+                operatorFilterSelect.appendChild(opt);
+            });
+        }
+        
+        const selectedOperator = operatorFilterSelect ? operatorFilterSelect.value : '';
+        
         // Qidiruv bo'yicha filtrlaymiz (Lotin va Kirill transkripsiyasi bilan)
         const searchValNorm = window.normalizeUzbek ? window.normalizeUzbek(searchVal) : searchVal.toLowerCase();
         const filteredCustomers = customers.filter(c => {
+            // Operator bo'yicha filter
+            if (selectedOperator && c.operator !== selectedOperator) {
+                return false;
+            }
+            
             const nameNorm = window.normalizeUzbek ? window.normalizeUzbek(c.name) : c.name.toLowerCase();
             const operatorNorm = c.operator ? (window.normalizeUzbek ? window.normalizeUzbek(c.operator) : c.operator.toLowerCase()) : '';
             return nameNorm.includes(searchValNorm) || 

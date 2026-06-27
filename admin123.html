@@ -338,9 +338,16 @@
                 </div>
 
                 <div class="filter-row card" style="padding: 16px;">
-                    <div class="search-box">
-                        <i class="fas fa-search"></i>
-                        <input type="text" id="crm-search" class="form-control" placeholder="Mijoz ismi yoki kompaniya bo'yicha qidirish...">
+                    <div style="display: flex; gap: 12px; align-items: center; flex-grow: 1; min-width: 250px; max-width: 600px;">
+                        <div class="search-box" style="flex-grow: 1; max-width: none; width: auto; margin: 0;">
+                            <i class="fas fa-search"></i>
+                            <input type="text" id="crm-search" class="form-control" placeholder="Mijoz ismi yoki kompaniya bo'yicha qidirish...">
+                        </div>
+                        <div style="min-width: 180px; width: 180px;">
+                            <select id="crm-operator-filter" class="form-control" style="height: 42px; background-color: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); color: var(--text-main); border-radius: 8px;">
+                                <option value="">Barcha operatorlar</option>
+                            </select>
+                        </div>
                     </div>
                     <div class="filter-group">
                         <button class="btn btn-primary" id="crm-tab-kanban"><i class="fas fa-columns"></i> Kanban</button>
