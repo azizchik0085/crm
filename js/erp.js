@@ -92,20 +92,23 @@ window.ERP = {
             return name.toLowerCase() === activeRoleName.toLowerCase();
         });
         
+        const activeUserRole = localStorage.getItem('activeUserRole') || 'admin';
+        const isAdmin = activeUserId === 'admin' || activeUserRole === 'admin' || activeUserRole === 'superadmin';
+        
         let userPerms = [];
-        if (activeUserId === 'admin') {
-            userPerms = ['crm', 'telephony', 'erp', 'finance', 'chats', 'hr', 'settings', 'receipts', 'seniklar', 'kassa'];
+        if (isAdmin) {
+            userPerms = ['crm', 'telephony', 'erp', 'erp_write', 'finance', 'chats', 'hr', 'settings', 'receipts', 'seniklar', 'kassa'];
         } else if (userCustomRole && userCustomRole.permissions) {
             userPerms = userCustomRole.permissions;
         } else {
             // Legacy fallbacks
             const lower = activeRoleName.toLowerCase();
             if (lower.includes('direktor') || lower.includes('admin') || lower.includes('dasturchi') || lower.includes('boshliq')) {
-                userPerms = ['crm', 'telephony', 'erp', 'finance', 'chats', 'hr', 'settings', 'receipts', 'seniklar', 'kassa'];
+                userPerms = ['crm', 'telephony', 'erp', 'erp_write', 'finance', 'chats', 'hr', 'settings', 'receipts', 'seniklar', 'kassa'];
             } else if (lower.includes('sotuv') || lower.includes('operator')) {
                 userPerms = ['crm', 'telephony', 'chats', 'erp', 'receipts', 'seniklar', 'kassa'];
             } else if (lower.includes('ombor') || lower.includes('logist')) {
-                userPerms = ['erp', 'receipts', 'seniklar', 'kassa'];
+                userPerms = ['erp', 'erp_write', 'receipts', 'seniklar', 'kassa'];
             } else if (lower.includes('kassir') || lower.includes('buxgalter')) {
                 userPerms = ['finance', 'erp', 'receipts', 'seniklar', 'kassa'];
             } else if (lower.includes('hr')) {
@@ -113,8 +116,18 @@ window.ERP = {
             }
         }
         
-        const canWriteInventory = activeUserId === 'admin' || userPerms.includes('erp');
-        const canSeeValuation = activeUserId === 'admin' || userPerms.includes('finance') || userPerms.includes('erp');
+        const canWriteInventory = isAdmin || userPerms.includes('erp_write');
+        const canSeeValuation = isAdmin || userPerms.includes('finance') || userPerms.includes('erp');
+
+        // Dynamically toggle buttons in header-actions
+        const addProductBtn = document.getElementById('erp-add-product-btn');
+        const syncRegosBtn = document.getElementById('erp-sync-regos-btn');
+        if (addProductBtn) {
+            addProductBtn.style.display = canWriteInventory ? 'inline-flex' : 'none';
+        }
+        if (syncRegosBtn) {
+            syncRegosBtn.style.display = canWriteInventory ? 'inline-flex' : 'none';
+        }
 
         let html = `
             <div class="stats-grid" style="margin-top: 16px;">
@@ -259,7 +272,44 @@ window.ERP = {
         container.innerHTML = html;
     },
 
+    hasWritePermission: async function() {
+        const activeUserId = localStorage.getItem('activeUserId') || 'admin';
+        const activeUserRole = localStorage.getItem('activeUserRole') || 'admin';
+        const isAdmin = activeUserId === 'admin' || activeUserRole === 'admin' || activeUserRole === 'superadmin';
+        if (isAdmin) return true;
+        
+        try {
+            const employees = await DB.getEmployees();
+            const currentEmp = employees.find(e => String(e.id) === String(activeUserId));
+            if (!currentEmp) return false;
+            
+            const activeRoleName = window.HR.parseRoleAndPlan(currentEmp.role).role;
+            const settings = AppStorage.load().settings || {};
+            const customRolesList = settings.roles || [];
+            const userCustomRole = customRolesList.find(r => {
+                const name = typeof r === 'string' ? r : r.name;
+                return name.toLowerCase() === activeRoleName.toLowerCase();
+            });
+            
+            if (userCustomRole && userCustomRole.permissions) {
+                return userCustomRole.permissions.includes('erp_write');
+            }
+            
+            const lower = activeRoleName.toLowerCase();
+            if (lower.includes('direktor') || lower.includes('admin') || lower.includes('dasturchi') || lower.includes('boshliq') || lower.includes('ombor') || lower.includes('logist')) {
+                return true;
+            }
+        } catch(e) {
+            console.error(e);
+        }
+        return false;
+    },
+
     addProduct: async function() {
+        if (!(await this.hasWritePermission())) {
+            alert("Sizda omborxonada amallar bajarish ruxsati yo'q!");
+            return;
+        }
         const name = document.getElementById('prod-name').value;
         const sku = document.getElementById('prod-sku').value;
         const category = document.getElementById('prod-cat').value;
@@ -300,6 +350,10 @@ window.ERP = {
     },
 
     adjustStock: async function(id, amount) {
+        if (!(await this.hasWritePermission())) {
+            alert("Sizda omborxonada amallar bajarish ruxsati yo'q!");
+            return;
+        }
         const inventory = await DB.getInventory();
         const product = inventory.find(p => p.id === id);
         
@@ -331,6 +385,10 @@ window.ERP = {
     },
 
     deleteProduct: async function(id) {
+        if (!(await this.hasWritePermission())) {
+            alert("Sizda omborxonada amallar bajarish ruxsati yo'q!");
+            return;
+        }
         if (!confirm('Ushbu mahsulotni o\'chirib tashlamoqchimisiz?')) return;
 
         await DB.deleteProduct(id);
@@ -347,6 +405,10 @@ window.ERP = {
     },
 
     syncWithRegos: async function() {
+        if (!(await this.hasWritePermission())) {
+            alert("Sizda omborxonada amallar bajarish ruxsati yo'q!");
+            return;
+        }
         const settings = AppStorage.load().settings;
         if (!settings.regosEndpoint || !settings.regosToken) {
             alert("REGOS API sozlanmagan. Iltimos, sozlamalar sahifasida Endpoint va Access Tokenni kiriting.");
@@ -1076,7 +1138,8 @@ window.HR = {
     ALL_PERMISSIONS: [
         { key: 'crm', label: 'Mijozlar (CRM)' },
         { key: 'telephony', label: 'Telefoniya' },
-        { key: 'erp', label: 'Omborxona (ERP)' },
+        { key: 'erp', label: 'Omborxona (ERP) - Ko\'rish' },
+        { key: 'erp_write', label: 'Omborxona (ERP) - Amallar bajarish (Qo\'shish/O\'chirish)' },
         { key: 'finance', label: 'Moliya' },
         { key: 'chats', label: 'Muloqotlar' },
         { key: 'hr', label: 'Xodimlar (HR)' },
