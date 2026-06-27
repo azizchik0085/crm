@@ -568,22 +568,31 @@ window.HR = {
         // Supabase yoki keshdan xodimlarni yuklash
         const employees = await DB.getEmployees();
         
-        // Fetch REGOS report for real-time sales & profit (current month cumulative)
+        // Fetch REGOS report for real-time sales & profit (current month cumulative) - Asynchronous Non-Blocking
         const now = new Date();
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
         const startTimestamp = Math.floor(startOfMonth.getTime() / 1000);
         const endTimestamp = Math.floor(new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59).getTime() / 1000);
 
-        let reportData = null;
-        try {
-            const response = await fetch(`/api/integration/regos/sales-report?start_date=${startTimestamp}&end_date=${endTimestamp}`);
-            if (response.ok) {
-                reportData = await response.json();
-            }
-        } catch (e) {
-            console.error("Failed to fetch REGOS sales report in HR:", e);
+        if (!window.HR.salesMap && !window.HR.isFetchingSales) {
+            window.HR.isFetchingSales = true;
+            fetch(`/api/integration/regos/sales-report?start_date=${startTimestamp}&end_date=${endTimestamp}`)
+                .then(res => res.ok ? res.json() : null)
+                .then(data => {
+                    window.HR.isFetchingSales = false;
+                    if (data && data.employee_sales) {
+                        window.HR.salesMap = data.employee_sales;
+                        // Fast re-render once stats load in background
+                        window.HR.render();
+                    }
+                })
+                .catch(err => {
+                    window.HR.isFetchingSales = false;
+                    console.error("Failed to fetch REGOS sales report in HR:", err);
+                });
         }
-        const employeeSalesMap = (reportData && reportData.employee_sales) || {};
+        
+        const employeeSalesMap = window.HR.salesMap || {};
 
         const settings = AppStorage.load().settings;
         const currency = settings.currency;
