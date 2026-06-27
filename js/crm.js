@@ -109,13 +109,15 @@ window.CRM = {
         // Xodimlar ro'yxatini olib, ID-larni ismlarga o'giramiz
         let employeeIdToName = {};
         const activeUserId = localStorage.getItem('activeUserId') || 'admin';
+        const activeUserRole = localStorage.getItem('activeUserRole') || 'admin';
+        const isAdmin = activeUserId === 'admin' || activeUserRole === 'admin' || activeUserRole === 'superadmin';
         let loggedInEmployeeName = '';
         
         try {
             const employeesList = await DB.getEmployees();
             employeesList.forEach(e => {
                 employeeIdToName[e.id] = e.name;
-                if (e.id === activeUserId) {
+                if (String(e.id) === String(activeUserId)) {
                     loggedInEmployeeName = e.name;
                 }
             });
@@ -126,7 +128,7 @@ window.CRM = {
         // Display/hide the filter dropdown based on whether user is admin
         const operatorFilterContainer = document.getElementById('crm-operator-filter-container');
         if (operatorFilterContainer) {
-            if (activeUserId === 'admin') {
+            if (isAdmin) {
                 operatorFilterContainer.style.setProperty('display', 'block', 'important');
             } else {
                 operatorFilterContainer.style.setProperty('display', 'none', 'important');
@@ -167,7 +169,7 @@ window.CRM = {
         const searchValNorm = window.normalizeUzbek ? window.normalizeUzbek(searchVal) : searchVal.toLowerCase();
         const filteredCustomers = customers.filter(c => {
             // Operator bo'yicha filter
-            if (activeUserId !== 'admin') {
+            if (!isAdmin) {
                 // Xodim faqat o'ziga biriktirilgan sdelkalarni ko'radi
                 if (loggedInEmployeeName && c.displayOperator !== loggedInEmployeeName) {
                     return false;
