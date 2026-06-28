@@ -49,18 +49,25 @@ window.App = {
                 if (backendSettings) {
                     const data = AppStorage.load();
                     
-                    data.settings.aiProvider = backendSettings.ai_provider || data.settings.aiProvider;
-                    data.settings.telephonyProvider = backendSettings.telephony_provider || data.settings.telephonyProvider;
-                    data.settings.telegramToken = backendSettings.telegram_token || data.settings.telegramToken;
-                    data.settings.instagramToken = backendSettings.instagram_token || data.settings.instagramToken;
-                    data.settings.geminiApiKey = backendSettings.gemini_api_key || data.settings.geminiApiKey;
-                    data.settings.openaiApiKey = backendSettings.openai_api_key || data.settings.openaiApiKey;
-                    data.settings.groqApiKey = backendSettings.groq_api_key || data.settings.groqApiKey;
-                    data.settings.aiAutoReply = !!backendSettings.ai_auto_reply;
-                    data.settings.regosEndpoint = backendSettings.regos_endpoint || data.settings.regosEndpoint;
-                    data.settings.regosToken = backendSettings.regos_token || data.settings.regosToken;
-                    data.settings.amocrmSubdomain = backendSettings.amocrm_subdomain || data.settings.amocrmSubdomain;
-                    data.settings.amocrmToken = backendSettings.amocrm_token || data.settings.amocrmToken;
+                    if (backendSettings.company_name !== undefined) data.settings.companyName = backendSettings.company_name;
+                    if (backendSettings.currency !== undefined) data.settings.currency = backendSettings.currency;
+                    if (backendSettings.sip_server !== undefined) data.settings.sipServer = backendSettings.sip_server;
+                    if (backendSettings.sip_user !== undefined) data.settings.sipUser = backendSettings.sip_user;
+                    if (backendSettings.sip_password !== undefined) data.settings.sipPassword = backendSettings.sip_password;
+                    if (backendSettings.sip_wss !== undefined) data.settings.sipWssGateway = backendSettings.sip_wss;
+
+                    if (backendSettings.ai_provider !== undefined) data.settings.aiProvider = backendSettings.ai_provider;
+                    if (backendSettings.telephony_provider !== undefined) data.settings.telephonyProvider = backendSettings.telephony_provider;
+                    if (backendSettings.telegram_token !== undefined) data.settings.telegramToken = backendSettings.telegram_token;
+                    if (backendSettings.instagram_token !== undefined) data.settings.instagramToken = backendSettings.instagram_token;
+                    if (backendSettings.gemini_api_key !== undefined) data.settings.geminiApiKey = backendSettings.gemini_api_key;
+                    if (backendSettings.openai_api_key !== undefined) data.settings.openaiApiKey = backendSettings.openai_api_key;
+                    if (backendSettings.groq_api_key !== undefined) data.settings.groqApiKey = backendSettings.groq_api_key;
+                    if (backendSettings.ai_auto_reply !== undefined) data.settings.aiAutoReply = !!backendSettings.ai_auto_reply;
+                    if (backendSettings.regos_endpoint !== undefined) data.settings.regosEndpoint = backendSettings.regos_endpoint;
+                    if (backendSettings.regos_token !== undefined) data.settings.regosToken = backendSettings.regos_token;
+                    if (backendSettings.amocrm_subdomain !== undefined) data.settings.amocrmSubdomain = backendSettings.amocrm_subdomain;
+                    if (backendSettings.amocrm_token !== undefined) data.settings.amocrmToken = backendSettings.amocrm_token;
                     
                     // Subscription settings
                     data.settings.maxEmployees = backendSettings.max_employees !== undefined ? backendSettings.max_employees : (data.settings.maxEmployees || 100);
@@ -768,6 +775,12 @@ window.App = {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
+                            company_name: name,
+                            currency: currency,
+                            sip_server: sipServer,
+                            sip_user: sipUser,
+                            sip_password: sipPassword,
+                            sip_wss: sipWss,
                             ai_provider: aiProvider,
                             telephony_provider: telephonyProvider,
                             telegram_token: telegramToken,

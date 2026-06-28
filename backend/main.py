@@ -1057,6 +1057,8 @@ _settings_cache = {}
 def get_company_settings(company_id: str, use_central: bool = False, bypass_cache: bool = False):
     if not company_id:
         return {
+            "company_name": "", "currency": "UZS",
+            "sip_server": "", "sip_user": "", "sip_password": "", "sip_wss": "",
             "telegram_token": "", "instagram_token": "", "ai_provider": "local",
             "telephony_provider": "sarkor", "gemini_api_key": "", "openai_api_key": "",
             "groq_api_key": "", "ai_auto_reply": False, "regos_endpoint": "", "regos_token": "",
@@ -1072,6 +1074,8 @@ def get_company_settings(company_id: str, use_central: bool = False, bypass_cach
         return _settings_cache[company_id]
         
     default_keys = {
+        "company_name": "", "currency": "UZS",
+        "sip_server": "", "sip_user": "", "sip_password": "", "sip_wss": "",
         "telegram_token": "", "instagram_token": "", "ai_provider": "local",
         "telephony_provider": "sarkor", "gemini_api_key": "", "openai_api_key": "",
         "groq_api_key": "", "ai_auto_reply": False, "regos_endpoint": "", "regos_token": "",
@@ -1516,6 +1520,13 @@ def update_settings(settings: dict, request: Request):
         raise HTTPException(status_code=400, detail="Kompaniya ID topilmadi")
     
     company_settings = get_company_settings(company_id)
+    company_settings["company_name"] = settings.get("company_name", "")
+    company_settings["currency"] = settings.get("currency", "UZS")
+    company_settings["sip_server"] = settings.get("sip_server", "")
+    company_settings["sip_user"] = settings.get("sip_user", "")
+    company_settings["sip_password"] = settings.get("sip_password", "")
+    company_settings["sip_wss"] = settings.get("sip_wss", "")
+    
     company_settings["telegram_token"] = settings.get("telegram_token", "")
     company_settings["instagram_token"] = settings.get("instagram_token", "")
     company_settings["ai_provider"] = settings.get("ai_provider", "local")
