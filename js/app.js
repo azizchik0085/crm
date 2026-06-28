@@ -322,8 +322,12 @@ window.App = {
         
         const activeUserRole = localStorage.getItem('activeUserRole');
         
-        // Redirect POS Kassa role to dedicated POS terminal
-        if (activeUserRole && (activeUserRole === 'POS Kassa' || activeUserRole.toLowerCase().includes('pos kassa') || activeUserRole.toLowerCase() === 'pos_kassa')) {
+        // Redirect POS Kassa and Kassir roles to dedicated POS terminal
+        if (activeUserRole && (
+            activeUserRole.toLowerCase().includes('pos kassa') || 
+            activeUserRole.toLowerCase() === 'pos_kassa' ||
+            activeUserRole.toLowerCase().includes('kassir')
+        )) {
             window.location.href = 'pos.html';
             return;
         }
