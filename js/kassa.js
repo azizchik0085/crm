@@ -1227,5 +1227,431 @@ window.Kassa = {
                 console.error("Error polling sync status:", e);
             }
         }, 1500);
+    },
+
+    posProducts: [],
+    posCustomers: [],
+    posCart: [],
+    posSubtotal: 0,
+    posTotal: 0,
+
+    openPOSTerminal: async function() {
+        showModal('kassa-pos-modal');
+        const grid = document.getElementById('pos-products-grid');
+        grid.innerHTML = '<div style="grid-column: 1 / -1; display: flex; justify-content: center; align-items: center; padding: 48px; color: var(--text-muted);"><i class="fas fa-spinner fa-spin fa-2x"></i> &nbsp; Mahsulotlar yuklanmoqda...</div>';
+        
+        try {
+            // Load products
+            this.posProducts = await DB.getInventory();
+            
+            // Load customers
+            const customersRes = await fetch('/api/customers');
+            if (customersRes.ok) {
+                this.posCustomers = await customersRes.json();
+            } else {
+                this.posCustomers = [];
+            }
+            
+            // Render customers select dropdown
+            const custSelect = document.getElementById('pos-customer-select');
+            custSelect.innerHTML = '<option value="">Tanlanmagan (Umumiy mijoz)</option>';
+            this.posCustomers.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c.id;
+                opt.textContent = `${c.name || 'Noma\'lum'} (${c.phone || ''})`;
+                custSelect.appendChild(opt);
+            });
+            
+            // Populate category filter select
+            const catSelect = document.getElementById('pos-category-select');
+            catSelect.innerHTML = '<option value="all">Barcha toifalar</option>';
+            const categories = [...new Set(this.posProducts.map(p => p.category || 'Barchasi'))];
+            categories.forEach(cat => {
+                if (cat && cat !== 'all') {
+                    const opt = document.createElement('option');
+                    opt.value = cat;
+                    opt.textContent = cat;
+                    catSelect.appendChild(opt);
+                }
+            });
+            
+            // Reset state
+            this.posCart = [];
+            document.getElementById('pos-search-input').value = '';
+            document.getElementById('pos-discount').value = '0';
+            
+            // Set payment to Naqd
+            const naqdRadio = document.querySelector('input[name="pos-payment-type"][value="Naqd"]');
+            if (naqdRadio) naqdRadio.checked = true;
+            this.updatePOSPaymentUI();
+            
+            // Render
+            this.filterPOSProducts();
+            this.renderPOSCart();
+            
+        } catch (e) {
+            console.error("POS terminal initialization failed:", e);
+            grid.innerHTML = `<div style="grid-column: 1 / -1; color: var(--danger); text-align: center; padding: 24px;"><i class="fas fa-exclamation-triangle fa-2x"></i><br>Mahsulotlarni yuklashda xatolik yuz berdi: ${e.message}</div>`;
+        }
+    },
+
+    filterPOSProducts: function() {
+        const query = document.getElementById('pos-search-input').value.toLowerCase().trim();
+        const category = document.getElementById('pos-category-select').value;
+        
+        let filtered = this.posProducts || [];
+        if (category !== 'all') {
+            filtered = filtered.filter(p => p.category === category);
+        }
+        if (query) {
+            filtered = filtered.filter(p => 
+                (p.name && p.name.toLowerCase().includes(query)) || 
+                (p.sku && p.sku.toLowerCase().includes(query))
+            );
+        }
+        
+        this.renderPOSProductsList(filtered);
+    },
+
+    renderPOSProductsList: function(products) {
+        const grid = document.getElementById('pos-products-grid');
+        if (!grid) return;
+        
+        if (products.length === 0) {
+            grid.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; color: var(--text-muted); padding: 48px;"><i class="fas fa-box-open fa-3x" style="margin-bottom:12px;"></i><br>Mahsulotlar topilmadi</div>';
+            return;
+        }
+        
+        grid.innerHTML = '';
+        products.forEach(p => {
+            const card = document.createElement('div');
+            card.className = 'card';
+            card.style.cssText = 'background: #1e293b; border: 1px solid #334155; padding: 12px; border-radius: 10px; cursor: pointer; display: flex; flex-direction: column; justify-content: space-between; transition: all 0.2s; user-select: none;';
+            card.onmouseover = () => { card.style.borderColor = 'var(--accent)'; card.style.transform = 'translateY(-2px)'; };
+            card.onmouseout = () => { card.style.borderColor = '#334155'; card.style.transform = 'translateY(0)'; };
+            card.onclick = () => this.addToPOSCart(p.id);
+            
+            const isOutOfStock = p.stock <= 0;
+            const stockBadge = isOutOfStock 
+                ? '<span style="background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.2); padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: 700;">Tugagan</span>'
+                : `<span style="background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.2); padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: 700;">Qoldiq: ${p.stock} ta</span>`;
+                
+            card.innerHTML = `
+                <div>
+                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 6px;">
+                        <span style="font-size: 0.7rem; color: #64748b; font-weight: 700; text-transform: uppercase;">${p.category || 'Barchasi'}</span>
+                        ${stockBadge}
+                    </div>
+                    <h4 style="margin: 0 0 4px 0; color: #f8fafc; font-size: 0.9rem; line-height: 1.2; font-weight: 600; text-align: left;">${p.name}</h4>
+                    <p style="margin: 0; font-size: 0.75rem; color: #64748b; font-family: 'JetBrains Mono'; text-align: left;">SKU: ${p.sku || '-'}</p>
+                </div>
+                <div style="margin-top: 10px; display: flex; justify-content: space-between; align-items: center;">
+                    <span style="color: #10b981; font-weight: 700; font-size: 0.95rem;">${parseFloat(p.price).toLocaleString()} UZS</span>
+                    <span style="color: var(--accent); background: rgba(99, 102, 241, 0.1); width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 1px dashed var(--accent);"><i class="fas fa-plus" style="font-size: 0.75rem;"></i></span>
+                </div>
+            `;
+            grid.appendChild(card);
+        });
+    },
+
+    addToPOSCart: function(prodId) {
+        const prod = this.posProducts.find(p => p.id === prodId);
+        if (!prod) return;
+        
+        // Find existing item in cart
+        const existing = this.posCart.find(item => item.id === prodId);
+        if (existing) {
+            // Check stock limit
+            if (existing.qty >= prod.stock) {
+                this.showToast(`Omborda faqat ${prod.stock} ta mahsulot bor!`, 'warning');
+                return;
+            }
+            existing.qty++;
+        } else {
+            // Check stock limit
+            if (prod.stock <= 0) {
+                this.showToast("Bu mahsulot omborda tugagan!", 'warning');
+                return;
+            }
+            this.posCart.push({
+                id: prod.id,
+                name: prod.name,
+                price: parseFloat(prod.price) || 0,
+                sku: prod.sku,
+                qty: 1,
+                maxStock: prod.stock
+            });
+        }
+        
+        this.renderPOSCart();
+    },
+
+    removeFromPOSCart: function(prodId) {
+        this.posCart = this.posCart.filter(item => item.id !== prodId);
+        this.renderPOSCart();
+    },
+
+    changePOSCartQty: function(prodId, delta) {
+        const item = this.posCart.find(i => i.id === prodId);
+        if (!item) return;
+        
+        const newQty = item.qty + delta;
+        if (newQty <= 0) {
+            this.removeFromPOSCart(prodId);
+        } else if (newQty > item.maxStock) {
+            this.showToast(`Omborda faqat ${item.maxStock} ta mahsulot bor!`, 'warning');
+        } else {
+            item.qty = newQty;
+            this.renderPOSCart();
+        }
+    },
+
+    renderPOSCart: function() {
+        const list = document.getElementById('pos-cart-list');
+        if (!list) return;
+        
+        if (this.posCart.length === 0) {
+            list.innerHTML = `
+                <div style="margin: auto; color: #64748b; text-align: center; font-size: 0.85rem; padding: 24px;">
+                    <i class="fas fa-cart-arrow-down" style="font-size: 2.5rem; margin-bottom: 8px; color: #334155;"></i><br>Savatcha bo'sh
+                </div>
+            `;
+            this.updatePOSTotals();
+            return;
+        }
+        
+        list.innerHTML = '';
+        this.posCart.forEach(item => {
+            const div = document.createElement('div');
+            div.style.cssText = 'display: flex; justify-content: space-between; align-items: center; background: #1e293b; border: 1px solid #334155; padding: 10px; border-radius: 8px; gap: 8px;';
+            div.innerHTML = `
+                <div style="flex: 1; min-width: 0; text-align: left;">
+                    <h5 style="margin: 0 0 2px 0; color: #f8fafc; font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600;">${item.name}</h5>
+                    <span style="font-size: 0.75rem; color: #10b981; font-weight: 700;">${item.price.toLocaleString()} UZS</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 6px; background: #0f172a; border-radius: 6px; padding: 2px;">
+                    <button class="btn btn-sm btn-secondary" onclick="window.Kassa.changePOSCartQty('${item.id}', -1)" style="padding: 2px 8px; font-size: 0.8rem; background: transparent; border: none; color: #94a3b8; cursor: pointer;"><i class="fas fa-minus"></i></button>
+                    <span style="color: #f8fafc; font-weight: 700; font-size: 0.85rem; width: 24px; text-align: center;">${item.qty}</span>
+                    <button class="btn btn-sm btn-secondary" onclick="window.Kassa.changePOSCartQty('${item.id}', 1)" style="padding: 2px 8px; font-size: 0.8rem; background: transparent; border: none; color: #94a3b8; cursor: pointer;"><i class="fas fa-plus"></i></button>
+                </div>
+                <div style="text-align: right; min-width: 80px;">
+                    <div style="color: #f8fafc; font-weight: 700; font-size: 0.85rem;">${(item.price * item.qty).toLocaleString()} UZS</div>
+                </div>
+                <button onclick="window.Kassa.removeFromPOSCart('${item.id}')" style="background: none; border: none; color: #ef4444; cursor: pointer; font-size: 0.9rem; padding: 4px;"><i class="fas fa-trash"></i></button>
+            `;
+            list.appendChild(div);
+        });
+        
+        this.updatePOSTotals();
+    },
+
+    updatePOSTotals: function() {
+        let subtotal = 0;
+        this.posCart.forEach(item => {
+            subtotal += item.price * item.qty;
+        });
+        
+        const discInput = document.getElementById('pos-discount');
+        const discount = parseFloat(discInput.value) || 0;
+        
+        const total = Math.max(0, subtotal - discount);
+        
+        this.posSubtotal = subtotal;
+        this.posTotal = total;
+        
+        document.getElementById('pos-subtotal').textContent = subtotal.toLocaleString() + ' UZS';
+        document.getElementById('pos-total').textContent = total.toLocaleString() + ' UZS';
+    },
+
+    updatePOSPaymentUI: function() {
+        const payType = document.querySelector('input[name="pos-payment-type"]:checked').value;
+        const custSelect = document.getElementById('pos-customer-select');
+        
+        if (payType === 'Qarz') {
+            custSelect.style.borderColor = '#ef4444';
+            custSelect.style.boxShadow = '0 0 0 1px #ef4444';
+        } else {
+            custSelect.style.borderColor = '#334155';
+            custSelect.style.boxShadow = 'none';
+        }
+    },
+
+    openNewCustomerForm: function(e) {
+        if (e) e.preventDefault();
+        document.getElementById('pos-new-customer-form').style.display = 'block';
+    },
+
+    closeNewCustomerForm: function(e) {
+        if (e) e.preventDefault();
+        document.getElementById('pos-new-customer-form').style.display = 'none';
+        document.getElementById('pos-new-cust-name').value = '';
+        document.getElementById('pos-new-cust-phone').value = '';
+    },
+
+    saveNewPOSCustomer: async function(e) {
+        if (e) e.preventDefault();
+        const name = document.getElementById('pos-new-cust-name').value.trim();
+        const phone = document.getElementById('pos-new-cust-phone').value.trim();
+        
+        if (!name || !phone) {
+            alert("Iltimos, xaridor ismi va telefon raqamini to'liq kiriting!");
+            return;
+        }
+        
+        const payload = {
+            id: 'cust-' + Date.now(),
+            name: name,
+            phone: phone,
+            status: 'customer',
+            value: 0,
+            source: 'POS Terminal'
+        };
+        
+        try {
+            const response = await fetch('/api/customers', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            
+            if (!response.ok) throw new Error("Mijozni saqlashda xatolik");
+            
+            // Reload customers
+            const customersRes = await fetch('/api/customers');
+            if (customersRes.ok) {
+                this.posCustomers = await customersRes.json();
+            }
+            
+            // Re-render select dropdown and select new customer
+            const custSelect = document.getElementById('pos-customer-select');
+            custSelect.innerHTML = '<option value="">Tanlanmagan (Umumiy mijoz)</option>';
+            this.posCustomers.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c.id;
+                opt.textContent = `${c.name || 'Noma\'lum'} (${c.phone || ''})`;
+                custSelect.appendChild(opt);
+            });
+            
+            custSelect.value = payload.id;
+            this.updatePOSPaymentUI();
+            this.closeNewCustomerForm();
+            this.showToast("Yangi xaridor muvaffaqiyatli saqlandi.");
+            
+        } catch (err) {
+            console.error(err);
+            alert("Mijozni saqlashda xatolik yuz berdi: " + err.message);
+        }
+    },
+
+    completePOSSale: async function() {
+        if (this.posCart.length === 0) {
+            alert("Savatcha bo'sh! Iltimos, sotish uchun kamida bitta mahsulot tanlang.");
+            return;
+        }
+        
+        const payType = document.querySelector('input[name="pos-payment-type"]:checked').value;
+        const customerSelect = document.getElementById('pos-customer-select');
+        const customerId = customerSelect.value;
+        
+        if (payType === 'Qarz' && !customerId) {
+            alert("Diqqat! Mahsulotni qarzga (nasiyaga) sotish uchun mijozni tanlashingiz yoki yangi mijoz qo'shishingiz shart!");
+            return;
+        }
+        
+        if (!confirm("Sotuvni yakunlashni tasdiqlaysizmi?")) return;
+        
+        try {
+            // 1. Decrement inventory stock levels for all sold products
+            for (const item of this.posCart) {
+                const prod = this.posProducts.find(p => p.id === item.id);
+                if (prod) {
+                    const updatedProduct = {
+                        ...prod,
+                        stock: Math.max(0, prod.stock - item.qty)
+                    };
+                    // Update in backend
+                    await DB.saveProduct(updatedProduct);
+                }
+            }
+            
+            // 2. Prepare receipt payload
+            const receiptId = 'pos-' + Date.now();
+            const code = 'POS-' + Math.floor(100000 + Math.random() * 900000);
+            const cashierName = AppStorage.load().currentUser?.name || 'Kassa xodimi';
+            const discount = parseFloat(document.getElementById('pos-discount').value) || 0;
+            const customerName = customerId ? customerSelect.options[customerSelect.selectedIndex].text.split(' (')[0] : '';
+            const customerPhone = customerId ? this.posCustomers.find(c => c.id === customerId)?.phone || '' : '';
+            
+            const receiptPayload = {
+                id: receiptId,
+                code: code,
+                cashier_name: cashierName,
+                total_amount: this.posTotal,
+                discount: discount,
+                payment_type: payType, // 'Naqd', 'Karta', 'Elektron' yoki 'Qarz'
+                items: {
+                    products: this.posCart.map(item => ({
+                        sku: item.sku || '',
+                        name: item.name,
+                        price: item.price,
+                        total: item.price * item.qty,
+                        quantity: item.qty
+                    })),
+                    customer_id: customerId || null,
+                    customer_name: customerName,
+                    customer_phone: customerPhone,
+                    debt_amount: payType === 'Qarz' ? this.posTotal : 0
+                },
+                created_at: new Date().toISOString()
+            };
+            
+            // 3. Save receipt in backend
+            const response = await fetch('/api/receipts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(receiptPayload)
+            });
+            
+            if (!response.ok) throw new Error("Sotuv chekini saqlashda xatolik yuz berdi");
+            
+            // 4. Update customer lifecycle value if customer is associated
+            if (customerId) {
+                const customer = this.posCustomers.find(c => c.id === customerId);
+                if (customer) {
+                    customer.value = (parseFloat(customer.value) || 0) + this.posTotal;
+                    customer.status = 'customer';
+                    await fetch('/api/customers', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(customer)
+                    });
+                }
+            }
+            
+            // 5. Success cleanup
+            this.showToast("Sotuv muvaffaqiyatli yakunlandi!");
+            closeModal('kassa-pos-modal');
+            
+            // 6. Reload lists
+            await this.loadReceipts();
+            await this.render();
+            
+            // 7. Open the print/detail view of the new POS receipt
+            if (window.Kassa.viewReceiptDetails) {
+                window.Kassa.viewReceiptDetails(receiptId);
+            }
+            
+        } catch (e) {
+            console.error("POS transaction failed:", e);
+            alert("Xatolik yuz berdi: " + e.message);
+        }
+    },
+
+    showToast: function(message, type = 'success') {
+        if (window.showToast) {
+            window.showToast(message, type);
+        } else {
+            alert(message);
+        }
     }
 };
