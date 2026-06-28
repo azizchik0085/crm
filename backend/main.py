@@ -1068,7 +1068,8 @@ def get_company_settings(company_id: str, use_central: bool = False, bypass_cach
             "enable_crm": True,
             "enable_warehouse": True,
             "enable_kassa": True,
-            "amocrm_operators_map": {}
+            "amocrm_operators_map": {},
+            "roles": ["POS Kassa", "Menejer", "Kassir", "Kuryer", "Operator", "Sotuvchi"]
         }
     if company_id in _settings_cache and not use_central and not bypass_cache:
         return _settings_cache[company_id]
@@ -1085,7 +1086,8 @@ def get_company_settings(company_id: str, use_central: bool = False, bypass_cach
         "enable_crm": True,
         "enable_warehouse": True,
         "enable_kassa": True,
-        "amocrm_operators_map": {}
+        "amocrm_operators_map": {},
+        "roles": ["POS Kassa", "Menejer", "Kassir", "Kuryer", "Operator", "Sotuvchi"]
     }
     
     # 1. Try loading from Supabase database

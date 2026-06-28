@@ -978,7 +978,11 @@ window.HR = {
 
     updateRoleSelects: function() {
         const data = AppStorage.load();
-        const roles = data.settings.roles || [];
+        let roles = data.settings.roles || [];
+        
+        if (roles.length === 0) {
+            roles = ["POS Kassa", "Menejer", "Kassir", "Kuryer", "Operator", "Sotuvchi"];
+        }
         
         const empRoleSelect = document.getElementById('emp-role');
         const editEmpRoleSelect = document.getElementById('edit-emp-role');
