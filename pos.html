@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Kassa POS Terminali</title>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Main Style Sheet -->
+    <link rel="stylesheet" href="css/styles.css">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background: #0f172a;
+            color: #f8fafc;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        .pos-header {
+            height: 60px;
+            background: #1e293b;
+            border-bottom: 1px solid #334155;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 24px;
+        }
+
+        .pos-container {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+            min-height: 0;
+        }
+
+        .pos-left {
+            flex: 1.4;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid #1e293b;
+            padding: 16px;
+            min-width: 0;
+            overflow: hidden;
+        }
+
+        .pos-right {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #1e293b;
+            padding: 16px;
+            min-width: 320px;
+            max-width: 450px;
+            overflow: hidden;
+        }
+
+        .pos-products-grid {
+            flex: 1;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 12px;
+            overflow-y: auto;
+            padding-right: 6px;
+        }
+
+        .pos-cart-list {
+            flex: 1;
+            overflow-y: auto;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            padding: 8px;
+            background: #0f172a;
+            margin-bottom: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .pos-pay-type-label:has(input:checked) {
+            border-color: var(--accent) !important;
+            background: rgba(99, 102, 241, 0.15) !important;
+            box-shadow: 0 0 0 1px var(--accent);
+        }
+        #pos-pay-debt-label:has(input:checked) {
+            border-color: #ef4444 !important;
+            background: rgba(239, 68, 68, 0.15) !important;
+            box-shadow: 0 0 0 1px #ef4444;
+        }
+    </style>
+</head>
+<body class="dark-theme">
+    <!-- Top Header -->
+    <header class="pos-header">
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <span style="font-size: 24px; color: var(--accent);"><i class="fas fa-cash-register"></i></span>
+            <div style="text-align: left;">
+                <h3 style="margin: 0; color: #f8fafc; font-size: 1.15rem; font-weight: 700;">Smart POS Terminali</h3>
+                <p style="margin: 0; font-size: 0.7rem; color: #94a3b8;" id="pos-company-name">Korxona sozlamalari yuklanmoqda...</p>
+            </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 16px;">
+            <div style="text-align: right;">
+                <div style="font-size: 0.85rem; font-weight: 600; color: #f8fafc;" id="pos-cashier-name">Smena xodimi</div>
+                <div style="font-size: 0.75rem; color: #94a3b8;" id="pos-cashier-role">Kassir</div>
+            </div>
+            <button class="btn btn-secondary" onclick="logout()" style="height: 36px; padding: 0 12px; font-size: 0.85rem; border-color: #334155; display: flex; align-items: center; gap: 6px; cursor: pointer; background: transparent; color: #ef4444;">
+                <i class="fas fa-sign-out-alt"></i> Chiqish
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <div class="pos-container">
+        <!-- Left Panel: Products List -->
+        <div class="pos-left">
+            <div style="display: flex; gap: 12px; margin-bottom: 16px;">
+                <div class="search-box" style="flex: 1; margin: 0; background: #1e293b; border-color: #334155;">
+                    <i class="fas fa-search" style="color: #64748b;"></i>
+                    <input type="text" id="pos-search-input" class="form-control" placeholder="Mahsulot nomi yoki shtrix-kodi bo'yicha..." style="background: transparent; border: none; color: #f8fafc;" oninput="filterPOSProducts()">
+                </div>
+                <select id="pos-category-select" class="form-control" style="width: 180px; background: #1e293b; border-color: #334155; color: #f8fafc;" onchange="filterPOSProducts()">
+                    <option value="all">Barcha toifalar</option>
+                </select>
+            </div>
+            
+            <div id="pos-products-grid" class="pos-products-grid">
+                <!-- Products dynamically loaded here -->
+            </div>
+        </div>
+
+        <!-- Right Panel: Cart & Checkout -->
+        <div class="pos-right">
+            <!-- Customer selection section -->
+            <div class="card" style="background: #0f172a; border: 1px solid #334155; padding: 12px; margin-bottom: 16px; border-radius: 8px;">
+                <h4 style="margin: 0 0 8px 0; color: #f8fafc; font-size: 0.9rem; display: flex; justify-content: space-between; align-items: center;">
+                    <span><i class="fas fa-user-circle"></i> Xaridor</span>
+                    <button class="btn btn-secondary btn-sm" onclick="openNewCustomerForm(event)" style="padding: 2px 6px; font-size: 0.75rem; border-color: #334155; cursor: pointer;"><i class="fas fa-plus"></i> Yangi</button>
+                </h4>
+                <div style="display: flex; gap: 8px;">
+                    <select id="pos-customer-select" class="form-control" style="background: #1e293b; border-color: #334155; color: #f8fafc; flex: 1;" onchange="updatePOSPaymentUI()">
+                        <option value="">Tanlanmagan (Umumiy mijoz)</option>
+                    </select>
+                </div>
+                
+                <!-- Inline New Customer Form -->
+                <div id="pos-new-customer-form" style="display: none; border-top: 1px dashed #334155; margin-top: 10px; padding-top: 10px;">
+                    <div style="display: flex; gap: 8px; flex-direction: column;">
+                        <input type="text" id="pos-new-cust-name" class="form-control" placeholder="Mijoz ismi..." style="background: #1e293b; border-color: #334155; color: #f8fafc; font-size: 0.85rem; height: 32px;">
+                        <input type="text" id="pos-new-cust-phone" class="form-control" placeholder="Telefoni (+998...)" style="background: #1e293b; border-color: #334155; color: #f8fafc; font-size: 0.85rem; height: 32px;">
+                        <div style="display: flex; gap: 6px; justify-content: flex-end;">
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="closeNewCustomerForm(event)" style="padding: 2px 6px; font-size: 0.75rem; cursor: pointer;">Yopish</button>
+                            <button type="button" class="btn btn-primary btn-sm" onclick="saveNewPOSCustomer(event)" style="padding: 2px 6px; font-size: 0.75rem; background: var(--accent); cursor: pointer;">Saqlash</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Cart Title -->
+            <h4 style="margin: 0 0 8px 0; color: #f8fafc; font-size: 1rem;"><i class="fas fa-shopping-cart"></i> Xarid savatchasi</h4>
+            
+            <!-- Cart Items List -->
+            <div id="pos-cart-list" class="pos-cart-list">
+                <div style="margin: auto; color: #64748b; text-align: center; font-size: 0.85rem; padding: 24px;">
+                    <i class="fas fa-cart-arrow-down" style="font-size: 2.5rem; margin-bottom: 8px; color: #334155;"></i><br>Savatcha bo'sh
+                </div>
+            </div>
+            
+            <!-- Checkout Details -->
+            <div style="display: flex; flex-direction: column; gap: 10px; border-top: 1px solid #334155; padding-top: 12px; margin-top: auto;">
+                <div style="display: flex; justify-content: space-between; align-items: center; color: #94a3b8; font-size: 0.9rem;">
+                    <span>Jami summa:</span>
+                    <span id="pos-subtotal" style="font-weight: 600; color: #f8fafc;">0 UZS</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; color: #94a3b8; font-size: 0.9rem;">
+                    <span>Chegirma (UZS):</span>
+                    <input type="number" id="pos-discount" class="form-control" value="0" min="0" style="width: 100px; text-align: right; background: #0f172a; border-color: #334155; color: #ef4444; height: 30px; font-weight: 700; padding: 0 8px;" oninput="updatePOSTotals()">
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; color: #f8fafc; font-size: 1.1rem; font-weight: 700; border-top: 1px dashed #334155; padding-top: 8px; margin-top: 4px;">
+                    <span>To'lov summasi:</span>
+                    <span id="pos-total" style="color: #10b981;">0 UZS</span>
+                </div>
+                
+                <!-- Payment Type Selection -->
+                <div style="margin-top: 8px;">
+                    <label style="color: #94a3b8; font-size: 0.8rem; font-weight: 600; display: block; margin-bottom: 6px;">To'lov usuli:</label>
+                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;">
+                        <label style="display: flex; align-items: center; justify-content: center; gap: 6px; padding: 10px; background: #0f172a; border: 1px solid #334155; border-radius: 8px; color: #f8fafc; font-size: 0.85rem; font-weight: 600; cursor: pointer;" class="pos-pay-type-label">
+                            <input type="radio" name="pos-payment-type" value="Naqd" checked style="display: none;" onchange="updatePOSPaymentUI()">
+                            <i class="fas fa-money-bill-wave" style="color: #10b981;"></i> Naqd
+                        </label>
+                        <label style="display: flex; align-items: center; justify-content: center; gap: 6px; padding: 10px; background: #0f172a; border: 1px solid #334155; border-radius: 8px; color: #f8fafc; font-size: 0.85rem; font-weight: 600; cursor: pointer;" class="pos-pay-type-label">
+                            <input type="radio" name="pos-payment-type" value="Karta" style="display: none;" onchange="updatePOSPaymentUI()">
+                            <i class="fas fa-credit-card" style="color: #3b82f6;"></i> Karta
+                        </label>
+                        <label style="display: flex; align-items: center; justify-content: center; gap: 6px; padding: 10px; background: #0f172a; border: 1px solid #334155; border-radius: 8px; color: #f8fafc; font-size: 0.85rem; font-weight: 600; cursor: pointer;" class="pos-pay-type-label">
+                            <input type="radio" name="pos-payment-type" value="Elektron" style="display: none;" onchange="updatePOSPaymentUI()">
+                            <i class="fas fa-mobile-alt" style="color: #a855f7;"></i> Click/Payme
+                        </label>
+                        <label style="display: flex; align-items: center; justify-content: center; gap: 6px; padding: 10px; background: #0f172a; border: 1px solid #ef4444; border-radius: 8px; color: #f8fafc; font-size: 0.85rem; font-weight: 600; cursor: pointer;" class="pos-pay-type-label" id="pos-pay-debt-label">
+                            <input type="radio" name="pos-payment-type" value="Qarz" style="display: none;" onchange="updatePOSPaymentUI()">
+                            <i class="fas fa-hand-holding-usd" style="color: #ef4444;"></i> Qarz (Nasiya)
+                        </label>
+                    </div>
+                </div>
+                
+                <!-- Submit Button -->
+                <button class="btn btn-primary" onclick="completePOSSale()" style="width: 100%; height: 46px; font-size: 1.05rem; font-weight: 700; margin-top: 10px; background: #10b981; border-color: #10b981; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer;">
+                    <i class="fas fa-check-circle"></i> Sotuvni yakunlash
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Supabase JS SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Storage & DB wraps -->
+    <script src="js/storage.js"></script>
+    <script src="js/db.js"></script>
+    <!-- POS Dedicated Script -->
+    <script src="js/pos.js?v=2"></script>
+</body>
+</html>
