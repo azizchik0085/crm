@@ -321,6 +321,13 @@ window.App = {
         }
         
         const activeUserRole = localStorage.getItem('activeUserRole');
+        
+        // Redirect POS Kassa role to dedicated POS terminal
+        if (activeUserRole && (activeUserRole === 'POS Kassa' || activeUserRole.toLowerCase().includes('pos kassa') || activeUserRole.toLowerCase() === 'pos_kassa')) {
+            window.location.href = 'pos.html';
+            return;
+        }
+        
         const isSuperAdminPortal = !!window.IS_SUPERADMIN_PORTAL;
         
         // Seanslar xavfsizligini ta'minlash: Portallar va rollar mosligini tekshirish

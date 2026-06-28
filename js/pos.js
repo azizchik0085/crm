@@ -9,15 +9,23 @@ const POS = {
     currentUser: null,
 
     init: async function() {
-        // 1. Authenticate user
-        const localData = AppStorage.load();
-        this.currentUser = localData.currentUser;
+        // 1. Authenticate user from localStorage
+        const activeUserId = localStorage.getItem('activeUserId');
+        const activeCompanyId = localStorage.getItem('activeCompanyId');
+        const activeUserRole = localStorage.getItem('activeUserRole');
+        const activeUserName = localStorage.getItem('activeUserName');
         
-        if (!this.currentUser) {
-            // Redirect to index.html to login
+        if (!activeUserId) {
             window.location.href = 'index.html';
             return;
         }
+
+        this.currentUser = {
+            id: activeUserId,
+            company_id: activeCompanyId,
+            role: activeUserRole,
+            name: activeUserName
+        };
 
         // Display Cashier details
         document.getElementById('pos-cashier-name').textContent = this.currentUser.name || 'Kassa xodimi';
@@ -443,7 +451,12 @@ function updatePOSTotals() { POS.updateTotals(); }
 function updatePOSPaymentUI() { POS.updatePaymentUI(); }
 function completePOSSale() { POS.completeSale(); }
 function logout() {
-    AppStorage.save({ currentUser: null, settings: {} });
+    localStorage.removeItem('activeUserId');
+    localStorage.removeItem('activeCompanyId');
+    localStorage.removeItem('activeUserRole');
+    localStorage.removeItem('activeUserName');
+    localStorage.removeItem('activeView');
+    document.cookie = "company_id=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
     window.location.href = 'index.html';
 }
 
