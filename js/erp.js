@@ -854,7 +854,7 @@ window.HR = {
         } catch (err) {
             console.error("Xodimni saqlashda xatolik:", err);
             const errStr = err.message || "";
-            if (errStr.includes("column") || errStr.includes("login") || errStr.includes("password") || errStr.includes("400") || errStr.toLowerCase().includes("bad request") || errStr.includes("does not exist")) {
+            if (errStr.includes("does not exist") || (errStr.includes("column") && (errStr.includes("login") || errStr.includes("password")))) {
                 alert("Xatolik: Supabase bazasida 'login' va 'password' ustunlari topilmadi!\n\nIltimos, Supabase Dashboard SQL Editor oynasida quyidagi SQL so'rovni ishga tushiring:\n\nALTER TABLE public.employees ADD COLUMN IF NOT EXISTS login TEXT UNIQUE;\nALTER TABLE public.employees ADD COLUMN IF NOT EXISTS password TEXT;");
             } else {
                 alert("Xodimni saqlashda xatolik yuz berdi: " + errStr);
