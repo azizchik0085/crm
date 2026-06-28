@@ -672,6 +672,29 @@ def get_employees(request: Request):
 @app.post("/api/employees")
 def save_employee(employee: dict, request: Request):
     company_id = get_company_id(request)
+    
+    # Check for unique login across employees table
+    login = employee.get("login")
+    if login:
+        login_val = login.strip()
+        if login_val:
+            query = f"employees?login=eq.{login_val}"
+            emp_id = employee.get("id")
+            if emp_id:
+                query += f"&id=neq.{emp_id}"
+            try:
+                # Query central database directly to check unique login globally
+                existing_login = supabase_req("GET", query, use_central=True)
+                if existing_login and isinstance(existing_login, list) and len(existing_login) > 0:
+                    raise HTTPException(
+                        status_code=400, 
+                        detail=f"Tizimda '{login_val}' logini allaqachon band. Iltimos, boshqa kirish logini tanlang!"
+                    )
+            except HTTPException as he:
+                raise he
+            except Exception:
+                pass
+
     if company_id:
         settings = get_company_settings(company_id)
         max_employees = int(settings.get("max_employees", 100))
