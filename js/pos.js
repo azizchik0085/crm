@@ -439,6 +439,115 @@ const POS = {
             console.error("POS transaction failed:", e);
             alert("Xatolik yuz berdi: " + e.message);
         }
+    },
+
+    openXReport: async function() {
+        const modal = document.getElementById('x-report-modal');
+        const body = document.getElementById('x-report-body');
+        modal.style.display = 'flex';
+        body.innerHTML = '<div style="text-align: center; padding: 24px; color: var(--text-muted);"><i class="fas fa-spinner fa-spin fa-2x"></i><br>Hisobot tayyorlanmoqda...</div>';
+        
+        try {
+            const res = await fetch('/api/receipts');
+            if (!res.ok) throw new Error("Cheklarni yuklashda xatolik yuz berdi");
+            const receipts = await res.json();
+            
+            const todayStr = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD
+            const cashierName = this.currentUser.name || 'Kassa xodimi';
+            
+            // Filter today's receipts for this cashier
+            const todayReceipts = receipts.filter(r => {
+                const isToday = r.created_at && r.created_at.startsWith(todayStr);
+                const isMyReceipt = r.cashier_name === cashierName;
+                return isToday && isMyReceipt;
+            });
+            
+            let totalSales = todayReceipts.length;
+            let grossAmount = 0;
+            let totalDiscount = 0;
+            let netAmount = 0;
+            
+            let cashTotal = 0;
+            let cardTotal = 0;
+            let electronicTotal = 0;
+            let debtTotal = 0;
+            
+            todayReceipts.forEach(r => {
+                const total = parseFloat(r.total_amount) || 0;
+                const disc = parseFloat(r.discount) || 0;
+                
+                netAmount += total;
+                totalDiscount += disc;
+                grossAmount += (total + disc);
+                
+                const payType = r.payment_type || 'Naqd';
+                if (payType === 'Naqd') cashTotal += total;
+                else if (payType === 'Karta') cardTotal += total;
+                else if (payType === 'Elektron') electronicTotal += total;
+                else if (payType === 'Qarz') debtTotal += total;
+            });
+            
+            const companyName = document.getElementById('pos-company-name').textContent;
+            const nowTime = new Date().toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            
+            body.innerHTML = `
+                <div style="text-align: center; font-weight: bold; border-bottom: 1px dashed #334155; padding-bottom: 8px; margin-bottom: 8px;">
+                    <span style="font-size: 1.05rem;">${companyName}</span><br>
+                    <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: normal;">Smena hisoboti (X-HISOBOT)</span>
+                </div>
+                
+                <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--text-muted);">
+                    <span>Sana: ${new Date().toLocaleDateString('uz-UZ')}</span>
+                    <span>Vaqt: ${nowTime}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 10px;">
+                    <span>Kassir: ${cashierName}</span>
+                </div>
+                
+                <div style="border-bottom: 1px dashed #334155; padding-bottom: 8px; margin-bottom: 8px; display: flex; flex-direction: column; gap: 6px;">
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>Cheklar soni:</span>
+                        <span style="font-weight: 600;">${totalSales} ta</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>Umumiy Savdo (Gross):</span>
+                        <span style="font-weight: 600;">${grossAmount.toLocaleString()} UZS</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; color: #ef4444;">
+                        <span>Berilgan Chegirmalar:</span>
+                        <span style="font-weight: 600;">-${totalDiscount.toLocaleString()} UZS</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; font-size: 1rem; font-weight: 700; color: #10b981; border-top: 1px dashed #334155; padding-top: 6px; margin-top: 4px;">
+                        <span>Sof tushum (Net):</span>
+                        <span>${netAmount.toLocaleString()} UZS</span>
+                    </div>
+                </div>
+                
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                    <div style="font-weight: bold; font-size: 0.85rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 4px;">To'lov turlari bo'yicha:</div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>Naqd pul:</span>
+                        <span style="font-weight: 600; color: #10b981;">${cashTotal.toLocaleString()} UZS</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>Plastik karta:</span>
+                        <span style="font-weight: 600; color: #3b82f6;">${cardTotal.toLocaleString()} UZS</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>Click / Payme:</span>
+                        <span style="font-weight: 600; color: #a855f7;">${electronicTotal.toLocaleString()} UZS</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; border-top: 1px dotted #334155; padding-top: 4px;">
+                        <span>Nasiya (Qarzlar):</span>
+                        <span style="font-weight: 600; color: #ef4444;">${debtTotal.toLocaleString()} UZS</span>
+                    </div>
+                </div>
+            `;
+            
+        } catch (e) {
+            console.error("Load X-Report failed:", e);
+            body.innerHTML = `<div style="color: var(--danger); text-align: center; padding: 24px;"><i class="fas fa-exclamation-triangle fa-2x"></i><br>Hisobotni yuklashda xatolik: ${e.message}</div>`;
+        }
     }
 };
 
@@ -450,6 +559,47 @@ function saveNewPOSCustomer(e) { POS.saveNewCustomer(e); }
 function updatePOSTotals() { POS.updateTotals(); }
 function updatePOSPaymentUI() { POS.updatePaymentUI(); }
 function completePOSSale() { POS.completeSale(); }
+function openXReport() { POS.openXReport(); }
+function closeXReportModal() { document.getElementById('x-report-modal').style.display = 'none'; }
+function printXReport() {
+    const reportHtml = document.getElementById('x-report-body').innerHTML;
+    const printWindow = window.open('', '_blank', 'width=400,height=600');
+    printWindow.document.write(`
+        <html>
+        <head>
+            <title>X-Hisobot</title>
+            <style>
+                body {
+                    font-family: 'Courier New', Courier, monospace;
+                    padding: 20px;
+                    color: #000;
+                    background: #fff;
+                    font-size: 14px;
+                }
+                .text-center { text-align: center; }
+                .divider { border-top: 1px dashed #000; margin: 10px 0; }
+                .flex-justify { display: flex; justify-content: space-between; }
+                .bold { font-weight: bold; }
+            </style>
+        </head>
+        <body>
+            <h2 class="text-center" style="margin: 0 0 5px 0;">X-HISOBOT</h2>
+            <h3 class="text-center" style="margin: 0 0 10px 0;">KASSA TERMINALI</h3>
+            <div class="divider"></div>
+            \${reportHtml}
+            <div class="divider"></div>
+            <p class="text-center" style="font-size: 11px; margin-top: 20px;">Smena yopilmagan (X-Hisobot)<br>Dastur: Smart POS</p>
+            <script>
+                window.onload = function() {
+                    window.print();
+                    setTimeout(function() { window.close(); }, 500);
+                }
+            <\/script>
+        </body>
+        </html>
+    `);
+    printWindow.document.close();
+}
 function logout() {
     localStorage.removeItem('activeUserId');
     localStorage.removeItem('activeCompanyId');

@@ -61,6 +61,11 @@ async def company_id_middleware(request: Request, call_next):
     token = active_company_id.set(company_id)
     try:
         response = await call_next(request)
+        # Prevent browser caching of API responses to avoid mixed company data on account switches
+        if request.url.path.startswith("/api/"):
+            response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
         return response
     finally:
         active_company_id.reset(token)
@@ -93,16 +98,25 @@ def get_company_id(request: Request = None, company_id: str = None):
     cid = active_company_id.get()
     if cid:
         return cid
-    # Fallback to local settings file if running locally and no company_id is provided
-    try:
-        backend_dir = os.path.dirname(__file__)
-        for f in os.listdir(backend_dir):
-            if f.startswith("settings_") and f.endswith(".json"):
-                local_cid = f.replace("settings_", "").replace(".json", "")
-                if local_cid:
-                    return local_cid
-    except Exception:
-        pass
+    # Fallback to local settings file ONLY if running locally
+    if request:
+        try:
+            host = request.base_url.hostname or ""
+            is_local = False
+            if host in ["localhost", "127.0.0.1", "::1"]:
+                is_local = True
+            elif host.startswith(("192.168.", "10.", "172.16.", "172.17.", "172.18.", "172.19.", "172.2", "172.3")):
+                is_local = True
+                
+            if is_local:
+                backend_dir = os.path.dirname(__file__)
+                for f in os.listdir(backend_dir):
+                    if f.startswith("settings_") and f.endswith(".json"):
+                        local_cid = f.replace("settings_", "").replace(".json", "")
+                        if local_cid:
+                            return local_cid
+        except Exception:
+            pass
     return None
 
 # Helper to proxy requests to Supabase REST API
