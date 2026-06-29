@@ -93,6 +93,16 @@ def get_company_id(request: Request = None, company_id: str = None):
     cid = active_company_id.get()
     if cid:
         return cid
+    # Fallback to local settings file if running locally and no company_id is provided
+    try:
+        backend_dir = os.path.dirname(__file__)
+        for f in os.listdir(backend_dir):
+            if f.startswith("settings_") and f.endswith(".json"):
+                local_cid = f.replace("settings_", "").replace(".json", "")
+                if local_cid:
+                    return local_cid
+    except Exception:
+        pass
     return None
 
 # Helper to proxy requests to Supabase REST API
@@ -779,11 +789,12 @@ class CallEvent(BaseModel):
     phone: str
 
 @app.post("/api/calls/event")
-def handle_call_event(payload: CallEvent):
+def handle_call_event(payload: CallEvent, request: Request):
     event = payload.event
     phone = payload.phone
+    company_id = get_company_id(request)
     
-    print(f"Received call event: {event} for phone: {phone}")
+    print(f"Received call event: {event} for phone: {phone} (Company: {company_id})")
     
     # Clean phone format
     clean_phone = "".join(c for c in phone if c.isdigit() or c == "+")
@@ -797,7 +808,10 @@ def handle_call_event(payload: CallEvent):
     customer_id = None
     if event in ["incoming", "outgoing"]:
         try:
-            customers = supabase_req("GET", "customers?select=id,phone")
+            path = "customers?select=id,phone"
+            if company_id:
+                path += f"&company_id=eq.{company_id}"
+            customers = supabase_req("GET", path)
             digits_only_phone = "".join(c for c in clean_phone if c.isdigit())
             
             for c in customers:
@@ -832,6 +846,8 @@ def handle_call_event(payload: CallEvent):
                     "status": "lead",
                     "value": 0
                 }
+                if company_id:
+                    new_customer["company_id"] = company_id
                 supabase_req("POST", "customers?on_conflict=id", json_data=new_customer)
                 print(f"Auto-created new lead: {customer_id} ({formatted_phone})")
             except Exception as e:
@@ -852,21 +868,34 @@ def handle_call_event(payload: CallEvent):
             "duration": 0,
             "status": "ringing"
         }
+        if company_id:
+            call_payload["company_id"] = company_id
         supabase_req("POST", "calls?on_conflict=id", json_data=call_payload)
         return {"status": "success", "message": f"Created call {call_id}"}
         
     elif event == "start":
         # Find active ringing call
-        active_calls = supabase_req("GET", f"calls?select=*&phone=eq.{clean_phone}&status=eq.ringing&order=id.desc&limit=1")
+        path = f"calls?select=*&phone=eq.{clean_phone}&status=eq.ringing"
+        if company_id:
+            path += f"&company_id=eq.{company_id}"
+        path += "&order=id.desc&limit=1"
+        active_calls = supabase_req("GET", path)
         if active_calls:
             call = active_calls[0]
-            supabase_req("PATCH", f"calls?id=eq.{call['id']}", json_data={"status": "answered"})
+            patch_path = f"calls?id=eq.{call['id']}"
+            if company_id:
+                patch_path += f"&company_id=eq.{company_id}"
+            supabase_req("PATCH", patch_path, json_data={"status": "answered"})
             return {"status": "success", "message": f"Call answered: {call['id']}"}
         return {"status": "error", "message": f"No active ringing call found for {clean_phone}"}
         
     elif event == "end":
         # Find active call (ringing or answered)
-        active_calls = supabase_req("GET", f"calls?select=*&phone=eq.{clean_phone}&status=in.(ringing,answered)&order=id.desc&limit=1")
+        path = f"calls?select=*&phone=eq.{clean_phone}&status=in.(ringing,answered)"
+        if company_id:
+            path += f"&company_id=eq.{company_id}"
+        path += "&order=id.desc&limit=1"
+        active_calls = supabase_req("GET", path)
         if active_calls:
             call = active_calls[0]
             
@@ -894,7 +923,10 @@ def handle_call_event(payload: CallEvent):
                 # If answered, make sure duration is at least 1 second
                 duration = max(1, duration)
                 
-            supabase_req("PATCH", f"calls?id=eq.{call['id']}", json_data={"duration": duration, "status": final_status})
+            patch_path = f"calls?id=eq.{call['id']}"
+            if company_id:
+                patch_path += f"&company_id=eq.{company_id}"
+            supabase_req("PATCH", patch_path, json_data={"duration": duration, "status": final_status})
             return {"status": "success", "message": f"Call ended: {call['id']}, status: {final_status}, duration: {duration}s"}
         return {"status": "error", "message": f"No active call found for {clean_phone}"}
 
@@ -961,10 +993,14 @@ async def sipuni_webhook(request: Request):
         
     clean_phone = "".join(c for c in str(client_phone) if c.isdigit() or c == "+")
     
+    company_id = get_company_id(request)
     customer_id = None
     if is_incoming and clean_phone and clean_phone != "unknown":
         try:
-            customers = supabase_req("GET", "customers?select=id,phone")
+            path = "customers?select=id,phone"
+            if company_id:
+                path += f"&company_id=eq.{company_id}"
+            customers = supabase_req("GET", path)
             digits_only_phone = "".join(c for c in clean_phone if c.isdigit())
             
             for c in customers:
@@ -996,6 +1032,8 @@ async def sipuni_webhook(request: Request):
                     "status": "lead",
                     "value": 0
                 }
+                if company_id:
+                    new_customer["company_id"] = company_id
                 supabase_req("POST", "customers?on_conflict=id", json_data=new_customer)
                 print(f"Sipuni Webhook created new lead: {customer_id} ({formatted_phone})")
             except Exception as e:
@@ -1011,6 +1049,8 @@ async def sipuni_webhook(request: Request):
             "duration": 0,
             "status": "ringing"
         }
+        if company_id:
+            call_payload["company_id"] = company_id
         try:
             supabase_req("POST", "calls?on_conflict=id", json_data=call_payload)
         except Exception as e:
@@ -1052,6 +1092,8 @@ async def sipuni_webhook(request: Request):
             "duration": duration,
             "status": crm_status
         }
+        if company_id:
+            call_payload["company_id"] = company_id
         if recording_url:
             call_payload["recording_url"] = recording_url
             
@@ -2079,12 +2121,21 @@ class AIAnalyzePayload(BaseModel):
     prompt: str
 
 @app.post("/api/ai/analyze")
-def ai_analyze(payload: AIAnalyzePayload):
+def ai_analyze(payload: AIAnalyzePayload, request: Request):
+    company_id = get_company_id(request)
     try:
         # Fetch CRM context
-        customers = supabase_req("GET", "customers?select=*")
-        inventory = supabase_req("GET", "inventory?select=*")
-        transactions = supabase_req("GET", "transactions?select=*")
+        cust_path = "customers?select=*"
+        inv_path = "inventory?select=*"
+        tx_path = "transactions?select=*"
+        if company_id:
+            cust_path += f"&company_id=eq.{company_id}"
+            inv_path += f"&company_id=eq.{company_id}"
+            tx_path += f"&company_id=eq.{company_id}"
+            
+        customers = supabase_req("GET", cust_path)
+        inventory = supabase_req("GET", inv_path)
+        transactions = supabase_req("GET", tx_path)
         
         # Calculate financials
         total_income = sum(t.get("amount", 0) for t in transactions if t.get("type") == "income")
@@ -2130,7 +2181,7 @@ Qoidalar:
 3. Javobingizni chiroyli Markdown formatida yozing (masalan, muhim ma'lumotlarni qalin harflar bilan yoki ro'yxat ko'rinishida bering).
 4. Qisqa va lo'nda bo'ling. Keraksiz ortiqcha gaplar qo'shmang."""
 
-        ai_reply = call_ai_engine(payload.prompt, system_instruction)
+        ai_reply = call_ai_engine(payload.prompt, system_instruction, company_id=company_id)
         if ai_reply == "FALLBACK":
             ai_reply = generate_analyze_fallback(payload.prompt, customers, inventory, total_income, total_expense, net_balance)
             
@@ -2138,9 +2189,16 @@ Qoidalar:
     except Exception as e:
         print(f"AI Analyze failed: {e}")
         try:
-            customers = supabase_req("GET", "customers?select=*")
-            inventory = supabase_req("GET", "inventory?select=*")
-            transactions = supabase_req("GET", "transactions?select=*")
+            cust_path = "customers?select=*"
+            inv_path = "inventory?select=*"
+            tx_path = "transactions?select=*"
+            if company_id:
+                cust_path += f"&company_id=eq.{company_id}"
+                inv_path += f"&company_id=eq.{company_id}"
+                tx_path += f"&company_id=eq.{company_id}"
+            customers = supabase_req("GET", cust_path)
+            inventory = supabase_req("GET", inv_path)
+            transactions = supabase_req("GET", tx_path)
             total_income = sum(t.get("amount", 0) for t in transactions if t.get("type") == "income")
             total_expense = sum(t.get("amount", 0) for t in transactions if t.get("type") == "expense")
             net_balance = total_income - total_expense
@@ -2153,18 +2211,27 @@ class AISuggestPayload(BaseModel):
     customer_id: str
 
 @app.post("/api/ai/suggest")
-def ai_suggest(payload: AISuggestPayload):
+def ai_suggest(payload: AISuggestPayload, request: Request):
+    company_id = get_company_id(request)
     try:
         # Fetch customer and messages
-        messages = supabase_req("GET", f"messages?customer_id=eq.{payload.customer_id}&order=created_at.asc")
-        customer_res = supabase_req("GET", f"customers?id=eq.{payload.customer_id}")
+        msg_path = f"messages?customer_id=eq.{payload.customer_id}&order=created_at.asc"
+        cust_path = f"customers?id=eq.{payload.customer_id}"
+        inv_path = "inventory?select=*"
+        if company_id:
+            msg_path += f"&company_id=eq.{company_id}"
+            cust_path += f"&company_id=eq.{company_id}"
+            inv_path += f"&company_id=eq.{company_id}"
+            
+        messages = supabase_req("GET", msg_path)
+        customer_res = supabase_req("GET", cust_path)
         
         customer_name = "Noma'lum"
         if customer_res:
             customer_name = customer_res[0].get("name", "Noma'lum")
             
         # Fetch inventory for product suggestions
-        inventory = supabase_req("GET", "inventory?select=*")
+        inventory = supabase_req("GET", inv_path)
         inv_list = []
         for p in inventory:
             status = "Sotuvda mavjud" if p.get("stock", 0) > 0 else "Tugagan (yaqin orada keladi)"
@@ -2195,7 +2262,7 @@ Qoidalar:
 5. Faqat operator mijozga yuborishi mumkin bo'lgan javob matnini o'zini qaytaring. Ortiqcha "Mana javob:" yoki qo'shtirnoqlar kabi matnlarni qo'shmang."""
 
         prompt = "Mijozga mos javob matnini tayyorlang."
-        suggestion = call_ai_engine(prompt, system_instruction)
+        suggestion = call_ai_engine(prompt, system_instruction, company_id=company_id)
         
         if suggestion == "FALLBACK":
             last_message_text = ""
@@ -2210,7 +2277,10 @@ Qoidalar:
     except Exception as e:
         print(f"AI suggestion failed: {e}")
         try:
-            inventory = supabase_req("GET", "inventory?select=*")
+            inv_path = "inventory?select=*"
+            if company_id:
+                inv_path += f"&company_id=eq.{company_id}"
+            inventory = supabase_req("GET", inv_path)
             last_message_text = ""
             if messages:
                 cust_msgs = [m for m in messages if m.get("sender") == "customer"]
@@ -2222,9 +2292,13 @@ Qoidalar:
             return {"suggestion": "Kechirasiz, sun'iy intellektdan javob taklifi olishda xatolik yuz berdi."}
 
 @app.get("/api/chats")
-def get_chats():
+def get_chats(request: Request):
+    company_id = get_company_id(request)
     try:
-        messages = supabase_req("GET", "messages?select=*&order=created_at.desc")
+        msg_path = "messages?select=*&order=created_at.desc"
+        if company_id:
+            msg_path += f"&company_id=eq.{company_id}"
+        messages = supabase_req("GET", msg_path)
     except Exception as e:
         print(f"Failed to fetch messages for chats list: {e}")
         return []
@@ -2236,7 +2310,10 @@ def get_chats():
             last_messages[c_id] = msg
             
     try:
-        customers = supabase_req("GET", "customers?select=*")
+        cust_path = "customers?select=*"
+        if company_id:
+            cust_path += f"&company_id=eq.{company_id}"
+        customers = supabase_req("GET", cust_path)
         customers_dict = {c["id"]: c for c in customers}
     except Exception as e:
         print(f"Failed to fetch customers for chats list: {e}")
@@ -2263,8 +2340,12 @@ def get_chats():
     return chats_list
 
 @app.get("/api/messages/{customer_id}")
-def get_messages(customer_id: str):
-    return supabase_req("GET", f"messages?customer_id=eq.{customer_id}&order=created_at.asc")
+def get_messages(customer_id: str, request: Request):
+    company_id = get_company_id(request)
+    path = f"messages?customer_id=eq.{customer_id}&order=created_at.asc"
+    if company_id:
+        path += f"&company_id=eq.{company_id}"
+    return supabase_req("GET", path)
 
 class MessagePayload(BaseModel):
     customer_id: str
@@ -2273,25 +2354,29 @@ class MessagePayload(BaseModel):
     text: str
 
 @app.post("/api/messages")
-def send_and_save_message(payload: MessagePayload):
+def send_and_save_message(payload: MessagePayload, request: Request):
+    company_id = get_company_id(request)
     new_msg = {
         "customer_id": payload.customer_id,
         "sender": payload.sender,
         "platform": payload.platform,
         "text": payload.text
     }
+    if company_id:
+        new_msg["company_id"] = company_id
     
     saved_msg = supabase_req("POST", "messages", json_data=new_msg)
     
     if payload.sender == "agent":
+        settings = get_company_settings(company_id) if company_id else settings_state
         if payload.platform == "telegram":
             chat_id = payload.customer_id.replace("c_tg_", "")
-            token = settings_state.get("telegram_token")
+            token = settings.get("telegram_token")
             if token:
                 send_telegram_message(token, chat_id, payload.text)
         elif payload.platform == "instagram":
             recipient_id = payload.customer_id.replace("c_ig_", "")
-            token = settings_state.get("instagram_token")
+            token = settings.get("instagram_token")
             if token:
                 send_instagram_message(token, recipient_id, payload.text)
                 
@@ -2316,9 +2401,10 @@ def verify_instagram_webhook(request: Request):
     return {"message": "Instagram Webhook Verification Endpoint"}
 
 @app.post("/api/integration/instagram/webhook")
-def handle_instagram_webhook(body: dict):
+def handle_instagram_webhook(body: dict, request: Request):
     try:
-        print("Received Instagram Webhook:", json.dumps(body))
+        company_id = get_company_id(request)
+        print(f"Received Instagram Webhook: {json.dumps(body)} (Company: {company_id})")
         
         if body.get("object") == "instagram":
             for entry in body.get("entry", []):
@@ -2331,7 +2417,10 @@ def handle_instagram_webhook(body: dict):
                     if sender_id and text:
                         customer_id = f"c_ig_{sender_id}"
                         
-                        res = supabase_req("GET", f"customers?id=eq.{customer_id}")
+                        path = f"customers?id=eq.{customer_id}"
+                        if company_id:
+                            path += f"&company_id=eq.{company_id}"
+                        res = supabase_req("GET", path)
                         if not res:
                             new_customer = {
                                 "id": customer_id,
@@ -2341,6 +2430,8 @@ def handle_instagram_webhook(body: dict):
                                 "status": "lead",
                                 "value": 0
                             }
+                            if company_id:
+                                new_customer["company_id"] = company_id
                             supabase_req("POST", "customers?on_conflict=id", json_data=new_customer)
                             print(f"Auto-created Instagram customer: {customer_id}")
                             
@@ -2350,21 +2441,27 @@ def handle_instagram_webhook(body: dict):
                             "platform": "instagram",
                             "text": text
                         }
+                        if company_id:
+                            new_msg["company_id"] = company_id
                         supabase_req("POST", "messages", json_data=new_msg)
                         print(f"Stored Instagram message from {customer_id}: {text}")
                         
                         # Trigger AI auto reply if enabled
-                        if settings_state.get("ai_auto_reply"):
+                        settings = get_company_settings(company_id) if company_id else settings_state
+                        if settings.get("ai_auto_reply"):
                             cust_name = f"Instagram User {sender_id}"
                             try:
-                                cust_res = supabase_req("GET", f"customers?id=eq.{customer_id}")
+                                path_cust = f"customers?id=eq.{customer_id}"
+                                if company_id:
+                                    path_cust += f"&company_id=eq.{company_id}"
+                                cust_res = supabase_req("GET", path_cust)
                                 if cust_res:
                                     cust_name = cust_res[0].get("name", cust_name)
                             except Exception:
                                 pass
                                 
                             import threading
-                            threading.Thread(target=trigger_ai_auto_reply, args=(customer_id, "instagram", cust_name, text)).start()
+                            threading.Thread(target=trigger_ai_auto_reply, args=(customer_id, "instagram", cust_name, text, company_id)).start()
                         
         return {"status": "success"}
     except Exception as e:
@@ -2376,17 +2473,21 @@ def handle_instagram_webhook(body: dict):
 # --- CHATS SIMULATOR TEST ENDPOINTS ---
 
 @app.post("/api/test/simulate-telegram")
-def simulate_telegram_message(payload: dict):
+def simulate_telegram_message(payload: dict, request: Request):
     chat_id = payload.get("chat_id")
     text = payload.get("text")
     name = payload.get("name", f"Telegram User {chat_id}")
+    company_id = get_company_id(request)
     
     if not chat_id or not text:
         raise HTTPException(status_code=400, detail="chat_id and text are required")
         
     customer_id = f"c_tg_{chat_id}"
     try:
-        res = supabase_req("GET", f"customers?id=eq.{customer_id}")
+        path = f"customers?id=eq.{customer_id}"
+        if company_id:
+            path += f"&company_id=eq.{company_id}"
+        res = supabase_req("GET", path)
         if not res:
             new_customer = {
                 "id": customer_id,
@@ -2396,6 +2497,8 @@ def simulate_telegram_message(payload: dict):
                 "status": "lead",
                 "value": 0
             }
+            if company_id:
+                new_customer["company_id"] = company_id
             supabase_req("POST", "customers?on_conflict=id", json_data=new_customer)
             print(f"[Simulator] Auto-created Telegram customer: {customer_id} ({name})")
             
@@ -2405,6 +2508,8 @@ def simulate_telegram_message(payload: dict):
             "platform": "telegram",
             "text": text
         }
+        if company_id:
+            new_msg["company_id"] = company_id
         supabase_req("POST", "messages", json_data=new_msg)
         print(f"[Simulator] Stored Telegram message: {text}")
         return {"status": "success", "message": "Telegram message simulated successfully"}
@@ -2413,17 +2518,21 @@ def simulate_telegram_message(payload: dict):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/test/simulate-instagram")
-def simulate_instagram_message(payload: dict):
+def simulate_instagram_message(payload: dict, request: Request):
     sender_id = payload.get("sender_id")
     text = payload.get("text")
     name = payload.get("name", f"Instagram User {sender_id}")
+    company_id = get_company_id(request)
     
     if not sender_id or not text:
         raise HTTPException(status_code=400, detail="sender_id and text are required")
         
     customer_id = f"c_ig_{sender_id}"
     try:
-        res = supabase_req("GET", f"customers?id=eq.{customer_id}")
+        path = f"customers?id=eq.{customer_id}"
+        if company_id:
+            path += f"&company_id=eq.{company_id}"
+        res = supabase_req("GET", path)
         if not res:
             new_customer = {
                 "id": customer_id,
@@ -2433,6 +2542,8 @@ def simulate_instagram_message(payload: dict):
                 "status": "lead",
                 "value": 0
             }
+            if company_id:
+                new_customer["company_id"] = company_id
             supabase_req("POST", "customers?on_conflict=id", json_data=new_customer)
             print(f"[Simulator] Auto-created Instagram customer: {customer_id} ({name})")
             
@@ -2442,6 +2553,8 @@ def simulate_instagram_message(payload: dict):
             "platform": "instagram",
             "text": text
         }
+        if company_id:
+            new_msg["company_id"] = company_id
         supabase_req("POST", "messages", json_data=new_msg)
         print(f"[Simulator] Stored Instagram message: {text}")
         return {"status": "success", "message": "Instagram message simulated successfully"}
@@ -3321,9 +3434,10 @@ def get_sync_status():
     return sync_progress
 
 @app.post("/api/test/simulate-receipt")
-def simulate_receipt(payload: dict):
+def simulate_receipt(payload: dict, request: Request):
+    company_id = get_company_id(request)
     try:
-        save_parsed_receipt(payload)
+        save_parsed_receipt(payload, company_id)
         return {"status": "success", "message": "Receipt simulated successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
