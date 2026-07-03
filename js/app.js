@@ -2081,5 +2081,51 @@ window.SuperAdmin = {
                 console.error("Failed to copy link:", err);
                 alert("Nusxalashda xatolik yuz berdi. Havolani o'zingiz belgilab nusxalab oling.");
             });
+    },
+
+    uploadTaplinkLogo: async function(input) {
+        if (!input.files || !input.files[0]) return;
+        
+        const file = input.files[0];
+        const formData = new FormData();
+        formData.append("file", file);
+        
+        try {
+            // Find loading button wrapper
+            const button = input.previousElementSibling ? input.previousElementSibling.querySelector('button') : null;
+            const originalHTML = button ? button.innerHTML : '';
+            if (button) {
+                button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Yuklanmoqda...';
+                button.disabled = true;
+            }
+            
+            const response = await fetch("/api/settings/upload-logo", {
+                method: "POST",
+                headers: {
+                    "x-company-id": localStorage.getItem("company_id") || localStorage.getItem("activeCompanyId") || "admin"
+                },
+                body: formData
+            });
+            
+            if (button) {
+                button.innerHTML = originalHTML;
+                button.disabled = false;
+            }
+            
+            if (response.ok) {
+                const data = await response.json();
+                const logoInput = document.getElementById("settings-taplink-logo");
+                if (logoInput) {
+                    logoInput.value = data.url;
+                }
+                alert("Logotip muvaffaqiyatli yuklandi!");
+            } else {
+                const err = await response.json();
+                alert("Yuklashda xatolik: " + (err.detail || "Noma'lum xato"));
+            }
+        } catch (err) {
+            console.error("Logo upload failed:", err);
+            alert("Logotip yuklashda xatolik yuz berdi");
+        }
     }
 };

@@ -5,7 +5,7 @@ import asyncio
 from datetime import datetime, timezone
 from contextvars import ContextVar
 import requests
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, UploadFile, File
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -1609,6 +1609,25 @@ def get_public_taplink_settings(company_id: str):
         "taplink_slogan": settings.get("taplink_slogan", ""),
         "taplink_logo": settings.get("taplink_logo", "/assets/logo.png")
     }
+
+@app.post("/api/settings/upload-logo")
+async def upload_logo(request: Request, file: UploadFile = File(...)):
+    company_id = get_company_id(request)
+    if not company_id:
+        raise HTTPException(status_code=400, detail="Kompaniya ID topilmadi")
+    
+    assets_dir = os.path.join(STATIC_DIR, "assets")
+    os.makedirs(assets_dir, exist_ok=True)
+    
+    timestamp = int(time.time())
+    file_ext = os.path.splitext(file.filename)[1] or ".png"
+    file_name = f"logo_{company_id}_{timestamp}{file_ext}"
+    file_path = os.path.join(assets_dir, file_name)
+    
+    with open(file_path, "wb") as buffer:
+        buffer.write(await file.read())
+        
+    return {"status": "success", "url": f"/assets/{file_name}"}
 
 @app.get("/api/settings")
 def get_settings(request: Request):
