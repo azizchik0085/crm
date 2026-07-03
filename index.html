@@ -1191,7 +1191,7 @@
                             <label for="settings-taplink-logo">Logotip rasmi (Logo)</label>
                             <div style="display:flex; gap:10px; align-items:center;">
                                 <input type="text" id="settings-taplink-logo" class="form-control" placeholder="Masalan: /assets/logo.png" style="flex-grow:1;">
-                                <button type="button" class="btn btn-secondary" onclick="document.getElementById('settings-taplink-logo-file').click()" style="white-space:nowrap; height: 38px; display:flex; align-items:center; gap:6px;"><i class="fas fa-upload"></i> Rasm Tanlash</button>
+                                <button type="button" id="settings-taplink-logo-btn" class="btn btn-secondary" onclick="document.getElementById('settings-taplink-logo-file').click()" style="white-space:nowrap; height: 38px; display:flex; align-items:center; gap:6px;"><i class="fas fa-upload"></i> Rasm Tanlash</button>
                             </div>
                             <input type="file" id="settings-taplink-logo-file" accept="image/*" style="display:none;" onchange="App.uploadTaplinkLogo(this)">
                         </div>

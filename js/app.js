@@ -2088,80 +2088,102 @@ window.SuperAdmin = {
         
         const file = input.files[0];
         
-        // Check file size (limit to 5MB before compression)
-        if (file.size > 5 * 1024 * 1024) {
-            alert("Xatolik: Tanlangan rasm juda katta! Max 5MB gacha rasm tanlang.");
+        // Let's support up to 50MB images
+        if (file.size > 50 * 1024 * 1024) {
+            alert("Xatolik: Tanlangan rasm juda katta! Max 50MB gacha rasm tanlang.");
             return;
         }
 
         const reader = new FileReader();
         
-        // Find button to show loading state
-        const button = input.previousElementSibling ? input.previousElementSibling.querySelector('button') : null;
-        const originalHTML = button ? button.innerHTML : '';
+        // Find button using its ID (extremely reliable and bulletproof)
+        const button = document.getElementById('settings-taplink-logo-btn');
+        const originalHTML = button ? button.innerHTML : 'Rasm Tanlash';
         if (button) {
             button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Tayyorlanmoqda...';
             button.disabled = true;
         }
 
         reader.onload = function(e) {
+            const rawBase64 = e.target.result;
             const img = new Image();
+            
             img.onload = function() {
-                // Resize image to 250x250 max to keep Base64 string small and lightning fast in database
-                const canvas = document.createElement('canvas');
-                let width = img.width;
-                let height = img.height;
-                const max_size = 250;
-                
-                if (width > height) {
-                    if (width > max_size) {
-                        height *= max_size / width;
-                        width = max_size;
+                try {
+                    // Resize image to keep base64 representation lightweight (max 250px)
+                    const canvas = document.createElement('canvas');
+                    let width = img.width;
+                    let height = img.height;
+                    const max_size = 250;
+                    
+                    if (width > height) {
+                        if (width > max_size) {
+                            height *= max_size / width;
+                            width = max_size;
+                        }
+                    } else {
+                        if (height > max_size) {
+                            width *= max_size / height;
+                            height = max_size;
+                        }
                     }
-                } else {
-                    if (height > max_size) {
-                        width *= max_size / height;
-                        height = max_size;
+                    
+                    canvas.width = width;
+                    canvas.height = height;
+                    
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+                    
+                    const base64Url = canvas.toDataURL('image/jpeg', 0.85);
+                    const logoInput = document.getElementById("settings-taplink-logo");
+                    if (logoInput) {
+                        logoInput.value = base64Url;
                     }
+                    
+                    if (button) {
+                        button.innerHTML = originalHTML;
+                        button.disabled = false;
+                    }
+                    alert("Rasm muvaffaqiyatli tayyorlandi! Sozlamalarni saqlash tugmasini bossangiz, u doimiy ravishda bazaga yoziladi.");
+                } catch (canvasErr) {
+                    console.error("Canvas compression failed, falling back to raw base64:", canvasErr);
+                    const logoInput = document.getElementById("settings-taplink-logo");
+                    if (logoInput) {
+                        logoInput.value = rawBase64;
+                    }
+                    if (button) {
+                        button.innerHTML = originalHTML;
+                        button.disabled = false;
+                    }
+                    alert("Rasm muvaffaqiyatli yuklandi!");
                 }
-                
-                canvas.width = width;
-                canvas.height = height;
-                
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0, width, height);
-                
-                // Convert to compressed Base64 JPEG URL (85% quality)
-                const base64Url = canvas.toDataURL('image/jpeg', 0.85);
-                
+            };
+            
+            img.onerror = function(err) {
+                console.error("Image object loading failed, falling back to raw base64:", err);
                 const logoInput = document.getElementById("settings-taplink-logo");
                 if (logoInput) {
-                    logoInput.value = base64Url;
+                    logoInput.value = rawBase64;
                 }
-                
                 if (button) {
                     button.innerHTML = originalHTML;
                     button.disabled = false;
                 }
-                
-                alert("Rasm muvaffaqiyatli tayyorlandi! Sozlamalarni saqlash tugmasini bossangiz, u doimiy ravishda bazaga (Supabase) yoziladi.");
+                alert("Rasm muvaffaqiyatli yuklandi!");
             };
-            img.onerror = function() {
-                if (button) {
-                    button.innerHTML = originalHTML;
-                    button.disabled = false;
-                }
-                alert("Rasmni o'qishda xatolik yuz berdi. Boshqa rasm formatini sinab ko'ring.");
-            };
-            img.src = e.target.result;
+            
+            img.src = rawBase64;
         };
-        reader.onerror = function() {
+        
+        reader.onerror = function(err) {
+            console.error("FileReader failed:", err);
             if (button) {
                 button.innerHTML = originalHTML;
                 button.disabled = false;
             }
             alert("Faylni o'qishda xatolik yuz berdi.");
         };
+        
         reader.readAsDataURL(file);
     }
 };
