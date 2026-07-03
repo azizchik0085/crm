@@ -566,7 +566,14 @@ window.HR = {
         if (!container) return;
 
         // Supabase yoki keshdan xodimlarni yuklash
-        const employees = await DB.getEmployees();
+        let employees = [];
+        try {
+            employees = await DB.getEmployees() || [];
+            if (!Array.isArray(employees)) employees = [];
+        } catch (err_emp) {
+            console.error("Failed to load employees:", err_emp);
+            employees = [];
+        }
         
         // Fetch REGOS report for real-time sales & profit (current month cumulative) - Asynchronous Non-Blocking
         const now = new Date();
@@ -619,9 +626,12 @@ window.HR = {
         }
 
         const filtered = employees.filter(e => {
+            if (!e || !e.name) return false;
             const parsed = this.parseRoleAndPlan(e.role);
-            return e.name.toLowerCase().includes(searchVal) || 
-                   parsed.role.toLowerCase().includes(searchVal);
+            const searchValLower = (searchVal || '').toLowerCase();
+            const nameLower = (e.name || '').toLowerCase();
+            const roleLower = (parsed.role || '').toLowerCase();
+            return nameLower.includes(searchValLower) || roleLower.includes(searchValLower);
         });
 
         // Fetch active employee role to check permissions
@@ -681,8 +691,9 @@ window.HR = {
             html += `<div class="card" style="grid-column: 1/-1; text-align: center; color: var(--text-muted); padding: 32px;">Xodimlar topilmadi.</div>`;
         } else {
             filtered.forEach(e => {
+                if (!e) return;
                 // Name initials
-                const initials = e.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+                const initials = (e.name || 'X').split(' ').map(n => n[0] || '').join('').substring(0, 2).toUpperCase() || 'X';
                 
                 // Parse role name and plan
                 const parsed = this.parseRoleAndPlan(e.role);
@@ -695,11 +706,11 @@ window.HR = {
                 let foundData = null;
                 const salesList = Object.values(employeeSalesMap);
                 
-                if (e.login) {
-                    foundData = salesList.find(s => (s.login || '').trim().toLowerCase() === e.login.trim().toLowerCase());
+                if (e.login && salesList.length > 0) {
+                    foundData = salesList.find(s => s && (s.login || '').trim().toLowerCase() === (e.login || '').trim().toLowerCase());
                 }
-                if (!foundData) {
-                    foundData = salesList.find(s => (s.name || '').trim().toLowerCase() === e.name.trim().toLowerCase());
+                if (!foundData && e.name && salesList.length > 0) {
+                    foundData = salesList.find(s => s && (s.name || '').trim().toLowerCase() === (e.name || '').trim().toLowerCase());
                 }
                 if (foundData) {
                     empSales = foundData.sales || 0;
