@@ -27,6 +27,8 @@ window.Tasks = {
         }
     },
 
+    tasksList: [],
+
     async loadTasks() {
         try {
             const res = await fetch("/api/tasks", {
@@ -35,7 +37,8 @@ window.Tasks = {
                 }
             });
             const tasks = await res.json();
-            this.renderKanban(tasks);
+            this.tasksList = Array.isArray(tasks) ? tasks : [];
+            this.renderKanban(this.tasksList);
         } catch (e) {
             console.error("Failed to load tasks", e);
         }
@@ -75,14 +78,58 @@ window.Tasks = {
                     <span style="font-size: 10px; color: ${priorityColor}; font-weight: bold; text-transform: uppercase;">${t.priority}</span>
                     <span style="font-size: 11px; color: #a5b4fc;"><i class="fas fa-user"></i> ${t.assigned_to_name || "Biriktirilmagan"}</span>
                 </div>
-                <div style="font-size: 10px; color: #64748b;">
-                    <i class="fas fa-folder"></i> ${t.project_name || "Loyiha tashqarisi"}
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px; border-top: 1px solid #334155; padding-top: 8px;">
+                    <span style="font-size: 10px; color: #64748b;"><i class="fas fa-folder"></i> ${t.project_name || "Loyiha tashqarisi"}</span>
+                    <select class="form-control" style="width: auto; padding: 2px 6px; font-size: 11px; background: rgba(0,0,0,0.3); border: 1px solid #475569; color: #f8fafc; border-radius: 4px; cursor: pointer; height: auto;" onchange="window.Tasks.changeStatus('${t.id}', this.value)">
+                        <option value="todo" ${t.status === 'todo' ? 'selected' : ''}>Todo</option>
+                        <option value="in_progress" ${t.status === 'in_progress' ? 'selected' : ''}>In Progress</option>
+                        <option value="review" ${t.status === 'review' ? 'selected' : ''}>Review</option>
+                        <option value="done" ${t.status === 'done' ? 'selected' : ''}>Done</option>
+                    </select>
                 </div>
             `;
             
             const col = columns[t.status];
             if (col) col.appendChild(card);
         });
+    },
+
+    async changeStatus(taskId, newStatus) {
+        const task = (this.tasksList || []).find(t => String(t.id) === String(taskId));
+        if (!task) return;
+
+        const activeUserId = localStorage.getItem("activeUserId") || "admin";
+        const activeUserRole = localStorage.getItem("activeUserRole") || "admin";
+        const isSupervisor = activeUserRole.includes("direktor") || activeUserRole.includes("admin") || activeUserRole.includes("dasturchi") || activeUserRole.includes("boshliq");
+
+        if (activeUserId !== "admin" && !isSupervisor && String(task.assigned_to) !== String(activeUserId)) {
+            alert("Xatolik: Siz bu vazifaning mas'ul xodimi emassiz! Holatni faqat vazifa biriktirilgan xodim yoki administrator o'zgartirishi mumkin.");
+            this.renderKanban(this.tasksList);
+            return;
+        }
+
+        try {
+            const res = await fetch(`/api/tasks/${taskId}`, {
+                method: "PATCH",
+                headers: {
+                    "Content-Type": "application/json",
+                    "x-company-id": localStorage.getItem("company_id") || "admin"
+                },
+                body: JSON.stringify({ status: newStatus })
+            });
+
+            if (res.ok) {
+                await this.loadTasks();
+            } else {
+                const err = await res.json();
+                alert("Xatolik: " + JSON.stringify(err.detail));
+                this.renderKanban(this.tasksList);
+            }
+        } catch (e) {
+            console.error("Failed to update task status", e);
+            alert("Vazifa holatini o'zgartirishda xatolik yuz berdi");
+            this.renderKanban(this.tasksList);
+        }
     },
 
     openProjectModal() {

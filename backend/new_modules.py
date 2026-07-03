@@ -317,6 +317,13 @@ def save_task(payload: TaskModel, request: Request):
     log_audit(request, "SAVE", "tasks", data["id"], None, data)
     return res
 
+@router.patch("/tasks/{id}")
+def update_task_fields(id: str, payload: dict, request: Request):
+    from backend.main import supabase_req
+    res = supabase_req("PATCH", f"tasks?id=eq.{id}", json_data=payload)
+    log_audit(request, "UPDATE_TASK", "tasks", id, None, payload)
+    return res
+
 @router.delete("/tasks/{id}")
 def delete_task(id: str, request: Request):
     from backend.main import supabase_req
