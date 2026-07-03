@@ -1802,6 +1802,31 @@ CREATE TABLE IF NOT EXISTS public.messages (
     <script src="js/seniklar.js?v=6"></script>
     <script>
         window.IS_SUPERADMIN_PORTAL = true;
+        
+        // Global fetch interceptor to append x-company-id header automatically
+        const originalFetch = window.fetch;
+        window.fetch = function(url, options) {
+            options = options || {};
+            options.headers = options.headers || {};
+            
+            const companyId = localStorage.getItem('company_id') || localStorage.getItem('activeCompanyId') || '';
+            if (companyId && (typeof url === 'string' && url.startsWith('/api/'))) {
+                if (options.headers instanceof Headers) {
+                    if (!options.headers.has('x-company-id')) {
+                        options.headers.append('x-company-id', companyId);
+                    }
+                } else if (Array.isArray(options.headers)) {
+                    if (!options.headers.some(h => h[0].toLowerCase() === 'x-company-id')) {
+                        options.headers.push(['x-company-id', companyId]);
+                    }
+                } else {
+                    if (!options.headers['x-company-id'] && !options.headers['X-Company-Id']) {
+                        options.headers['x-company-id'] = companyId;
+                    }
+                }
+            }
+            return originalFetch.call(this, url, options);
+        };
     </script>
     <script src="js/app.js?v=17"></script>
     
