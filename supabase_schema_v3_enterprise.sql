@@ -11,7 +11,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- =========================================================================
 
 CREATE TABLE IF NOT EXISTS public.branches (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     name TEXT NOT NULL,
     address TEXT,
@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS public.branches (
 );
 
 CREATE TABLE IF NOT EXISTS public.departments (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     branch_id UUID REFERENCES public.branches(id) ON DELETE SET NULL,
     name TEXT NOT NULL,
@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS public.departments (
 );
 
 CREATE TABLE IF NOT EXISTS public.users (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     login TEXT NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS public.users (
 );
 
 CREATE TABLE IF NOT EXISTS public.roles (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     name TEXT NOT NULL,
     description TEXT,
@@ -58,7 +58,7 @@ CREATE TABLE IF NOT EXISTS public.roles (
 );
 
 CREATE TABLE IF NOT EXISTS public.permissions (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     code TEXT NOT NULL UNIQUE, -- e.g., 'sales:create'
     name TEXT NOT NULL,
     description TEXT
@@ -77,7 +77,7 @@ CREATE TABLE IF NOT EXISTS public.user_roles (
 );
 
 CREATE TABLE IF NOT EXISTS public.employees (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     user_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
     branch_id UUID REFERENCES public.branches(id) ON DELETE SET NULL,
@@ -95,7 +95,7 @@ CREATE TABLE IF NOT EXISTS public.employees (
 );
 
 CREATE TABLE IF NOT EXISTS public.settings (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL UNIQUE,
     currency_primary TEXT DEFAULT 'UZS',
     timezone TEXT DEFAULT 'Asia/Tashkent',
@@ -108,7 +108,7 @@ CREATE TABLE IF NOT EXISTS public.settings (
 );
 
 CREATE TABLE IF NOT EXISTS public.audit_logs (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     user_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
     action TEXT NOT NULL,
@@ -122,7 +122,7 @@ CREATE TABLE IF NOT EXISTS public.audit_logs (
 );
 
 CREATE TABLE IF NOT EXISTS public.notifications (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     user_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
     title TEXT NOT NULL,
@@ -132,7 +132,7 @@ CREATE TABLE IF NOT EXISTS public.notifications (
 );
 
 CREATE TABLE IF NOT EXISTS public.activity_logs (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     user_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
     description TEXT NOT NULL,
@@ -145,7 +145,7 @@ CREATE TABLE IF NOT EXISTS public.activity_logs (
 -- =========================================================================
 
 CREATE TABLE IF NOT EXISTS public.customer_groups (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     name TEXT NOT NULL,
     discount_percent NUMERIC(5,2) DEFAULT 0.00,
@@ -153,7 +153,7 @@ CREATE TABLE IF NOT EXISTS public.customer_groups (
 );
 
 CREATE TABLE IF NOT EXISTS public.customers (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     group_id UUID REFERENCES public.customer_groups(id) ON DELETE SET NULL,
     name TEXT NOT NULL,
@@ -169,7 +169,7 @@ CREATE TABLE IF NOT EXISTS public.customers (
 );
 
 CREATE TABLE IF NOT EXISTS public.customer_addresses (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     customer_id UUID REFERENCES public.customers(id) ON DELETE CASCADE,
     address_line TEXT NOT NULL,
     city TEXT,
@@ -178,7 +178,7 @@ CREATE TABLE IF NOT EXISTS public.customer_addresses (
 );
 
 CREATE TABLE IF NOT EXISTS public.customer_contacts (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     customer_id UUID REFERENCES public.customers(id) ON DELETE CASCADE,
     contact_name TEXT NOT NULL,
     phone TEXT,
@@ -187,7 +187,7 @@ CREATE TABLE IF NOT EXISTS public.customer_contacts (
 );
 
 CREATE TABLE IF NOT EXISTS public.customer_notes (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     customer_id UUID REFERENCES public.customers(id) ON DELETE CASCADE,
     author_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
     note TEXT NOT NULL,
@@ -195,7 +195,7 @@ CREATE TABLE IF NOT EXISTS public.customer_notes (
 );
 
 CREATE TABLE IF NOT EXISTS public.customer_files (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     customer_id UUID REFERENCES public.customers(id) ON DELETE CASCADE,
     file_name TEXT NOT NULL,
     file_url TEXT NOT NULL,
@@ -203,7 +203,7 @@ CREATE TABLE IF NOT EXISTS public.customer_files (
 );
 
 CREATE TABLE IF NOT EXISTS public.customer_history (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     customer_id UUID REFERENCES public.customers(id) ON DELETE CASCADE,
     action TEXT NOT NULL,
     description TEXT,
@@ -211,7 +211,7 @@ CREATE TABLE IF NOT EXISTS public.customer_history (
 );
 
 CREATE TABLE IF NOT EXISTS public.customer_tasks (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     customer_id UUID REFERENCES public.customers(id) ON DELETE CASCADE,
     assigned_to UUID REFERENCES public.users(id) ON DELETE SET NULL,
     task_desc TEXT NOT NULL,
@@ -220,7 +220,7 @@ CREATE TABLE IF NOT EXISTS public.customer_tasks (
 );
 
 CREATE TABLE IF NOT EXISTS public.customer_tags (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     customer_id UUID REFERENCES public.customers(id) ON DELETE CASCADE,
     tag TEXT NOT NULL
 );
@@ -231,19 +231,19 @@ CREATE TABLE IF NOT EXISTS public.customer_tags (
 -- =========================================================================
 
 CREATE TABLE IF NOT EXISTS public.lead_sources (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     name TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS public.lead_statuses (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     name TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS public.leads (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     customer_id UUID REFERENCES public.customers(id) ON DELETE SET NULL,
     source_id UUID REFERENCES public.lead_sources(id) ON DELETE SET NULL,
@@ -256,7 +256,7 @@ CREATE TABLE IF NOT EXISTS public.leads (
 );
 
 CREATE TABLE IF NOT EXISTS public.quotations (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     customer_id UUID REFERENCES public.customers(id) ON DELETE SET NULL,
     valid_until DATE,
@@ -267,7 +267,7 @@ CREATE TABLE IF NOT EXISTS public.quotations (
 );
 
 CREATE TABLE IF NOT EXISTS public.quotation_items (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     quotation_id UUID REFERENCES public.quotations(id) ON DELETE CASCADE,
     product_id UUID, -- product reference
     quantity INTEGER DEFAULT 1,
@@ -275,7 +275,7 @@ CREATE TABLE IF NOT EXISTS public.quotation_items (
 );
 
 CREATE TABLE IF NOT EXISTS public.sales_orders (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     customer_id UUID REFERENCES public.customers(id) ON DELETE SET NULL,
     quotation_id UUID REFERENCES public.quotations(id) ON DELETE SET NULL,
@@ -286,7 +286,7 @@ CREATE TABLE IF NOT EXISTS public.sales_orders (
 );
 
 CREATE TABLE IF NOT EXISTS public.sales_order_items (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     sales_order_id UUID REFERENCES public.sales_orders(id) ON DELETE CASCADE,
     product_id UUID, -- product reference
     quantity INTEGER DEFAULT 1,
@@ -294,7 +294,7 @@ CREATE TABLE IF NOT EXISTS public.sales_order_items (
 );
 
 CREATE TABLE IF NOT EXISTS public.invoices (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     sales_order_id UUID REFERENCES public.sales_orders(id) ON DELETE SET NULL,
     customer_id UUID REFERENCES public.customers(id) ON DELETE SET NULL,
@@ -306,7 +306,7 @@ CREATE TABLE IF NOT EXISTS public.invoices (
 );
 
 CREATE TABLE IF NOT EXISTS public.invoice_items (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     invoice_id UUID REFERENCES public.invoices(id) ON DELETE CASCADE,
     product_id UUID,
     quantity INTEGER DEFAULT 1,
@@ -314,13 +314,13 @@ CREATE TABLE IF NOT EXISTS public.invoice_items (
 );
 
 CREATE TABLE IF NOT EXISTS public.payment_methods (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     name TEXT NOT NULL -- 'Cash', 'Card', 'Bank Transfer', 'Installment'
 );
 
 CREATE TABLE IF NOT EXISTS public.payments (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     invoice_id UUID REFERENCES public.invoices(id) ON DELETE SET NULL,
     payment_method_id UUID REFERENCES public.payment_methods(id) ON DELETE SET NULL,
@@ -330,7 +330,7 @@ CREATE TABLE IF NOT EXISTS public.payments (
 );
 
 CREATE TABLE IF NOT EXISTS public.sales_targets (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     employee_id UUID REFERENCES public.employees(id) ON DELETE CASCADE,
     target_amount NUMERIC(15,2) NOT NULL,
@@ -339,7 +339,7 @@ CREATE TABLE IF NOT EXISTS public.sales_targets (
 );
 
 CREATE TABLE IF NOT EXISTS public.sales_kpi (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     employee_id UUID REFERENCES public.employees(id) ON DELETE CASCADE,
     period_start DATE NOT NULL,
     period_end DATE NOT NULL,
@@ -347,7 +347,7 @@ CREATE TABLE IF NOT EXISTS public.sales_kpi (
 );
 
 CREATE TABLE IF NOT EXISTS public.sales_bonus (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     employee_id UUID REFERENCES public.employees(id) ON DELETE CASCADE,
     amount NUMERIC(15,2) NOT NULL,
     date_granted DATE NOT NULL
@@ -359,7 +359,7 @@ CREATE TABLE IF NOT EXISTS public.sales_bonus (
 -- =========================================================================
 
 CREATE TABLE IF NOT EXISTS public.categories (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     name TEXT NOT NULL,
     parent_id UUID REFERENCES public.categories(id) ON DELETE SET NULL,
@@ -367,14 +367,14 @@ CREATE TABLE IF NOT EXISTS public.categories (
 );
 
 CREATE TABLE IF NOT EXISTS public.brands (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     name TEXT NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS public.products (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     category_id UUID REFERENCES public.categories(id) ON DELETE SET NULL,
     brand_id UUID REFERENCES public.brands(id) ON DELETE SET NULL,
@@ -388,19 +388,19 @@ CREATE TABLE IF NOT EXISTS public.products (
 );
 
 CREATE TABLE IF NOT EXISTS public.product_models (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     product_id UUID REFERENCES public.products(id) ON DELETE CASCADE,
     model_name TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS public.product_images (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     product_id UUID REFERENCES public.products(id) ON DELETE CASCADE,
     image_url TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS public.product_prices (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     product_id UUID REFERENCES public.products(id) ON DELETE CASCADE,
     price NUMERIC(15,2) NOT NULL,
     currency TEXT DEFAULT 'UZS',
@@ -408,14 +408,14 @@ CREATE TABLE IF NOT EXISTS public.product_prices (
 );
 
 CREATE TABLE IF NOT EXISTS public.product_costs (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     product_id UUID REFERENCES public.products(id) ON DELETE CASCADE,
     cost NUMERIC(15,2) NOT NULL,
     effective_from TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS public.product_serials (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     product_id UUID REFERENCES public.products(id) ON DELETE CASCADE,
     serial_number TEXT NOT NULL,
     status TEXT DEFAULT 'available', -- 'available', 'sold', 'damaged'
@@ -423,27 +423,27 @@ CREATE TABLE IF NOT EXISTS public.product_serials (
 );
 
 CREATE TABLE IF NOT EXISTS public.product_barcodes (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     product_id UUID REFERENCES public.products(id) ON DELETE CASCADE,
     barcode_type TEXT DEFAULT 'EAN13',
     barcode_value TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS public.product_attributes (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     name TEXT NOT NULL -- e.g., 'Color', 'Power Output'
 );
 
 CREATE TABLE IF NOT EXISTS public.product_attribute_values (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     product_id UUID REFERENCES public.products(id) ON DELETE CASCADE,
     attribute_id UUID REFERENCES public.product_attributes(id) ON DELETE CASCADE,
     value TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS public.product_reviews (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     product_id UUID REFERENCES public.products(id) ON DELETE CASCADE,
     rating INTEGER CHECK (rating >= 1 AND rating <= 5),
     comment TEXT,
@@ -456,7 +456,7 @@ CREATE TABLE IF NOT EXISTS public.product_reviews (
 -- =========================================================================
 
 CREATE TABLE IF NOT EXISTS public.suppliers (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     name TEXT NOT NULL,
     phone TEXT NOT NULL,
@@ -469,7 +469,7 @@ CREATE TABLE IF NOT EXISTS public.suppliers (
 );
 
 CREATE TABLE IF NOT EXISTS public.supplier_contacts (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     supplier_id UUID REFERENCES public.suppliers(id) ON DELETE CASCADE,
     contact_name TEXT NOT NULL,
     phone TEXT,
@@ -477,7 +477,7 @@ CREATE TABLE IF NOT EXISTS public.supplier_contacts (
 );
 
 CREATE TABLE IF NOT EXISTS public.purchase_requests (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     employee_id UUID REFERENCES public.employees(id) ON DELETE SET NULL,
     request_details TEXT NOT NULL,
@@ -486,7 +486,7 @@ CREATE TABLE IF NOT EXISTS public.purchase_requests (
 );
 
 CREATE TABLE IF NOT EXISTS public.purchase_orders (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     supplier_id UUID REFERENCES public.suppliers(id) ON DELETE SET NULL,
     status TEXT DEFAULT 'draft', -- 'draft', 'ordered', 'received', 'cancelled'
@@ -498,7 +498,7 @@ CREATE TABLE IF NOT EXISTS public.purchase_orders (
 );
 
 CREATE TABLE IF NOT EXISTS public.purchase_order_items (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     purchase_order_id UUID REFERENCES public.purchase_orders(id) ON DELETE CASCADE,
     product_id UUID REFERENCES public.products(id) ON DELETE CASCADE,
     quantity INTEGER DEFAULT 1,
@@ -506,14 +506,14 @@ CREATE TABLE IF NOT EXISTS public.purchase_order_items (
 );
 
 CREATE TABLE IF NOT EXISTS public.goods_receipts (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     purchase_order_id UUID REFERENCES public.purchase_orders(id) ON DELETE SET NULL,
     received_date DATE NOT NULL,
     received_by UUID REFERENCES public.users(id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS public.supplier_payments (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     purchase_order_id UUID REFERENCES public.purchase_orders(id) ON DELETE SET NULL,
     amount NUMERIC(15,2) NOT NULL,
     payment_date DATE NOT NULL,
@@ -526,7 +526,7 @@ CREATE TABLE IF NOT EXISTS public.supplier_payments (
 -- =========================================================================
 
 CREATE TABLE IF NOT EXISTS public.warehouses (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     name TEXT NOT NULL,
     address TEXT,
@@ -534,13 +534,13 @@ CREATE TABLE IF NOT EXISTS public.warehouses (
 );
 
 CREATE TABLE IF NOT EXISTS public.warehouse_locations (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     warehouse_id UUID REFERENCES public.warehouses(id) ON DELETE CASCADE,
     location_code TEXT NOT NULL -- e.g. 'A-1-3'
 );
 
 CREATE TABLE IF NOT EXISTS public.inventory (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     warehouse_id UUID REFERENCES public.warehouses(id) ON DELETE CASCADE,
     product_id UUID REFERENCES public.products(id) ON DELETE CASCADE,
@@ -551,7 +551,7 @@ CREATE TABLE IF NOT EXISTS public.inventory (
 );
 
 CREATE TABLE IF NOT EXISTS public.inventory_transactions (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     inventory_id UUID REFERENCES public.inventory(id) ON DELETE CASCADE,
     transaction_type TEXT NOT NULL, -- 'in', 'out', 'transfer', 'adjustment'
@@ -562,7 +562,7 @@ CREATE TABLE IF NOT EXISTS public.inventory_transactions (
 );
 
 CREATE TABLE IF NOT EXISTS public.stock_transfers (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     from_warehouse_id UUID REFERENCES public.warehouses(id) ON DELETE CASCADE,
     to_warehouse_id UUID REFERENCES public.warehouses(id) ON DELETE CASCADE,
@@ -571,7 +571,7 @@ CREATE TABLE IF NOT EXISTS public.stock_transfers (
 );
 
 CREATE TABLE IF NOT EXISTS public.stock_adjustments (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     warehouse_id UUID REFERENCES public.warehouses(id) ON DELETE CASCADE,
     adjusted_by UUID REFERENCES public.users(id) ON DELETE SET NULL,
@@ -580,14 +580,14 @@ CREATE TABLE IF NOT EXISTS public.stock_adjustments (
 );
 
 CREATE TABLE IF NOT EXISTS public.inventory_counts (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     warehouse_id UUID REFERENCES public.warehouses(id) ON DELETE CASCADE,
     counted_by UUID REFERENCES public.users(id) ON DELETE SET NULL,
     count_date DATE NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS public.dead_stock (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     product_id UUID REFERENCES public.products(id) ON DELETE CASCADE,
     warehouse_id UUID REFERENCES public.warehouses(id) ON DELETE CASCADE,
@@ -596,7 +596,7 @@ CREATE TABLE IF NOT EXISTS public.dead_stock (
 );
 
 CREATE TABLE IF NOT EXISTS public.stock_alerts (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     product_id UUID REFERENCES public.products(id) ON DELETE CASCADE,
     min_stock_level INTEGER DEFAULT 5,
@@ -609,7 +609,7 @@ CREATE TABLE IF NOT EXISTS public.stock_alerts (
 -- =========================================================================
 
 CREATE TABLE IF NOT EXISTS public.bank_accounts (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     bank_name TEXT NOT NULL,
     account_number TEXT NOT NULL,
@@ -618,14 +618,14 @@ CREATE TABLE IF NOT EXISTS public.bank_accounts (
 );
 
 CREATE TABLE IF NOT EXISTS public.cash_registers (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     name TEXT NOT NULL,
     balance NUMERIC(15,2) DEFAULT 0.00
 );
 
 CREATE TABLE IF NOT EXISTS public.transactions (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     type TEXT NOT NULL, -- 'income', 'expense'
     category TEXT NOT NULL,
@@ -636,13 +636,13 @@ CREATE TABLE IF NOT EXISTS public.transactions (
 );
 
 CREATE TABLE IF NOT EXISTS public.expense_categories (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     name TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS public.expenses (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     category_id UUID REFERENCES public.expense_categories(id) ON DELETE SET NULL,
     amount NUMERIC(15,2) NOT NULL,
@@ -651,7 +651,7 @@ CREATE TABLE IF NOT EXISTS public.expenses (
 );
 
 CREATE TABLE IF NOT EXISTS public.income (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     source TEXT NOT NULL,
     amount NUMERIC(15,2) NOT NULL,
@@ -660,7 +660,7 @@ CREATE TABLE IF NOT EXISTS public.income (
 );
 
 CREATE TABLE IF NOT EXISTS public.budgets (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     name TEXT NOT NULL,
     start_date DATE NOT NULL,
@@ -668,7 +668,7 @@ CREATE TABLE IF NOT EXISTS public.budgets (
 );
 
 CREATE TABLE IF NOT EXISTS public.budget_lines (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     budget_id UUID REFERENCES public.budgets(id) ON DELETE CASCADE,
     category TEXT NOT NULL,
     allocated_amount NUMERIC(15,2) NOT NULL,
@@ -676,7 +676,7 @@ CREATE TABLE IF NOT EXISTS public.budget_lines (
 );
 
 CREATE TABLE IF NOT EXISTS public.cashflow (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     month DATE NOT NULL,
     cash_inflow NUMERIC(15,2) DEFAULT 0.00,
@@ -684,7 +684,7 @@ CREATE TABLE IF NOT EXISTS public.cashflow (
 );
 
 CREATE TABLE IF NOT EXISTS public.financial_reports (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     report_type TEXT NOT NULL,
     generated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -697,7 +697,7 @@ CREATE TABLE IF NOT EXISTS public.financial_reports (
 -- =========================================================================
 
 CREATE TABLE IF NOT EXISTS public.ledger_accounts (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     code TEXT NOT NULL, -- e.g. '1010'
     name TEXT NOT NULL,
@@ -705,7 +705,7 @@ CREATE TABLE IF NOT EXISTS public.ledger_accounts (
 );
 
 CREATE TABLE IF NOT EXISTS public.journal_entries (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     entry_date DATE NOT NULL,
     description TEXT,
@@ -713,7 +713,7 @@ CREATE TABLE IF NOT EXISTS public.journal_entries (
 );
 
 CREATE TABLE IF NOT EXISTS public.ledger_transactions (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     entry_id UUID REFERENCES public.journal_entries(id) ON DELETE CASCADE,
     account_id UUID REFERENCES public.ledger_accounts(id) ON DELETE CASCADE,
     debit NUMERIC(15,2) DEFAULT 0.00,
@@ -721,7 +721,7 @@ CREATE TABLE IF NOT EXISTS public.ledger_transactions (
 );
 
 CREATE TABLE IF NOT EXISTS public.fixed_assets (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     name TEXT NOT NULL,
     purchase_date DATE NOT NULL,
@@ -731,7 +731,7 @@ CREATE TABLE IF NOT EXISTS public.fixed_assets (
 );
 
 CREATE TABLE IF NOT EXISTS public.depreciation (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     asset_id UUID REFERENCES public.fixed_assets(id) ON DELETE CASCADE,
     date DATE NOT NULL,
     amount NUMERIC(15,2) NOT NULL
@@ -743,20 +743,20 @@ CREATE TABLE IF NOT EXISTS public.depreciation (
 -- =========================================================================
 
 CREATE TABLE IF NOT EXISTS public.tax_types (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     name TEXT NOT NULL -- 'VAT', 'Corporate Tax', 'Property Tax'
 );
 
 CREATE TABLE IF NOT EXISTS public.tax_rates (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tax_type_id UUID REFERENCES public.tax_types(id) ON DELETE CASCADE,
     rate NUMERIC(5,2) NOT NULL,
     effective_from DATE NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS public.tax_payments (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     tax_type_id UUID REFERENCES public.tax_types(id) ON DELETE SET NULL,
     amount NUMERIC(15,2) NOT NULL,
@@ -764,7 +764,7 @@ CREATE TABLE IF NOT EXISTS public.tax_payments (
 );
 
 CREATE TABLE IF NOT EXISTS public.electronic_invoices (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     invoice_number TEXT NOT NULL UNIQUE,
     soliq_uuid TEXT,
@@ -779,7 +779,7 @@ CREATE TABLE IF NOT EXISTS public.electronic_invoices (
 -- =========================================================================
 
 CREATE TABLE IF NOT EXISTS public.attendance (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     employee_id UUID REFERENCES public.employees(id) ON DELETE CASCADE,
     date DATE NOT NULL,
@@ -790,7 +790,7 @@ CREATE TABLE IF NOT EXISTS public.attendance (
 );
 
 CREATE TABLE IF NOT EXISTS public.leave_requests (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     employee_id UUID REFERENCES public.employees(id) ON DELETE CASCADE,
     start_date DATE NOT NULL,
@@ -801,7 +801,7 @@ CREATE TABLE IF NOT EXISTS public.leave_requests (
 );
 
 CREATE TABLE IF NOT EXISTS public.vacancies (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     title TEXT NOT NULL,
     description TEXT,
@@ -810,7 +810,7 @@ CREATE TABLE IF NOT EXISTS public.vacancies (
 );
 
 CREATE TABLE IF NOT EXISTS public.recruitment (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     vacancy_id UUID REFERENCES public.vacancies(id) ON DELETE CASCADE,
     candidate_name TEXT NOT NULL,
     phone TEXT NOT NULL,
@@ -819,7 +819,7 @@ CREATE TABLE IF NOT EXISTS public.recruitment (
 );
 
 CREATE TABLE IF NOT EXISTS public.interviews (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     candidate_id UUID REFERENCES public.recruitment(id) ON DELETE CASCADE,
     interviewer_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
     scheduled_at TIMESTAMP WITH TIME ZONE NOT NULL,
@@ -827,7 +827,7 @@ CREATE TABLE IF NOT EXISTS public.interviews (
 );
 
 CREATE TABLE IF NOT EXISTS public.contracts (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     employee_id UUID REFERENCES public.employees(id) ON DELETE CASCADE,
     start_date DATE NOT NULL,
     end_date DATE,
@@ -835,7 +835,7 @@ CREATE TABLE IF NOT EXISTS public.contracts (
 );
 
 CREATE TABLE IF NOT EXISTS public.employee_documents (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     employee_id UUID REFERENCES public.employees(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     file_url TEXT NOT NULL,
@@ -843,7 +843,7 @@ CREATE TABLE IF NOT EXISTS public.employee_documents (
 );
 
 CREATE TABLE IF NOT EXISTS public.employee_kpi (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     employee_id UUID REFERENCES public.employees(id) ON DELETE CASCADE,
     period TEXT NOT NULL, -- e.g. '2026-Q2'
     score INTEGER DEFAULT 100
@@ -855,7 +855,7 @@ CREATE TABLE IF NOT EXISTS public.employee_kpi (
 -- =========================================================================
 
 CREATE TABLE IF NOT EXISTS public.courses (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     title TEXT NOT NULL,
     description TEXT,
@@ -863,46 +863,46 @@ CREATE TABLE IF NOT EXISTS public.courses (
 );
 
 CREATE TABLE IF NOT EXISTS public.lessons (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     course_id UUID REFERENCES public.courses(id) ON DELETE CASCADE,
     title TEXT NOT NULL,
     lesson_order INTEGER DEFAULT 1
 );
 
 CREATE TABLE IF NOT EXISTS public.videos (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     lesson_id UUID REFERENCES public.lessons(id) ON DELETE CASCADE,
     video_url TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS public.tests (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     lesson_id UUID REFERENCES public.lessons(id) ON DELETE CASCADE,
     title TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS public.questions (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     test_id UUID REFERENCES public.tests(id) ON DELETE CASCADE,
     question_text TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS public.answers (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     question_id UUID REFERENCES public.questions(id) ON DELETE CASCADE,
     answer_text TEXT NOT NULL,
     is_correct BOOLEAN DEFAULT false
 );
 
 CREATE TABLE IF NOT EXISTS public.certificates (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     employee_id UUID REFERENCES public.employees(id) ON DELETE CASCADE,
     course_id UUID REFERENCES public.courses(id) ON DELETE CASCADE,
     issued_date DATE NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS public.employee_training (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     employee_id UUID REFERENCES public.employees(id) ON DELETE CASCADE,
     lesson_id UUID REFERENCES public.lessons(id) ON DELETE CASCADE,
     is_completed BOOLEAN DEFAULT false,
@@ -915,7 +915,7 @@ CREATE TABLE IF NOT EXISTS public.employee_training (
 -- =========================================================================
 
 CREATE TABLE IF NOT EXISTS public.quality_checks (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     product_id UUID, -- product reference
     checked_by UUID REFERENCES public.users(id) ON DELETE SET NULL,
@@ -925,7 +925,7 @@ CREATE TABLE IF NOT EXISTS public.quality_checks (
 );
 
 CREATE TABLE IF NOT EXISTS public.complaints (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     customer_id UUID REFERENCES public.customers(id) ON DELETE CASCADE,
     issue TEXT NOT NULL,
@@ -934,13 +934,13 @@ CREATE TABLE IF NOT EXISTS public.complaints (
 );
 
 CREATE TABLE IF NOT EXISTS public.complaint_types (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     name TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS public.warranty (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     product_id UUID,
     customer_id UUID REFERENCES public.customers(id) ON DELETE CASCADE,
     start_date DATE NOT NULL,
@@ -948,7 +948,7 @@ CREATE TABLE IF NOT EXISTS public.warranty (
 );
 
 CREATE TABLE IF NOT EXISTS public.quality_audits (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     auditor_name TEXT NOT NULL,
     audit_date DATE NOT NULL,
@@ -956,7 +956,7 @@ CREATE TABLE IF NOT EXISTS public.quality_audits (
 );
 
 CREATE TABLE IF NOT EXISTS public.corrective_actions (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     complaint_id UUID REFERENCES public.complaints(id) ON DELETE CASCADE,
     action_plan TEXT NOT NULL,
@@ -969,7 +969,7 @@ CREATE TABLE IF NOT EXISTS public.corrective_actions (
 -- =========================================================================
 
 CREATE TABLE IF NOT EXISTS public.incidents (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     title TEXT NOT NULL,
     description TEXT NOT NULL,
@@ -978,7 +978,7 @@ CREATE TABLE IF NOT EXISTS public.incidents (
 );
 
 CREATE TABLE IF NOT EXISTS public.cctv_devices (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     name TEXT NOT NULL,
     stream_url TEXT,
@@ -986,14 +986,14 @@ CREATE TABLE IF NOT EXISTS public.cctv_devices (
 );
 
 CREATE TABLE IF NOT EXISTS public.gps_devices (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     device_uid TEXT NOT NULL UNIQUE,
     vehicle_name TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS public.visitor_logs (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     visitor_name TEXT NOT NULL,
     purpose TEXT,
@@ -1002,7 +1002,7 @@ CREATE TABLE IF NOT EXISTS public.visitor_logs (
 );
 
 CREATE TABLE IF NOT EXISTS public.security_checks (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     officer_name TEXT NOT NULL,
     check_date DATE NOT NULL,
@@ -1010,7 +1010,7 @@ CREATE TABLE IF NOT EXISTS public.security_checks (
 );
 
 CREATE TABLE IF NOT EXISTS public.vehicle_tracking (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     device_id UUID REFERENCES public.gps_devices(id) ON DELETE CASCADE,
     latitude NUMERIC(9,6) NOT NULL,
     longitude NUMERIC(9,6) NOT NULL,
@@ -1023,7 +1023,7 @@ CREATE TABLE IF NOT EXISTS public.vehicle_tracking (
 -- =========================================================================
 
 CREATE TABLE IF NOT EXISTS public.service_orders (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     customer_id UUID REFERENCES public.customers(id) ON DELETE CASCADE,
     product_name TEXT NOT NULL,
@@ -1036,19 +1036,19 @@ CREATE TABLE IF NOT EXISTS public.service_orders (
 );
 
 CREATE TABLE IF NOT EXISTS public.service_items (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     service_order_id UUID REFERENCES public.service_orders(id) ON DELETE CASCADE,
     description TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS public.technicians (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     employee_id UUID REFERENCES public.employees(id) ON DELETE CASCADE,
     specialization TEXT
 );
 
 CREATE TABLE IF NOT EXISTS public.spare_parts (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     service_order_id UUID REFERENCES public.service_orders(id) ON DELETE CASCADE,
     part_name TEXT NOT NULL,
     quantity INTEGER DEFAULT 1,
@@ -1056,7 +1056,7 @@ CREATE TABLE IF NOT EXISTS public.spare_parts (
 );
 
 CREATE TABLE IF NOT EXISTS public.service_history (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     customer_id UUID REFERENCES public.customers(id) ON DELETE CASCADE,
     service_order_id UUID REFERENCES public.service_orders(id) ON DELETE CASCADE,
     notes TEXT,
@@ -1069,7 +1069,7 @@ CREATE TABLE IF NOT EXISTS public.service_history (
 -- =========================================================================
 
 CREATE TABLE IF NOT EXISTS public.projects (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     name TEXT NOT NULL,
     description TEXT,
@@ -1078,7 +1078,7 @@ CREATE TABLE IF NOT EXISTS public.projects (
 );
 
 CREATE TABLE IF NOT EXISTS public.tasks (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     project_id UUID REFERENCES public.projects(id) ON DELETE CASCADE,
     title TEXT NOT NULL,
@@ -1093,7 +1093,7 @@ CREATE TABLE IF NOT EXISTS public.tasks (
 );
 
 CREATE TABLE IF NOT EXISTS public.task_comments (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     task_id UUID REFERENCES public.tasks(id) ON DELETE CASCADE,
     author_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
     comment TEXT NOT NULL,
@@ -1101,7 +1101,7 @@ CREATE TABLE IF NOT EXISTS public.task_comments (
 );
 
 CREATE TABLE IF NOT EXISTS public.task_files (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     task_id UUID REFERENCES public.tasks(id) ON DELETE CASCADE,
     file_name TEXT NOT NULL,
     file_url TEXT NOT NULL,
@@ -1114,14 +1114,14 @@ CREATE TABLE IF NOT EXISTS public.task_files (
 -- =========================================================================
 
 CREATE TABLE IF NOT EXISTS public.folders (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     name TEXT NOT NULL,
     parent_id UUID REFERENCES public.folders(id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS public.documents (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     folder_id UUID REFERENCES public.folders(id) ON DELETE SET NULL,
     name TEXT NOT NULL,
@@ -1131,7 +1131,7 @@ CREATE TABLE IF NOT EXISTS public.documents (
 );
 
 CREATE TABLE IF NOT EXISTS public.document_versions (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     document_id UUID REFERENCES public.documents(id) ON DELETE CASCADE,
     version INTEGER NOT NULL,
     content TEXT,
@@ -1139,7 +1139,7 @@ CREATE TABLE IF NOT EXISTS public.document_versions (
 );
 
 CREATE TABLE IF NOT EXISTS public.approvals (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     document_id UUID REFERENCES public.documents(id) ON DELETE CASCADE,
     approved_by UUID REFERENCES public.users(id) ON DELETE SET NULL,
     status TEXT DEFAULT 'pending',
@@ -1152,21 +1152,21 @@ CREATE TABLE IF NOT EXISTS public.approvals (
 -- =========================================================================
 
 CREATE TABLE IF NOT EXISTS public.report_templates (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     name TEXT NOT NULL,
     query_definition TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS public.scheduled_reports (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     template_id UUID REFERENCES public.report_templates(id) ON DELETE CASCADE,
     frequency TEXT DEFAULT 'monthly', -- 'daily', 'weekly', 'monthly'
     next_run_date DATE NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS public.report_exports (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     template_id UUID REFERENCES public.report_templates(id) ON DELETE CASCADE,
     exported_by UUID REFERENCES public.users(id) ON DELETE SET NULL,
     format TEXT DEFAULT 'pdf', -- 'pdf', 'excel'
@@ -1180,7 +1180,7 @@ CREATE TABLE IF NOT EXISTS public.report_exports (
 -- =========================================================================
 
 CREATE TABLE IF NOT EXISTS public.ai_logs (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     prompt TEXT NOT NULL,
     response TEXT NOT NULL,
@@ -1189,7 +1189,7 @@ CREATE TABLE IF NOT EXISTS public.ai_logs (
 );
 
 CREATE TABLE IF NOT EXISTS public.ai_recommendations (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     recommendation TEXT NOT NULL,
     category TEXT, -- 'sales', 'inventory', 'finance'
@@ -1198,7 +1198,7 @@ CREATE TABLE IF NOT EXISTS public.ai_recommendations (
 );
 
 CREATE TABLE IF NOT EXISTS public.ai_chat_history (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     user_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
     message TEXT NOT NULL,
@@ -1207,7 +1207,7 @@ CREATE TABLE IF NOT EXISTS public.ai_chat_history (
 );
 
 CREATE TABLE IF NOT EXISTS public.ai_predictions (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     target_metric TEXT NOT NULL, -- 'sales_forecast', 'stock_replenishment'
     prediction_value JSONB NOT NULL,
