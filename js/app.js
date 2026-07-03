@@ -274,6 +274,18 @@ window.App = {
         const tlSloganInput = document.getElementById('settings-taplink-slogan');
         if (tlSloganInput) tlSloganInput.value = data.settings.taplinkSlogan || '';
 
+        // Havolani yuklanganda avtomatik ravishda generatsiya qilish va ko'rsatish
+        const compId = localStorage.getItem('activeCompanyId') || localStorage.getItem('company_id') || '';
+        if (compId) {
+            const taplinkUrl = window.location.origin + `/taplink.html?company_id=${compId}`;
+            const tlContainer = document.getElementById('taplink-link-container');
+            const tlInput = document.getElementById('taplink-generated-url');
+            if (tlContainer && tlInput) {
+                tlInput.value = taplinkUrl;
+                tlContainer.style.display = 'block';
+            }
+        }
+
         this.renderAmoCRMOperatorsMapping();
         this.onAIProviderChange();
     },
