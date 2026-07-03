@@ -96,6 +96,7 @@ window.App = {
                     if (backendSettings.taplink_whatsapp !== undefined) data.settings.taplinkWhatsapp = backendSettings.taplink_whatsapp;
                     if (backendSettings.taplink_phone !== undefined) data.settings.taplinkPhone = backendSettings.taplink_phone;
                     if (backendSettings.taplink_slogan !== undefined) data.settings.taplinkSlogan = backendSettings.taplink_slogan;
+                    if (backendSettings.taplink_logo !== undefined) data.settings.taplinkLogo = backendSettings.taplink_logo;
                     
                     // Subscription settings
                     data.settings.maxEmployees = backendSettings.max_employees !== undefined ? backendSettings.max_employees : (data.settings.maxEmployees || 100);
@@ -144,7 +145,8 @@ window.App = {
                     taplink_youtube: data.settings.taplinkYoutube || '',
                     taplink_whatsapp: data.settings.taplinkWhatsapp || '',
                     taplink_phone: data.settings.taplinkPhone || '',
-                    taplink_slogan: data.settings.taplinkSlogan || ''
+                    taplink_slogan: data.settings.taplinkSlogan || '',
+                    taplink_logo: data.settings.taplinkLogo || ''
                 })
             }).catch(err => console.error("Initial settings sync failed:", err));
         }
@@ -269,6 +271,9 @@ window.App = {
         // Taplink formalarini to'ldirish
         const tlDescInput = document.getElementById('settings-taplink-desc');
         if (tlDescInput) tlDescInput.value = data.settings.taplinkDesc || '';
+
+        const tlLogoInput = document.getElementById('settings-taplink-logo');
+        if (tlLogoInput) tlLogoInput.value = data.settings.taplinkLogo || '';
 
         const tlWebInput = document.getElementById('settings-taplink-web');
         if (tlWebInput) tlWebInput.value = data.settings.taplinkWeb || '';
@@ -794,6 +799,7 @@ window.App = {
                  const taplinkWhatsapp = document.getElementById('settings-taplink-whatsapp')?.value.trim() || '';
                  const taplinkPhone = document.getElementById('settings-taplink-phone')?.value.trim() || '';
                  const taplinkSlogan = document.getElementById('settings-taplink-slogan')?.value.trim() || '';
+                 const taplinkLogo = document.getElementById('settings-taplink-logo')?.value.trim() || '';
                 
                 // Sozlamalar o'zgarganligini aniqlash
                 const sbChanged = data.settings.supabaseUrl !== sbUrl || data.settings.supabaseKey !== sbKey;
@@ -868,6 +874,7 @@ window.App = {
                  data.settings.taplinkWhatsapp = taplinkWhatsapp;
                  data.settings.taplinkPhone = taplinkPhone;
                  data.settings.taplinkSlogan = taplinkSlogan;
+                 data.settings.taplinkLogo = taplinkLogo;
                 
                 AppStorage.save(data);
 
@@ -906,7 +913,8 @@ window.App = {
                             taplink_youtube: taplinkYoutube,
                             taplink_whatsapp: taplinkWhatsapp,
                             taplink_phone: taplinkPhone,
-                            taplink_slogan: taplinkSlogan
+                            taplink_slogan: taplinkSlogan,
+                            taplink_logo: taplinkLogo
                         })
                     });
                 } catch(err) {

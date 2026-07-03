@@ -396,9 +396,14 @@
                 document.title = data.company_name + " - Taplink";
                 document.getElementById('company-name').innerHTML = `${data.company_name} <i class="fas fa-check-circle"></i>`;
                 
-                // Set avatar initials or placeholder
-                const initials = data.company_name ? data.company_name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 'GP';
-                document.getElementById('company-avatar').textContent = initials;
+                // Set avatar image or initials placeholder
+                const avatarEl = document.getElementById('company-avatar');
+                if (data.taplink_logo) {
+                    avatarEl.innerHTML = `<img src="${data.taplink_logo}" alt="Logo">`;
+                } else {
+                    const initials = data.company_name ? data.company_name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 'GP';
+                    avatarEl.textContent = initials;
+                }
 
                 // 2. Set Bio / Description
                 document.getElementById('company-bio').textContent = data.taplink_desc || "Kompaniyamizning rasmiy ijtimoiy sahifalari va bog'lanish yo'llari.";

@@ -1173,7 +1173,7 @@ def get_company_settings(company_id: str, use_central: bool = False, bypass_cach
         "roles": ["POS Kassa", "Menejer", "Kassir", "Kuryer", "Operator", "Sotuvchi"],
         "taplink_desc": "", "taplink_web": "", "taplink_telegram": "",
         "taplink_instagram": "", "taplink_youtube": "", "taplink_whatsapp": "",
-        "taplink_phone": "", "taplink_slogan": ""
+        "taplink_phone": "", "taplink_slogan": "", "taplink_logo": "/assets/logo.png"
     }
     
     # 1. Try loading from Supabase database
@@ -1606,7 +1606,8 @@ def get_public_taplink_settings(company_id: str):
         "taplink_youtube": settings.get("taplink_youtube", ""),
         "taplink_whatsapp": settings.get("taplink_whatsapp", ""),
         "taplink_phone": settings.get("taplink_phone", ""),
-        "taplink_slogan": settings.get("taplink_slogan", "")
+        "taplink_slogan": settings.get("taplink_slogan", ""),
+        "taplink_logo": settings.get("taplink_logo", "/assets/logo.png")
     }
 
 @app.get("/api/settings")
@@ -1657,6 +1658,7 @@ def update_settings(settings: dict, request: Request):
     company_settings["taplink_whatsapp"] = settings.get("taplink_whatsapp", "")
     company_settings["taplink_phone"] = settings.get("taplink_phone", "")
     company_settings["taplink_slogan"] = settings.get("taplink_slogan", "")
+    company_settings["taplink_logo"] = settings.get("taplink_logo", "/assets/logo.png")
     
     save_company_settings(company_id, company_settings)
     print(f"Settings for company {company_id} updated.")
