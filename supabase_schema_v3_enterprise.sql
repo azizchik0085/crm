@@ -213,7 +213,7 @@ CREATE TABLE IF NOT EXISTS public.customer_history (
 CREATE TABLE IF NOT EXISTS public.customer_tasks (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     customer_id TEXT REFERENCES public.customers(id) ON DELETE CASCADE,
-    assigned_to UUID REFERENCES public.users(id) ON DELETE SET NULL,
+    assigned_to TEXT REFERENCES public.employees(id) ON DELETE SET NULL,
     task_desc TEXT NOT NULL,
     due_date TIMESTAMP WITH TIME ZONE,
     status TEXT DEFAULT 'pending'
@@ -1086,7 +1086,7 @@ CREATE TABLE IF NOT EXISTS public.tasks (
     project_id UUID REFERENCES public.projects(id) ON DELETE CASCADE,
     title TEXT NOT NULL,
     description TEXT,
-    assigned_to UUID REFERENCES public.users(id) ON DELETE SET NULL,
+    assigned_to TEXT REFERENCES public.employees(id) ON DELETE SET NULL,
     priority TEXT DEFAULT 'medium',
     status TEXT DEFAULT 'todo',
     deadline TIMESTAMP WITH TIME ZONE,
@@ -1296,6 +1296,11 @@ CREATE TABLE IF NOT EXISTS public.marketing_campaigns (
 
 ALTER TABLE public.projects ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP WITH TIME ZONE DEFAULT NULL;
 ALTER TABLE public.purchase_orders ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP WITH TIME ZONE DEFAULT NULL;
+
+
+-- Alter tasks table to change assigned_to type to TEXT to match employee IDs (regos_x)
+ALTER TABLE public.tasks DROP CONSTRAINT IF EXISTS tasks_assigned_to_fkey;
+ALTER TABLE public.tasks ALTER COLUMN assigned_to TYPE TEXT;
 
 -- =========================================================================
 -- 19. DISABLE RLS FOR CUSTOM MODULES (FastAPI compatibility)
