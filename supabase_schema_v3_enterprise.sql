@@ -1271,6 +1271,24 @@ CREATE TABLE IF NOT EXISTS public.installment_sales (
 );
 
 
+
+
+CREATE TABLE IF NOT EXISTS public.marketing_campaigns (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    company_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    platform TEXT NOT NULL,
+    status TEXT DEFAULT 'draft',
+    budget NUMERIC(15,2) DEFAULT 0.00,
+    spent NUMERIC(15,2) DEFAULT 0.00,
+    leads INTEGER DEFAULT 0,
+    roi NUMERIC(15,2) DEFAULT 0.00,
+    roas NUMERIC(15,2) DEFAULT 0.00,
+    start_date DATE,
+    end_date DATE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- =========================================================================
 -- 19. DISABLE RLS FOR CUSTOM MODULES (FastAPI compatibility)
 -- =========================================================================
