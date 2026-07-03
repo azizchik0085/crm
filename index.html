@@ -107,6 +107,24 @@
                     <li class="nav-item" data-view="chats">
                         <a href="#" data-view="chats"><i class="fas fa-comments"></i> Xabarlar</a>
                     </li>
+                    <li class="nav-item" data-view="procurement">
+                        <a href="#" data-view="procurement"><i class="fas fa-shopping-cart"></i> Xaridlar</a>
+                    </li>
+                    <li class="nav-item" data-view="tasks">
+                        <a href="#" data-view="tasks"><i class="fas fa-tasks"></i> Vazifalar</a>
+                    </li>
+                    <li class="nav-item" data-view="marketing">
+                        <a href="#" data-view="marketing"><i class="fas fa-bullhorn"></i> Marketing</a>
+                    </li>
+                    <li class="nav-item" data-view="service">
+                        <a href="#" data-view="service"><i class="fas fa-tools"></i> Servis Markazi</a>
+                    </li>
+                    <li class="nav-item" data-view="documents">
+                        <a href="#" data-view="documents"><i class="fas fa-file-contract"></i> Hujjatlar</a>
+                    </li>
+                    <li class="nav-item" data-view="audit">
+                        <a href="#" data-view="audit"><i class="fas fa-shield-alt"></i> Xavfsizlik & Audit</a>
+                    </li>
                     <li class="nav-item" data-view="settings">
                         <a href="#" data-view="settings"><i class="fas fa-sliders-h"></i> Sozlamalar</a>
                     </li>
@@ -316,6 +334,136 @@
                                 <!-- Dinamik tranzaksiyalar -->
                             </tbody>
                         </table>
+                    </div>
+                </div>
+
+                <!-- CEO ENTERPRISE REAL-TIME WIDGETS -->
+                <div class="card" style="margin-top: 24px;">
+                    <div class="dashboard-title-bar">
+                        <h3><i class="fas fa-user-tie" style="color: var(--accent);"></i> CEO Enterprise Real-Time Widgets</h3>
+                        <span style="font-size:12px; color:var(--text-muted);">Tashkilotning to'liq real-vaqt nazorati</span>
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; margin-top: 16px;">
+                        <!-- Finance Row -->
+                        <div class="card stat-card" style="margin: 0; background: rgba(99, 102, 241, 0.03); border: 1px solid var(--border-color);">
+                            <div class="stat-info">
+                                <h3>Bugungi Savdo Plan %</h3>
+                                <div class="stat-value" id="ceo-plan-percent" style="font-size: 20px; font-weight: 700; color: var(--accent);">0%</div>
+                                <span style="font-size: 11px; color: var(--text-muted);" id="ceo-sales-plan">Plan: 0 UZS</span>
+                            </div>
+                        </div>
+                        <div class="card stat-card" style="margin: 0; background: rgba(99, 102, 241, 0.03); border: 1px solid var(--border-color);">
+                            <div class="stat-info">
+                                <h3>Sof Foyda</h3>
+                                <div class="stat-value" id="ceo-net-profit" style="font-size: 20px; font-weight: 700; color: var(--success);">0 UZS</div>
+                            </div>
+                        </div>
+                        <div class="card stat-card" style="margin: 0; background: rgba(99, 102, 241, 0.03); border: 1px solid var(--border-color);">
+                            <div class="stat-info">
+                                <h3>Pul Oqimi (Cash Flow)</h3>
+                                <div class="stat-value" id="ceo-cash-flow" style="font-size: 20px; font-weight: 700; color: #10b981;">0 UZS</div>
+                            </div>
+                        </div>
+                        <div class="card stat-card" style="margin: 0; background: rgba(99, 102, 241, 0.03); border: 1px solid var(--border-color);">
+                            <div class="stat-info">
+                                <h3>Bank Balance</h3>
+                                <div class="stat-value" id="ceo-bank-balance" style="font-size: 20px; font-weight: 700; color: #3b82f6;">0 UZS</div>
+                            </div>
+                        </div>
+                        <div class="card stat-card" style="margin: 0; background: rgba(99, 102, 241, 0.03); border: 1px solid var(--border-color);">
+                            <div class="stat-info">
+                                <h3>Kassa qoldig'i</h3>
+                                <div class="stat-value" id="ceo-cash-balance" style="font-size: 20px; font-weight: 700; color: #f59e0b;">0 UZS</div>
+                            </div>
+                        </div>
+                        
+                        <!-- Receivables & Payables -->
+                        <div class="card stat-card" style="margin: 0; background: rgba(239, 68, 68, 0.03); border: 1px solid var(--border-color);">
+                            <div class="stat-info">
+                                <h3>Olinadigan qarzlar (Debts)</h3>
+                                <div class="stat-value" id="ceo-receivables" style="font-size: 20px; font-weight: 700; color: #f43f5e;">0 UZS</div>
+                            </div>
+                        </div>
+                        <div class="card stat-card" style="margin: 0; background: rgba(239, 68, 68, 0.03); border: 1px solid var(--border-color);">
+                            <div class="stat-info">
+                                <h3>To'lanadigan qarzlar (Payables)</h3>
+                                <div class="stat-value" id="ceo-payables" style="font-size: 20px; font-weight: 700; color: #ef4444;">0 UZS</div>
+                            </div>
+                        </div>
+
+                        <!-- Warehouse & Inventory -->
+                        <div class="card stat-card" style="margin: 0; background: rgba(16, 185, 129, 0.03); border: 1px solid var(--border-color);">
+                            <div class="stat-info">
+                                <h3>Ombor Zaxira Tannarxi</h3>
+                                <div class="stat-value" id="ceo-warehouse-value" style="font-size: 20px; font-weight: 700; color: #10b981;">0 UZS</div>
+                            </div>
+                        </div>
+                        <div class="card stat-card" style="margin: 0; background: rgba(245, 158, 11, 0.03); border: 1px solid var(--border-color);">
+                            <div class="stat-info">
+                                <h3>Kritik kam tovarlar (Low Stock)</h3>
+                                <div class="stat-value" id="ceo-low-stock" style="font-size: 20px; font-weight: 700; color: #f59e0b;">0 ta</div>
+                            </div>
+                        </div>
+                        <div class="card stat-card" style="margin: 0; background: rgba(100, 116, 139, 0.03); border: 1px solid var(--border-color);">
+                            <div class="stat-info">
+                                <h3>Sotilmayotgan tovar (Dead Stock)</h3>
+                                <div class="stat-value" id="ceo-dead-stock" style="font-size: 20px; font-weight: 700; color: #64748b;">0 ta</div>
+                            </div>
+                        </div>
+
+                        <!-- Marketing -->
+                        <div class="card stat-card" style="margin: 0; background: rgba(139, 92, 246, 0.03); border: 1px solid var(--border-color);">
+                            <div class="stat-info">
+                                <h3>Lidlar / CPL</h3>
+                                <div class="stat-value" id="ceo-marketing-leads" style="font-size: 20px; font-weight: 700; color: #a855f7;">0 ta</div>
+                                <span style="font-size: 11px; color: var(--text-muted);" id="ceo-lead-cost">CPL: 0 UZS</span>
+                            </div>
+                        </div>
+                        <div class="card stat-card" style="margin: 0; background: rgba(139, 92, 246, 0.03); border: 1px solid var(--border-color);">
+                            <div class="stat-info">
+                                <h3>Marketing ROI / ROAS</h3>
+                                <div class="stat-value" id="ceo-marketing-roi" style="font-size: 20px; font-weight: 700; color: #8b5cf6;">0% / 0</div>
+                            </div>
+                        </div>
+
+                        <!-- HR & Operations -->
+                        <div class="card stat-card" style="margin: 0; background: rgba(6, 182, 212, 0.03); border: 1px solid var(--border-color);">
+                            <div class="stat-info">
+                                <h3>Bugungi Davomat</h3>
+                                <div class="stat-value" id="ceo-attendance" style="font-size: 20px; font-weight: 700; color: #06b6d4;">0 ta xodim</div>
+                            </div>
+                        </div>
+                        <div class="card stat-card" style="margin: 0; background: rgba(6, 182, 212, 0.03); border: 1px solid var(--border-color);">
+                            <div class="stat-info">
+                                <h3>Ochiq Vazifalar</h3>
+                                <div class="stat-value" id="ceo-open-tasks" style="font-size: 20px; font-weight: 700; color: #06b6d4;">0 ta</div>
+                            </div>
+                        </div>
+
+                        <!-- Alerts & Warnings -->
+                        <div class="card stat-card" style="margin: 0; background: rgba(239, 68, 68, 0.03); border: 1px solid rgba(239,68,68,0.2);">
+                            <div class="stat-info">
+                                <h3>Soliq holati (Tax Alerts)</h3>
+                                <div class="stat-value" id="ceo-tax-status" style="font-size: 13px; font-weight: 600; color: #ef4444;">Yuklanmoqda...</div>
+                            </div>
+                        </div>
+                        <div class="card stat-card" style="margin: 0; background: rgba(239, 68, 68, 0.03); border: 1px solid rgba(239,68,68,0.2);">
+                            <div class="stat-info">
+                                <h3>Sifat muammolari (Quality)</h3>
+                                <div class="stat-value" id="ceo-quality-issues" style="font-size: 20px; font-weight: 700; color: #ef4444;">0 ta</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- AI BIZNES TAVSIYALARI (CEO AI WIDGET) -->
+                    <div style="margin-top: 20px; padding: 16px; background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(168, 85, 247, 0.1) 100%); border: 1px solid rgba(99, 102, 241, 0.2); border-radius: 12px;">
+                        <h4 style="margin: 0 0 10px 0; color: #818cf8; display: flex; align-items: center; gap: 8px;">
+                            <i class="fas fa-brain"></i> Sun'iy Intellekt Biznes Tavsiyalari (CEO AI Recommendations)
+                        </h4>
+                        <ul id="ceo-ai-recommendations-list" style="margin: 0; padding-left: 20px; font-size: 13px; color: var(--text-main); display: flex; flex-direction: column; gap: 8px;">
+                            <li>Tahlil qilinmoqda...</li>
+                        </ul>
                     </div>
                 </div>
             </section>
@@ -923,6 +1071,211 @@
                             </tbody>
                         </table>
                     </div>
+                </div>
+            </section>
+
+            <!-- 11. PROCUREMENT SECTION (Xaridlar) -->
+            <section id="view-procurement" class="view-section">
+                <div class="header" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                    <div class="header-title">
+                        <h1>Xaridlar va Ta'minot zanjiri</h1>
+                        <p>Yetkazib beruvchilar va xarid buyurtmalari monitoringi</p>
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="btn btn-secondary" onclick="window.Procurement.openSupplierModal()">
+                            <i class="fas fa-truck"></i> Yetkazib beruvchilar
+                        </button>
+                        <button class="btn btn-primary" onclick="window.Procurement.openOrderModal()">
+                            <i class="fas fa-plus"></i> Yangi buyurtma
+                        </button>
+                    </div>
+                </div>
+
+                <div class="dashboard-grid" style="grid-template-columns: 1fr; margin-top: 20px;">
+                    <div class="card">
+                        <h3>Xarid buyurtmalari (Purchase Orders)</h3>
+                        <div class="table-responsive">
+                            <table class="custom-table">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Yetkazib beruvchi</th>
+                                        <th>Jami summa</th>
+                                        <th>Sana</th>
+                                        <th>Holat</th>
+                                        <th style="text-align: right;">Amallar</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="procurement-orders-list">
+                                    <!-- Dynamic content -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 12. TASKS SECTION (Vazifalar) -->
+            <section id="view-tasks" class="view-section">
+                <div class="header" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                    <div class="header-title">
+                        <h1>Loyihalar va Vazifalar</h1>
+                        <p>Kompaniya ichki vazifalari va Kanban doskasi</p>
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="btn btn-secondary" onclick="window.Tasks.openProjectModal()">
+                            <i class="fas fa-folder-plus"></i> Yangi loyiha
+                        </button>
+                        <button class="btn btn-primary" onclick="window.Tasks.openTaskModal()">
+                            <i class="fas fa-plus"></i> Yangi vazifa
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Kanban Doskasi -->
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-top: 20px;">
+                    <div class="card" style="min-height: 400px; background: rgba(255,255,255,0.02);">
+                        <h4 style="border-bottom: 2px solid #64748b; padding-bottom: 8px; margin: 0 0 12px 0;"><i class="fas fa-list"></i> Kutilmoqda (Todo)</h4>
+                        <div id="tasks-todo-list" style="display: flex; flex-direction: column; gap: 10px;"></div>
+                    </div>
+                    <div class="card" style="min-height: 400px; background: rgba(255,255,255,0.02);">
+                        <h4 style="border-bottom: 2px solid #3b82f6; padding-bottom: 8px; margin: 0 0 12px 0;"><i class="fas fa-spinner"></i> Bajarilmoqda (In Progress)</h4>
+                        <div id="tasks-progress-list" style="display: flex; flex-direction: column; gap: 10px;"></div>
+                    </div>
+                    <div class="card" style="min-height: 400px; background: rgba(255,255,255,0.02);">
+                        <h4 style="border-bottom: 2px solid #a855f7; padding-bottom: 8px; margin: 0 0 12px 0;"><i class="fas fa-eye"></i> Tekshirilmoqda (Review)</h4>
+                        <div id="tasks-review-list" style="display: flex; flex-direction: column; gap: 10px;"></div>
+                    </div>
+                    <div class="card" style="min-height: 400px; background: rgba(255,255,255,0.02);">
+                        <h4 style="border-bottom: 2px solid #10b981; padding-bottom: 8px; margin: 0 0 12px 0;"><i class="fas fa-check-circle"></i> Bajarildi (Done)</h4>
+                        <div id="tasks-done-list" style="display: flex; flex-direction: column; gap: 10px;"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 13. MARKETING SECTION -->
+            <section id="view-marketing" class="view-section">
+                <div class="header" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                    <div class="header-title">
+                        <h1>Marketing Kampaniyalari</h1>
+                        <p>Reklama kanallari xarajatlari, leads va ROI tahlili</p>
+                    </div>
+                    <button class="btn btn-primary" onclick="window.Marketing.openCampaignModal()">
+                        <i class="fas fa-plus"></i> Yangi Kampaniya
+                    </button>
+                </div>
+
+                <div class="table-responsive" style="margin-top: 20px;">
+                    <table class="custom-table">
+                        <thead>
+                            <tr>
+                                <th>Kampaniya Nomi</th>
+                                <th>Platforma</th>
+                                <th>Budjet</th>
+                                <th>Xarajat</th>
+                                <th>Lidlar</th>
+                                <th>ROI (%)</th>
+                                <th>ROAS</th>
+                                <th>Holat</th>
+                                <th style="text-align: right;">Amallar</th>
+                            </tr>
+                        </thead>
+                        <tbody id="marketing-campaigns-list">
+                            <!-- Dynamic content -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- 14. SERVICE SECTION -->
+            <section id="view-service" class="view-section">
+                <div class="header" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                    <div class="header-title">
+                        <h1>Servis Markazi</h1>
+                        <p>Kafolatli va kafolatsiz mahsulotlar ta'mirlash jurnali</p>
+                    </div>
+                    <button class="btn btn-primary" onclick="window.Service.openOrderModal()">
+                        <i class="fas fa-plus"></i> Yangi buyurtma
+                    </button>
+                </div>
+
+                <div class="table-responsive" style="margin-top: 20px;">
+                    <table class="custom-table">
+                        <thead>
+                            <tr>
+                                <th>Buyurtmachi</th>
+                                <th>Mahsulot</th>
+                                <th>Seriya raqami</th>
+                                <th>Muammo</th>
+                                <th>Usta</th>
+                                <th>Xizmat narxi</th>
+                                <th>Holat</th>
+                                <th style="text-align: right;">Amallar</th>
+                            </tr>
+                        </thead>
+                        <tbody id="service-orders-list">
+                            <!-- Dynamic content -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- 15. DOCUMENTS SECTION -->
+            <section id="view-documents" class="view-section">
+                <div class="header">
+                    <div class="header-title">
+                        <h1>Hujjatlar Ombori</h1>
+                        <p>Kompaniya shartnomalari, siyosatlari va hisob-fakturalari (E-Signature Tayyor)</p>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; margin-top: 20px;">
+                    <div class="card" style="text-align: center; padding: 24px;">
+                        <i class="fas fa-file-pdf" style="font-size: 3rem; color: #ef4444; margin-bottom: 12px;"></i>
+                        <h4>Mehnat shartnomalari</h4>
+                        <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">Xodimlar mehnat shartnomalari shablonlari va nusxalari</p>
+                        <button class="btn btn-secondary btn-sm" onclick="window.Documents.downloadMock('shartnoma_mehnat')">Yuklab olish</button>
+                    </div>
+                    <div class="card" style="text-align: center; padding: 24px;">
+                        <i class="fas fa-file-excel" style="font-size: 3rem; color: #10b981; margin-bottom: 12px;"></i>
+                        <h4>Moliyaviy hisobotlar</h4>
+                        <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">P&L va balans varaqlari Excel eksporti</p>
+                        <button class="btn btn-secondary btn-sm" onclick="window.Documents.downloadMock('moliya_excel')">Eksport Excel</button>
+                    </div>
+                    <div class="card" style="text-align: center; padding: 24px;">
+                        <i class="fas fa-file-word" style="font-size: 3rem; color: #3b82f6; margin-bottom: 12px;"></i>
+                        <h4>Ichki siyosat va yo'riqnomalar</h4>
+                        <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">Kompaniya ichki tartib-qoidalari (Rules)</p>
+                        <button class="btn btn-secondary btn-sm" onclick="window.Documents.downloadMock('ichki_tartib')">Ko'rish (Word)</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 16. AUDIT SECTION -->
+            <section id="view-audit" class="view-section">
+                <div class="header">
+                    <div class="header-title">
+                        <h1>Xavfsizlik va Tizim Audit Jurnali</h1>
+                        <p>Tizimdagi barcha foydalanuvchilar harakatlarining real-vaqt rejimida yozilgan jurnali</p>
+                    </div>
+                </div>
+
+                <div class="table-responsive" style="margin-top: 20px;">
+                    <table class="custom-table">
+                        <thead>
+                            <tr>
+                                <th>Foydalanuvchi</th>
+                                <th>Rol</th>
+                                <th>Amal</th>
+                                <th>Jadval</th>
+                                <th>IP Manzil</th>
+                                <th>Sana & Vaqt</th>
+                            </tr>
+                        </thead>
+                        <tbody id="audit-logs-list">
+                            <!-- Dynamic content -->
+                        </tbody>
+                    </table>
                 </div>
             </section>
 
@@ -1815,6 +2168,12 @@
     <!-- JsBarcode Library -->
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
     <script src="js/seniklar.js?v=6"></script>
+    <script src="js/procurement.js?v=1"></script>
+    <script src="js/tasks.js?v=1"></script>
+    <script src="js/marketing.js?v=1"></script>
+    <script src="js/service.js?v=1"></script>
+    <script src="js/documents.js?v=1"></script>
+    <script src="js/hr.js?v=1"></script>
     <script>
         window.IS_SUPERADMIN_PORTAL = false;
     </script>

@@ -548,7 +548,7 @@ window.App = {
             let allowedViews = ['dashboard'];
             
             if (activeUserId === 'admin') {
-                allowedViews = ['dashboard', 'crm', 'telephony', 'erp', 'finance', 'chats', 'hr', 'settings', 'receipts', 'seniklar', 'kassa'];
+                allowedViews = ['dashboard', 'crm', 'telephony', 'erp', 'finance', 'chats', 'hr', 'settings', 'receipts', 'seniklar', 'kassa', 'procurement', 'tasks', 'marketing', 'service', 'documents', 'audit'];
             } else if (foundRole && foundRole.permissions) {
                 allowedViews = ['dashboard', ...foundRole.permissions];
             } else {
@@ -560,7 +560,7 @@ window.App = {
                 const isHR = activeRoleName.includes('hr') || activeRoleName.includes('kadr') || activeRoleName.includes('recruiter');
                 
                 if (isSupervisor) {
-                    allowedViews = ['dashboard', 'crm', 'telephony', 'erp', 'finance', 'chats', 'hr', 'settings', 'receipts', 'seniklar', 'kassa'];
+                    allowedViews = ['dashboard', 'crm', 'telephony', 'erp', 'finance', 'chats', 'hr', 'settings', 'receipts', 'seniklar', 'kassa', 'procurement', 'tasks', 'marketing', 'service', 'documents', 'audit'];
                 } else if (isSales) {
                     allowedViews = ['dashboard', 'crm', 'telephony', 'chats', 'erp', 'receipts', 'seniklar', 'kassa'];
                 } else if (isWarehouse) {
@@ -932,6 +932,18 @@ window.App = {
             if (window.Kassa) window.Kassa.init();
         } else if (viewName === 'superadmin') {
             if (window.SuperAdmin) window.SuperAdmin.init();
+        } else if (viewName === 'procurement') {
+            if (window.Procurement) window.Procurement.init();
+        } else if (viewName === 'tasks') {
+            if (window.Tasks) window.Tasks.init();
+        } else if (viewName === 'marketing') {
+            if (window.Marketing) window.Marketing.init();
+        } else if (viewName === 'service') {
+            if (window.Service) window.Service.init();
+        } else if (viewName === 'documents') {
+            if (window.Documents) window.Documents.init();
+        } else if (viewName === 'audit') {
+            this.loadAuditLogs();
         }
     },
 
@@ -1088,6 +1100,44 @@ window.App = {
             // Grafik chizish
             this.renderCharts(transactions);
             this.renderSalesCharts(todaySales, todayProfit, employeeSalesMap);
+
+            // CEO widgets load
+            try {
+                const ceoRes = await fetch('/api/ceo/dashboard', {
+                    headers: {
+                        'x-company-id': localStorage.getItem('company_id') || 'admin'
+                    }
+                });
+                if (ceoRes.ok) {
+                    const ceoData = await ceoRes.json();
+                    document.getElementById('ceo-plan-percent').textContent = ceoData.plan_percent + '%';
+                    document.getElementById('ceo-sales-plan').textContent = 'Plan: ' + parseFloat(ceoData.sales_plan).toLocaleString() + ' UZS';
+                    document.getElementById('ceo-net-profit').textContent = parseFloat(ceoData.net_profit).toLocaleString() + ' UZS';
+                    document.getElementById('ceo-cash-flow').textContent = parseFloat(ceoData.cash_flow).toLocaleString() + ' UZS';
+                    document.getElementById('ceo-bank-balance').textContent = parseFloat(ceoData.bank_balance).toLocaleString() + ' UZS';
+                    document.getElementById('ceo-cash-balance').textContent = parseFloat(ceoData.cash_balance).toLocaleString() + ' UZS';
+                    document.getElementById('ceo-receivables').textContent = parseFloat(ceoData.accounts_receivable).toLocaleString() + ' UZS';
+                    document.getElementById('ceo-payables').textContent = parseFloat(ceoData.accounts_payable).toLocaleString() + ' UZS';
+                    document.getElementById('ceo-warehouse-value').textContent = parseFloat(ceoData.warehouse_value).toLocaleString() + ' UZS';
+                    document.getElementById('ceo-low-stock').textContent = ceoData.low_stock + ' ta';
+                    document.getElementById('ceo-dead-stock').textContent = ceoData.dead_stock + ' ta';
+                    document.getElementById('ceo-marketing-leads').textContent = ceoData.marketing_leads + ' ta';
+                    document.getElementById('ceo-lead-cost').textContent = 'CPL: ' + parseFloat(ceoData.lead_cost).toLocaleString() + ' UZS';
+                    document.getElementById('ceo-marketing-roi').textContent = ceoData.roi + '% / ' + ceoData.roas;
+                    document.getElementById('ceo-attendance').textContent = ceoData.attendance + ' ta xodim';
+                    document.getElementById('ceo-open-tasks').textContent = ceoData.open_tasks + ' ta';
+                    document.getElementById('ceo-tax-status').textContent = ceoData.tax_status;
+                    document.getElementById('ceo-quality-issues').textContent = ceoData.quality_issues + ' ta';
+                    
+                    // Render AI recommendations
+                    const recList = document.getElementById('ceo-ai-recommendations-list');
+                    if (recList && ceoData.ai_recommendations) {
+                        recList.innerHTML = ceoData.ai_recommendations.map(r => `<li><i class="fas fa-chevron-right" style="color:#818cf8; font-size:10px;"></i> ${r}</li>`).join('');
+                    }
+                }
+            } catch (err) {
+                console.error("Failed to load CEO dashboard widgets:", err);
+            }
 
         } else {
             // Operator specific stats
@@ -1540,6 +1590,45 @@ window.App = {
             .replace(/>/g, "&gt;")
             .replace(/"/g, "&quot;")
             .replace(/'/g, "&#039;");
+    },
+
+    loadAuditLogs: async function() {
+        const tbody = document.getElementById('audit-logs-list');
+        if (!tbody) return;
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;"><i class="fas fa-spinner fa-spin"></i> Yuklanmoqda...</td></tr>';
+        
+        try {
+            const res = await fetch('/api/audit-logs', {
+                headers: {
+                    'x-company-id': localStorage.getItem('company_id') || 'admin'
+                }
+            });
+            if (res.ok) {
+                const logs = await res.json();
+                tbody.innerHTML = '';
+                if (logs.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-muted);">Audit yozuvlari mavjud emas</td></tr>';
+                    return;
+                }
+                logs.forEach(l => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td><strong>${l.user_id}</strong></td>
+                        <td><span class="badge" style="background: rgba(99,102,241,0.1); color: #818cf8;">${l.role}</span></td>
+                        <td><code>${l.action}</code></td>
+                        <td>${l.table_name}</td>
+                        <td><span style="font-family:'JetBrains Mono'; font-size:12px;">${l.ip_address}</span></td>
+                        <td>${new Date(l.created_at).toLocaleString()}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } else {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--danger);">Xatolik yuz berdi</td></tr>';
+            }
+        } catch (err) {
+            console.error("Failed to load audit logs:", err);
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--danger);">Xatolik yuz berdi</td></tr>';
+        }
     }
 };
 

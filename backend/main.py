@@ -13,6 +13,10 @@ from pydantic import BaseModel
 
 app = FastAPI(title="Smart CRM Python Backend")
 
+# Register the PRO-TECH ERP new modules router
+from backend.new_modules import router as new_modules_router
+app.include_router(new_modules_router)
+
 # Enable CORS for local development
 app.add_middleware(
     CORSMiddleware,
