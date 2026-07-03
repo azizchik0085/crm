@@ -1289,6 +1289,14 @@ CREATE TABLE IF NOT EXISTS public.marketing_campaigns (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+
+-- =========================================================================
+-- 20. ADD MISSING COLUMNS TO EXISTING TABLES (Migratsiyani mustahkamlash)
+-- =========================================================================
+
+ALTER TABLE public.projects ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP WITH TIME ZONE DEFAULT NULL;
+ALTER TABLE public.purchase_orders ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP WITH TIME ZONE DEFAULT NULL;
+
 -- =========================================================================
 -- 19. DISABLE RLS FOR CUSTOM MODULES (FastAPI compatibility)
 -- =========================================================================
