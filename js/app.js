@@ -273,7 +273,17 @@ window.App = {
         if (tlDescInput) tlDescInput.value = data.settings.taplinkDesc || '';
 
         const tlLogoInput = document.getElementById('settings-taplink-logo');
-        if (tlLogoInput) tlLogoInput.value = data.settings.taplinkLogo || '';
+        if (tlLogoInput) {
+            tlLogoInput.value = data.settings.taplinkLogo || '';
+            const previewContainer = document.getElementById("settings-taplink-logo-preview-container");
+            const previewImg = document.getElementById("settings-taplink-logo-preview");
+            if (previewContainer && previewImg && data.settings.taplinkLogo) {
+                previewImg.src = data.settings.taplinkLogo;
+                previewContainer.style.display = 'flex';
+            } else if (previewContainer) {
+                previewContainer.style.display = 'none';
+            }
+        }
 
         const tlWebInput = document.getElementById('settings-taplink-web');
         if (tlWebInput) tlWebInput.value = data.settings.taplinkWeb || '';
@@ -2140,22 +2150,37 @@ window.SuperAdmin = {
                         logoInput.value = base64Url;
                     }
                     
+                    // Show preview
+                    const previewContainer = document.getElementById("settings-taplink-logo-preview-container");
+                    const previewImg = document.getElementById("settings-taplink-logo-preview");
+                    if (previewContainer && previewImg) {
+                        previewImg.src = base64Url;
+                        previewContainer.style.display = 'flex';
+                    }
+                    
                     if (button) {
                         button.innerHTML = originalHTML;
                         button.disabled = false;
                     }
-                    alert("Rasm muvaffaqiyatli tayyorlandi! Sozlamalarni saqlash tugmasini bossangiz, u doimiy ravishda bazaga yoziladi.");
                 } catch (canvasErr) {
                     console.error("Canvas compression failed, falling back to raw base64:", canvasErr);
                     const logoInput = document.getElementById("settings-taplink-logo");
                     if (logoInput) {
                         logoInput.value = rawBase64;
                     }
+                    
+                    // Show preview fallback
+                    const previewContainer = document.getElementById("settings-taplink-logo-preview-container");
+                    const previewImg = document.getElementById("settings-taplink-logo-preview");
+                    if (previewContainer && previewImg) {
+                        previewImg.src = rawBase64;
+                        previewContainer.style.display = 'flex';
+                    }
+                    
                     if (button) {
                         button.innerHTML = originalHTML;
                         button.disabled = false;
                     }
-                    alert("Rasm muvaffaqiyatli yuklandi!");
                 }
             };
             
@@ -2165,11 +2190,19 @@ window.SuperAdmin = {
                 if (logoInput) {
                     logoInput.value = rawBase64;
                 }
+                
+                // Show preview fallback
+                const previewContainer = document.getElementById("settings-taplink-logo-preview-container");
+                const previewImg = document.getElementById("settings-taplink-logo-preview");
+                if (previewContainer && previewImg) {
+                    previewImg.src = rawBase64;
+                    previewContainer.style.display = 'flex';
+                }
+                
                 if (button) {
                     button.innerHTML = originalHTML;
                     button.disabled = false;
                 }
-                alert("Rasm muvaffaqiyatli yuklandi!");
             };
             
             img.src = rawBase64;

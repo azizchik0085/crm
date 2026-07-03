@@ -1194,6 +1194,15 @@
                                 <button type="button" id="settings-taplink-logo-btn" class="btn btn-secondary" onclick="document.getElementById('settings-taplink-logo-file').click()" style="white-space:nowrap; height: 38px; display:flex; align-items:center; gap:6px;"><i class="fas fa-upload"></i> Rasm Tanlash</button>
                             </div>
                             <input type="file" id="settings-taplink-logo-file" accept="image/*" style="display:none;" onchange="App.uploadTaplinkLogo(this)">
+                            
+                            <!-- Logotip ko'rinishi (Live Preview) -->
+                            <div id="settings-taplink-logo-preview-container" style="margin-top: 10px; display: none; align-items: center; gap: 12px; padding: 8px 12px; background: rgba(255,255,255,0.03); border-radius: 8px; border: 1px dashed rgba(255,255,255,0.08);">
+                                <img id="settings-taplink-logo-preview" src="" alt="Preview" style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover; border: 2px solid #a855f7; background: rgba(255,255,255,0.05);">
+                                <div>
+                                    <div style="font-size: 13px; color: var(--success); font-weight: 600; display:flex; align-items:center; gap:4px;"><i class="fas fa-check-circle"></i> Rasm tayyorlandi!</div>
+                                    <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Sozlamalarni saqlash tugmasini bossangiz, u bazaga yoziladi.</div>
+                                </div>
+                            </div>
                         </div>
                         <div class="form-group">
                             <label for="settings-taplink-web">Veb-sayt manzili (Official Web Link)</label>
