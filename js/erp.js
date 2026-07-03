@@ -1212,6 +1212,12 @@ window.HR = {
         { key: 'receipts', label: 'Cheklar (POS)' },
         { key: 'seniklar', label: 'Seniklar (Narxlar)' },
         { key: 'kassa', label: 'Kassa (POS)' },
+        { key: 'procurement', label: 'Ta\'minot' },
+        { key: 'tasks', label: 'Vazifalar' },
+        { key: 'marketing', label: 'Marketing' },
+        { key: 'service', label: 'Servis Markazi' },
+        { key: 'documents', label: 'Hujjatlar' },
+        { key: 'audit', label: 'Xavfsizlik & Audit' },
         { key: 'settings', label: 'Sozlamalar' }
     ]
 };
