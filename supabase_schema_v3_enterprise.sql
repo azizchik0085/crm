@@ -494,7 +494,8 @@ CREATE TABLE IF NOT EXISTS public.purchase_orders (
     approved_by UUID REFERENCES public.users(id) ON DELETE SET NULL,
     expected_delivery_date DATE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    deleted_at TIMESTAMP WITH TIME ZONE DEFAULT NULL
 );
 
 CREATE TABLE IF NOT EXISTS public.purchase_order_items (
@@ -1075,7 +1076,8 @@ CREATE TABLE IF NOT EXISTS public.projects (
     name TEXT NOT NULL,
     description TEXT,
     status TEXT DEFAULT 'active',
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    deleted_at TIMESTAMP WITH TIME ZONE DEFAULT NULL
 );
 
 CREATE TABLE IF NOT EXISTS public.tasks (
@@ -1267,3 +1269,18 @@ CREATE TABLE IF NOT EXISTS public.installment_sales (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+
+-- =========================================================================
+-- 19. DISABLE RLS FOR CUSTOM MODULES (FastAPI compatibility)
+-- =========================================================================
+
+ALTER TABLE public.projects DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.tasks DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.employee_attendance DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.employee_leaves DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.installment_sales DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.purchase_orders DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.suppliers DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.marketing_campaigns DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.service_orders DISABLE ROW LEVEL SECURITY;
