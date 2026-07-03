@@ -47,7 +47,7 @@
             width: 100%;
             max-width: 480px;
             min-height: 100vh;
-            padding: 40px 24px 100px 24px;
+            padding: 40px 24px 40px 24px;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -299,50 +299,7 @@
             text-shadow: 0 2px 4px rgba(0,0,0,0.4);
         }
 
-        /* Bottom Quick Navigation Bar (Sticky/Fixed) */
-        .bottom-nav {
-            position: fixed;
-            bottom: 0;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 100%;
-            max-width: 480px;
-            background: rgba(10, 20, 12, 0.85);
-            border-top: 1px solid rgba(255, 255, 255, 0.08);
-            backdrop-filter: blur(15px);
-            display: grid;
-            grid-template-columns: repeat(5, 1fr);
-            padding: 10px 4px;
-            z-index: 10;
-        }
 
-        .bottom-nav-item {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            gap: 4px;
-            color: var(--text-muted);
-            text-decoration: none;
-            font-size: 9px;
-            font-weight: 600;
-            text-transform: uppercase;
-            text-align: center;
-            transition: all 0.3s ease;
-        }
-
-        .bottom-nav-item i {
-            font-size: 18px;
-            transition: transform 0.3s ease;
-        }
-
-        .bottom-nav-item:hover {
-            color: var(--accent-gold);
-        }
-
-        .bottom-nav-item:hover i {
-            transform: scale(1.15) translateY(-2px);
-        }
 
         /* Shimmer loading layout */
         .loading-screen {
@@ -413,29 +370,7 @@
 
         </div>
 
-        <!-- Sticky Bottom Quick Navigation Catalog Bar -->
-        <div class="bottom-nav">
-            <a href="#" class="bottom-nav-item">
-                <i class="fa-solid fa-sack-dollar"></i>
-                <span>OQ SEMENT</span>
-            </a>
-            <a href="#" class="bottom-nav-item">
-                <i class="fa-solid fa-cubes"></i>
-                <span>QURILISH</span>
-            </a>
-            <a href="#" class="bottom-nav-item">
-                <i class="fa-solid fa-tv"></i>
-                <span>TEXNIKA</span>
-            </a>
-            <a href="#" class="bottom-nav-item">
-                <i class="fa-solid fa-tags"></i>
-                <span>OPTOM NARX</span>
-            </a>
-            <a href="#" class="bottom-nav-item">
-                <i class="fa-solid fa-truck-fast"></i>
-                <span>TEZKOR ELTISH</span>
-            </a>
-        </div>
+
     </div>
 
     <script>
