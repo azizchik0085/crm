@@ -88,6 +88,15 @@ window.App = {
                     if (backendSettings.amocrm_subdomain !== undefined) data.settings.amocrmSubdomain = backendSettings.amocrm_subdomain;
                     if (backendSettings.amocrm_token !== undefined) data.settings.amocrmToken = backendSettings.amocrm_token;
                     
+                    if (backendSettings.taplink_desc !== undefined) data.settings.taplinkDesc = backendSettings.taplink_desc;
+                    if (backendSettings.taplink_web !== undefined) data.settings.taplinkWeb = backendSettings.taplink_web;
+                    if (backendSettings.taplink_telegram !== undefined) data.settings.taplinkTelegram = backendSettings.taplink_telegram;
+                    if (backendSettings.taplink_instagram !== undefined) data.settings.taplinkInstagram = backendSettings.taplink_instagram;
+                    if (backendSettings.taplink_youtube !== undefined) data.settings.taplinkYoutube = backendSettings.taplink_youtube;
+                    if (backendSettings.taplink_whatsapp !== undefined) data.settings.taplinkWhatsapp = backendSettings.taplink_whatsapp;
+                    if (backendSettings.taplink_phone !== undefined) data.settings.taplinkPhone = backendSettings.taplink_phone;
+                    if (backendSettings.taplink_slogan !== undefined) data.settings.taplinkSlogan = backendSettings.taplink_slogan;
+                    
                     // Subscription settings
                     data.settings.maxEmployees = backendSettings.max_employees !== undefined ? backendSettings.max_employees : (data.settings.maxEmployees || 100);
                     data.settings.enableCrm = backendSettings.enable_crm !== undefined ? backendSettings.enable_crm : (data.settings.enableCrm !== false);
@@ -127,7 +136,15 @@ window.App = {
                     regos_token: data.settings.regosToken || '',
                     amocrm_subdomain: data.settings.amocrmSubdomain || '',
                     amocrm_token: data.settings.amocrmToken || '',
-                    roles: data.settings.roles || []
+                    roles: data.settings.roles || [],
+                    taplink_desc: data.settings.taplinkDesc || '',
+                    taplink_web: data.settings.taplinkWeb || '',
+                    taplink_telegram: data.settings.taplinkTelegram || '',
+                    taplink_instagram: data.settings.taplinkInstagram || '',
+                    taplink_youtube: data.settings.taplinkYoutube || '',
+                    taplink_whatsapp: data.settings.taplinkWhatsapp || '',
+                    taplink_phone: data.settings.taplinkPhone || '',
+                    taplink_slogan: data.settings.taplinkSlogan || ''
                 })
             }).catch(err => console.error("Initial settings sync failed:", err));
         }
