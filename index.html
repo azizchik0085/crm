@@ -2429,6 +2429,100 @@
         </div>
     </div>
 
+    <!-- 10. Yangi Loyiha modal oynasi -->
+    <div class="modal" id="project-modal">
+        <div class="modal-content" style="max-width: 500px; width: 90vw;">
+            <div class="modal-header">
+                <h3>Yangi Loyiha Yaratish</h3>
+                <button class="close-modal-btn" onclick="closeModal('project-modal')">&times;</button>
+            </div>
+            <form id="add-project-form">
+                <div class="modal-body" style="text-align: left;">
+                    <div class="form-group" style="margin-bottom: 15px;">
+                        <label for="proj-name" style="display:block; margin-bottom: 5px; font-weight:600;">Loyiha Nomi <span style="color:var(--danger)">*</span></label>
+                        <input type="text" id="proj-name" class="form-control" required placeholder="Masalan: Quyosh panellari o'rnatish">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 15px;">
+                        <label for="proj-desc" style="display:block; margin-bottom: 5px; font-weight:600;">Tavsif</label>
+                        <textarea id="proj-desc" class="form-control" style="min-height: 80px;" placeholder="Loyiha tafsilotlari..."></textarea>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 15px;">
+                        <label for="proj-status" style="display:block; margin-bottom: 5px; font-weight:600;">Boshlang'ich holat</label>
+                        <select id="proj-status" class="form-control">
+                            <option value="planning" selected>Rejalashtirilmoqda</option>
+                            <option value="active">Faol</option>
+                            <option value="completed">Yakunlandi</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 15px;">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('project-modal')">Bekor qilish</button>
+                    <button type="submit" class="btn btn-primary">Yaratish</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 11. Yangi Vazifa modal oynasi -->
+    <div class="modal" id="task-modal">
+        <div class="modal-content" style="max-width: 550px; width: 90vw;">
+            <div class="modal-header">
+                <h3>Yangi Vazifa Biriktirish</h3>
+                <button class="close-modal-btn" onclick="closeModal('task-modal')">&times;</button>
+            </div>
+            <form id="add-task-form">
+                <div class="modal-body" style="text-align: left;">
+                    <div class="form-group" style="margin-bottom: 15px;">
+                        <label for="task-project-id" style="display:block; margin-bottom: 5px; font-weight:600;">Loyiha <span style="color:var(--danger)">*</span></label>
+                        <select id="task-project-id" class="form-control" required>
+                            <option value="">Loyihalar yuklanmoqda...</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 15px;">
+                        <label for="task-title" style="display:block; margin-bottom: 5px; font-weight:600;">Vazifa Nomi <span style="color:var(--danger)">*</span></label>
+                        <input type="text" id="task-title" class="form-control" required placeholder="Masalan: Mijoz bilan bog'lanish">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 15px;">
+                        <label for="task-desc" style="display:block; margin-bottom: 5px; font-weight:600;">Tavsif</label>
+                        <textarea id="task-desc" class="form-control" style="min-height: 80px;" placeholder="Vazifa tafsilotlari..."></textarea>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 15px;">
+                        <label for="task-assigned-to" style="display:block; margin-bottom: 5px; font-weight:600;">Mas'ul Xodim</label>
+                        <select id="task-assigned-to" class="form-control">
+                            <option value="">Biriktirilmagan</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 15px;">
+                        <label for="task-priority" style="display:block; margin-bottom: 5px; font-weight:600;">Prioritet</label>
+                        <select id="task-priority" class="form-control">
+                            <option value="low">Past</option>
+                            <option value="medium" selected>O'rtacha</option>
+                            <option value="high">Yuqori</option>
+                            <option value="critical">Kritik</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 15px;">
+                        <label for="task-status" style="display:block; margin-bottom: 5px; font-weight:600;">Holat (Status)</label>
+                        <select id="task-status" class="form-control">
+                            <option value="todo" selected>Kutilmoqda (Todo)</option>
+                            <option value="in_progress">Bajarilmoqda (In Progress)</option>
+                            <option value="review">Tekshirilmoqda (Review)</option>
+                            <option value="done">Bajarildi (Done)</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 15px;">
+                        <label for="task-deadline" style="display:block; margin-bottom: 5px; font-weight:600;">Muddat (Deadline)</label>
+                        <input type="date" id="task-deadline" class="form-control">
+                    </div>
+                </div>
+                <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 15px;">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('task-modal')">Bekor qilish</button>
+                    <button type="submit" class="btn btn-primary">Saqlash</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script>
         // Modal tranzaksiya sanasini bugungi sanaga avtomatik moslash
         document.getElementById('tx-date').value = new Date().toISOString().split('T')[0];
