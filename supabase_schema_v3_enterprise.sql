@@ -77,7 +77,7 @@ CREATE TABLE IF NOT EXISTS public.user_roles (
 );
 
 CREATE TABLE IF NOT EXISTS public.employees (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id TEXT PRIMARY KEY,
     company_id TEXT NOT NULL,
     user_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
     branch_id UUID REFERENCES public.branches(id) ON DELETE SET NULL,
@@ -153,7 +153,7 @@ CREATE TABLE IF NOT EXISTS public.customer_groups (
 );
 
 CREATE TABLE IF NOT EXISTS public.customers (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id TEXT PRIMARY KEY,
     company_id TEXT NOT NULL,
     group_id UUID REFERENCES public.customer_groups(id) ON DELETE SET NULL,
     name TEXT NOT NULL,
@@ -170,7 +170,7 @@ CREATE TABLE IF NOT EXISTS public.customers (
 
 CREATE TABLE IF NOT EXISTS public.customer_addresses (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    customer_id UUID REFERENCES public.customers(id) ON DELETE CASCADE,
+    customer_id TEXT REFERENCES public.customers(id) ON DELETE CASCADE,
     address_line TEXT NOT NULL,
     city TEXT,
     postal_code TEXT,
@@ -179,7 +179,7 @@ CREATE TABLE IF NOT EXISTS public.customer_addresses (
 
 CREATE TABLE IF NOT EXISTS public.customer_contacts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    customer_id UUID REFERENCES public.customers(id) ON DELETE CASCADE,
+    customer_id TEXT REFERENCES public.customers(id) ON DELETE CASCADE,
     contact_name TEXT NOT NULL,
     phone TEXT,
     email TEXT,
@@ -188,7 +188,7 @@ CREATE TABLE IF NOT EXISTS public.customer_contacts (
 
 CREATE TABLE IF NOT EXISTS public.customer_notes (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    customer_id UUID REFERENCES public.customers(id) ON DELETE CASCADE,
+    customer_id TEXT REFERENCES public.customers(id) ON DELETE CASCADE,
     author_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
     note TEXT NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -196,7 +196,7 @@ CREATE TABLE IF NOT EXISTS public.customer_notes (
 
 CREATE TABLE IF NOT EXISTS public.customer_files (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    customer_id UUID REFERENCES public.customers(id) ON DELETE CASCADE,
+    customer_id TEXT REFERENCES public.customers(id) ON DELETE CASCADE,
     file_name TEXT NOT NULL,
     file_url TEXT NOT NULL,
     uploaded_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -204,7 +204,7 @@ CREATE TABLE IF NOT EXISTS public.customer_files (
 
 CREATE TABLE IF NOT EXISTS public.customer_history (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    customer_id UUID REFERENCES public.customers(id) ON DELETE CASCADE,
+    customer_id TEXT REFERENCES public.customers(id) ON DELETE CASCADE,
     action TEXT NOT NULL,
     description TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -212,7 +212,7 @@ CREATE TABLE IF NOT EXISTS public.customer_history (
 
 CREATE TABLE IF NOT EXISTS public.customer_tasks (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    customer_id UUID REFERENCES public.customers(id) ON DELETE CASCADE,
+    customer_id TEXT REFERENCES public.customers(id) ON DELETE CASCADE,
     assigned_to UUID REFERENCES public.users(id) ON DELETE SET NULL,
     task_desc TEXT NOT NULL,
     due_date TIMESTAMP WITH TIME ZONE,
@@ -221,7 +221,7 @@ CREATE TABLE IF NOT EXISTS public.customer_tasks (
 
 CREATE TABLE IF NOT EXISTS public.customer_tags (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    customer_id UUID REFERENCES public.customers(id) ON DELETE CASCADE,
+    customer_id TEXT REFERENCES public.customers(id) ON DELETE CASCADE,
     tag TEXT NOT NULL
 );
 
@@ -245,7 +245,7 @@ CREATE TABLE IF NOT EXISTS public.lead_statuses (
 CREATE TABLE IF NOT EXISTS public.leads (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
-    customer_id UUID REFERENCES public.customers(id) ON DELETE SET NULL,
+    customer_id TEXT REFERENCES public.customers(id) ON DELETE SET NULL,
     source_id UUID REFERENCES public.lead_sources(id) ON DELETE SET NULL,
     status_id UUID REFERENCES public.lead_statuses(id) ON DELETE SET NULL,
     title TEXT NOT NULL,
@@ -258,7 +258,7 @@ CREATE TABLE IF NOT EXISTS public.leads (
 CREATE TABLE IF NOT EXISTS public.quotations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
-    customer_id UUID REFERENCES public.customers(id) ON DELETE SET NULL,
+    customer_id TEXT REFERENCES public.customers(id) ON DELETE SET NULL,
     valid_until DATE,
     total_amount NUMERIC(15,2) DEFAULT 0.00,
     status TEXT DEFAULT 'draft', -- 'draft', 'sent', 'accepted', 'declined'
@@ -277,7 +277,7 @@ CREATE TABLE IF NOT EXISTS public.quotation_items (
 CREATE TABLE IF NOT EXISTS public.sales_orders (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
-    customer_id UUID REFERENCES public.customers(id) ON DELETE SET NULL,
+    customer_id TEXT REFERENCES public.customers(id) ON DELETE SET NULL,
     quotation_id UUID REFERENCES public.quotations(id) ON DELETE SET NULL,
     total_amount NUMERIC(15,2) DEFAULT 0.00,
     status TEXT DEFAULT 'pending', -- 'pending', 'processed', 'shipped', 'cancelled'
@@ -297,7 +297,7 @@ CREATE TABLE IF NOT EXISTS public.invoices (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
     sales_order_id UUID REFERENCES public.sales_orders(id) ON DELETE SET NULL,
-    customer_id UUID REFERENCES public.customers(id) ON DELETE SET NULL,
+    customer_id TEXT REFERENCES public.customers(id) ON DELETE SET NULL,
     total_amount NUMERIC(15,2) DEFAULT 0.00,
     due_date DATE,
     status TEXT DEFAULT 'unpaid', -- 'unpaid', 'partially_paid', 'paid', 'overdue'
@@ -332,7 +332,7 @@ CREATE TABLE IF NOT EXISTS public.payments (
 CREATE TABLE IF NOT EXISTS public.sales_targets (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
-    employee_id UUID REFERENCES public.employees(id) ON DELETE CASCADE,
+    employee_id TEXT REFERENCES public.employees(id) ON DELETE CASCADE,
     target_amount NUMERIC(15,2) NOT NULL,
     start_date DATE NOT NULL,
     end_date DATE NOT NULL
@@ -340,7 +340,7 @@ CREATE TABLE IF NOT EXISTS public.sales_targets (
 
 CREATE TABLE IF NOT EXISTS public.sales_kpi (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    employee_id UUID REFERENCES public.employees(id) ON DELETE CASCADE,
+    employee_id TEXT REFERENCES public.employees(id) ON DELETE CASCADE,
     period_start DATE NOT NULL,
     period_end DATE NOT NULL,
     kpi_score NUMERIC(5,2) DEFAULT 100.00
@@ -348,7 +348,7 @@ CREATE TABLE IF NOT EXISTS public.sales_kpi (
 
 CREATE TABLE IF NOT EXISTS public.sales_bonus (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    employee_id UUID REFERENCES public.employees(id) ON DELETE CASCADE,
+    employee_id TEXT REFERENCES public.employees(id) ON DELETE CASCADE,
     amount NUMERIC(15,2) NOT NULL,
     date_granted DATE NOT NULL
 );
@@ -479,7 +479,7 @@ CREATE TABLE IF NOT EXISTS public.supplier_contacts (
 CREATE TABLE IF NOT EXISTS public.purchase_requests (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
-    employee_id UUID REFERENCES public.employees(id) ON DELETE SET NULL,
+    employee_id TEXT REFERENCES public.employees(id) ON DELETE SET NULL,
     request_details TEXT NOT NULL,
     status TEXT DEFAULT 'pending', -- 'pending', 'approved', 'rejected'
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -540,7 +540,7 @@ CREATE TABLE IF NOT EXISTS public.warehouse_locations (
 );
 
 CREATE TABLE IF NOT EXISTS public.inventory (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id TEXT PRIMARY KEY,
     company_id TEXT NOT NULL,
     warehouse_id UUID REFERENCES public.warehouses(id) ON DELETE CASCADE,
     product_id UUID REFERENCES public.products(id) ON DELETE CASCADE,
@@ -553,7 +553,7 @@ CREATE TABLE IF NOT EXISTS public.inventory (
 CREATE TABLE IF NOT EXISTS public.inventory_transactions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
-    inventory_id UUID REFERENCES public.inventory(id) ON DELETE CASCADE,
+    inventory_id TEXT REFERENCES public.inventory(id) ON DELETE CASCADE,
     transaction_type TEXT NOT NULL, -- 'in', 'out', 'transfer', 'adjustment'
     quantity INTEGER NOT NULL,
     date DATE NOT NULL,
@@ -778,26 +778,27 @@ CREATE TABLE IF NOT EXISTS public.electronic_invoices (
 -- 10. HR (Inson resurslari)
 -- =========================================================================
 
-CREATE TABLE IF NOT EXISTS public.attendance (
+CREATE TABLE IF NOT EXISTS public.employee_attendance (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
-    employee_id UUID REFERENCES public.employees(id) ON DELETE CASCADE,
+    employee_id TEXT REFERENCES public.employees(id) ON DELETE CASCADE,
     date DATE NOT NULL,
     clock_in TIMESTAMP WITH TIME ZONE,
     clock_out TIMESTAMP WITH TIME ZONE,
-    status TEXT DEFAULT 'present', -- 'present', 'late', 'absent'
-    UNIQUE(employee_id, date)
+    status TEXT DEFAULT 'present', -- 'present', 'late', 'absent', 'excused'
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(company_id, employee_id, date)
 );
 
-CREATE TABLE IF NOT EXISTS public.leave_requests (
+CREATE TABLE IF NOT EXISTS public.employee_leaves (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
-    employee_id UUID REFERENCES public.employees(id) ON DELETE CASCADE,
+    employee_id TEXT REFERENCES public.employees(id) ON DELETE CASCADE,
     start_date DATE NOT NULL,
     end_date DATE NOT NULL,
-    type TEXT DEFAULT 'annual',
-    status TEXT DEFAULT 'pending',
-    reason TEXT
+    reason TEXT,
+    status TEXT DEFAULT 'pending', -- 'pending', 'approved', 'rejected'
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS public.vacancies (
@@ -828,7 +829,7 @@ CREATE TABLE IF NOT EXISTS public.interviews (
 
 CREATE TABLE IF NOT EXISTS public.contracts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    employee_id UUID REFERENCES public.employees(id) ON DELETE CASCADE,
+    employee_id TEXT REFERENCES public.employees(id) ON DELETE CASCADE,
     start_date DATE NOT NULL,
     end_date DATE,
     terms TEXT
@@ -836,7 +837,7 @@ CREATE TABLE IF NOT EXISTS public.contracts (
 
 CREATE TABLE IF NOT EXISTS public.employee_documents (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    employee_id UUID REFERENCES public.employees(id) ON DELETE CASCADE,
+    employee_id TEXT REFERENCES public.employees(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     file_url TEXT NOT NULL,
     uploaded_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -844,7 +845,7 @@ CREATE TABLE IF NOT EXISTS public.employee_documents (
 
 CREATE TABLE IF NOT EXISTS public.employee_kpi (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    employee_id UUID REFERENCES public.employees(id) ON DELETE CASCADE,
+    employee_id TEXT REFERENCES public.employees(id) ON DELETE CASCADE,
     period TEXT NOT NULL, -- e.g. '2026-Q2'
     score INTEGER DEFAULT 100
 );
@@ -896,14 +897,14 @@ CREATE TABLE IF NOT EXISTS public.answers (
 
 CREATE TABLE IF NOT EXISTS public.certificates (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    employee_id UUID REFERENCES public.employees(id) ON DELETE CASCADE,
+    employee_id TEXT REFERENCES public.employees(id) ON DELETE CASCADE,
     course_id UUID REFERENCES public.courses(id) ON DELETE CASCADE,
     issued_date DATE NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS public.employee_training (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    employee_id UUID REFERENCES public.employees(id) ON DELETE CASCADE,
+    employee_id TEXT REFERENCES public.employees(id) ON DELETE CASCADE,
     lesson_id UUID REFERENCES public.lessons(id) ON DELETE CASCADE,
     is_completed BOOLEAN DEFAULT false,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -927,7 +928,7 @@ CREATE TABLE IF NOT EXISTS public.quality_checks (
 CREATE TABLE IF NOT EXISTS public.complaints (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
-    customer_id UUID REFERENCES public.customers(id) ON DELETE CASCADE,
+    customer_id TEXT REFERENCES public.customers(id) ON DELETE CASCADE,
     issue TEXT NOT NULL,
     status TEXT DEFAULT 'open', -- 'open', 'resolved', 'closed'
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -942,7 +943,7 @@ CREATE TABLE IF NOT EXISTS public.complaint_types (
 CREATE TABLE IF NOT EXISTS public.warranty (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     product_id UUID,
-    customer_id UUID REFERENCES public.customers(id) ON DELETE CASCADE,
+    customer_id TEXT REFERENCES public.customers(id) ON DELETE CASCADE,
     start_date DATE NOT NULL,
     end_date DATE NOT NULL
 );
@@ -1025,12 +1026,12 @@ CREATE TABLE IF NOT EXISTS public.vehicle_tracking (
 CREATE TABLE IF NOT EXISTS public.service_orders (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id TEXT NOT NULL,
-    customer_id UUID REFERENCES public.customers(id) ON DELETE CASCADE,
+    customer_id TEXT REFERENCES public.customers(id) ON DELETE CASCADE,
     product_name TEXT NOT NULL,
     serial_number TEXT,
     issue TEXT NOT NULL,
     status TEXT DEFAULT 'pending', -- 'pending', 'ready', 'delivered'
-    assigned_to UUID REFERENCES public.employees(id) ON DELETE SET NULL,
+    assigned_to TEXT REFERENCES public.employees(id) ON DELETE SET NULL,
     cost NUMERIC(15,2) DEFAULT 0.00,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -1043,7 +1044,7 @@ CREATE TABLE IF NOT EXISTS public.service_items (
 
 CREATE TABLE IF NOT EXISTS public.technicians (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    employee_id UUID REFERENCES public.employees(id) ON DELETE CASCADE,
+    employee_id TEXT REFERENCES public.employees(id) ON DELETE CASCADE,
     specialization TEXT
 );
 
@@ -1057,7 +1058,7 @@ CREATE TABLE IF NOT EXISTS public.spare_parts (
 
 CREATE TABLE IF NOT EXISTS public.service_history (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    customer_id UUID REFERENCES public.customers(id) ON DELETE CASCADE,
+    customer_id TEXT REFERENCES public.customers(id) ON DELETE CASCADE,
     service_order_id UUID REFERENCES public.service_orders(id) ON DELETE CASCADE,
     notes TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -1233,3 +1234,36 @@ CREATE INDEX IF NOT EXISTS idx_audit_logs_company ON public.audit_logs(company_i
 CREATE INDEX IF NOT EXISTS idx_tasks_company ON public.tasks(company_id);
 CREATE INDEX IF NOT EXISTS idx_documents_company ON public.documents(company_id);
 CREATE INDEX IF NOT EXISTS idx_ai_logs_company ON public.ai_logs(company_id);
+
+
+-- =========================================================================
+-- 18. INSTALLMENT SALES & RECEIPTS (Dodatkowe)
+-- =========================================================================
+
+CREATE TABLE IF NOT EXISTS public.receipts (
+    id TEXT PRIMARY KEY,
+    code TEXT,
+    cashier_name TEXT,
+    total_amount NUMERIC DEFAULT 0,
+    discount NUMERIC DEFAULT 0,
+    payment_type TEXT DEFAULT 'cash',
+    items JSONB,
+    company_id TEXT, -- Multi-tenant partitioning
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.installment_sales (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    company_id TEXT NOT NULL,
+    receipt_id TEXT NOT NULL, -- references receipts(id)
+    customer_id TEXT NOT NULL, -- references customers(id)
+    total_amount NUMERIC(15,2) NOT NULL,
+    paid_amount NUMERIC(15,2) DEFAULT 0.00,
+    remaining_debt NUMERIC(15,2) DEFAULT 0.00,
+    period_months INTEGER DEFAULT 12,
+    monthly_payment NUMERIC(15,2) DEFAULT 0.00,
+    status TEXT DEFAULT 'active', -- 'active', 'overdue', 'completed'
+    next_payment_date DATE NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
