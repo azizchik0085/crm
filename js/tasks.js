@@ -81,10 +81,10 @@ window.Tasks = {
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px; border-top: 1px solid #334155; padding-top: 8px;">
                     <span style="font-size: 10px; color: #64748b;"><i class="fas fa-folder"></i> ${t.project_name || "Loyiha tashqarisi"}</span>
                     <select class="form-control" style="width: auto; padding: 2px 6px; font-size: 11px; background: rgba(0,0,0,0.3); border: 1px solid #475569; color: #f8fafc; border-radius: 4px; cursor: pointer; height: auto;" onchange="window.Tasks.changeStatus('${t.id}', this.value)">
-                        <option value="todo" ${t.status === 'todo' ? 'selected' : ''}>Todo</option>
-                        <option value="in_progress" ${t.status === 'in_progress' ? 'selected' : ''}>In Progress</option>
-                        <option value="review" ${t.status === 'review' ? 'selected' : ''}>Review</option>
-                        <option value="done" ${t.status === 'done' ? 'selected' : ''}>Done</option>
+                        <option value="todo" ${t.status === 'todo' ? 'selected' : ''}>Kutilmoqda</option>
+                        <option value="in_progress" ${t.status === 'in_progress' ? 'selected' : ''}>Bajarilmoqda</option>
+                        <option value="review" ${t.status === 'review' ? 'selected' : ''}>Tekshirilmoqda</option>
+                        <option value="done" ${t.status === 'done' ? 'selected' : ''}>Bajarildi</option>
                     </select>
                 </div>
             `;
