@@ -1170,7 +1170,10 @@ def get_company_settings(company_id: str, use_central: bool = False, bypass_cach
         "enable_warehouse": True,
         "enable_kassa": True,
         "amocrm_operators_map": {},
-        "roles": ["POS Kassa", "Menejer", "Kassir", "Kuryer", "Operator", "Sotuvchi"]
+        "roles": ["POS Kassa", "Menejer", "Kassir", "Kuryer", "Operator", "Sotuvchi"],
+        "taplink_desc": "", "taplink_web": "", "taplink_telegram": "",
+        "taplink_instagram": "", "taplink_youtube": "", "taplink_whatsapp": "",
+        "taplink_phone": "", "taplink_slogan": ""
     }
     
     # 1. Try loading from Supabase database
@@ -1591,6 +1594,21 @@ def update_company_admin_settings(company_id: str, payload: dict):
     save_company_settings(company_id, company_settings)
     return {"status": "success", "settings": company_settings}
 
+@app.get("/api/public/taplink/{company_id}")
+def get_public_taplink_settings(company_id: str):
+    settings = get_company_settings(company_id)
+    return {
+        "company_name": settings.get("company_name", ""),
+        "taplink_desc": settings.get("taplink_desc", ""),
+        "taplink_web": settings.get("taplink_web", ""),
+        "taplink_telegram": settings.get("taplink_telegram", ""),
+        "taplink_instagram": settings.get("taplink_instagram", ""),
+        "taplink_youtube": settings.get("taplink_youtube", ""),
+        "taplink_whatsapp": settings.get("taplink_whatsapp", ""),
+        "taplink_phone": settings.get("taplink_phone", ""),
+        "taplink_slogan": settings.get("taplink_slogan", "")
+    }
+
 @app.get("/api/settings")
 def get_settings(request: Request):
     company_id = get_company_id(request)
@@ -1630,6 +1648,15 @@ def update_settings(settings: dict, request: Request):
         company_settings["roles"] = settings.get("roles")
     if "amocrm_operators_map" in settings:
         company_settings["amocrm_operators_map"] = settings.get("amocrm_operators_map", {})
+        
+    company_settings["taplink_desc"] = settings.get("taplink_desc", "")
+    company_settings["taplink_web"] = settings.get("taplink_web", "")
+    company_settings["taplink_telegram"] = settings.get("taplink_telegram", "")
+    company_settings["taplink_instagram"] = settings.get("taplink_instagram", "")
+    company_settings["taplink_youtube"] = settings.get("taplink_youtube", "")
+    company_settings["taplink_whatsapp"] = settings.get("taplink_whatsapp", "")
+    company_settings["taplink_phone"] = settings.get("taplink_phone", "")
+    company_settings["taplink_slogan"] = settings.get("taplink_slogan", "")
     
     save_company_settings(company_id, company_settings)
     print(f"Settings for company {company_id} updated.")

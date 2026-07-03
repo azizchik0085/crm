@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Taplink - Havolalar to'plami</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --bg-gradient: radial-gradient(circle at top, #0f1c12 0%, #050a06 100%);
+            --primary-green: #15803d;
+            --accent-gold: #eab308;
+            --glass-bg: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Outfit', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background: var(--bg-gradient);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            overflow-x: hidden;
+        }
+
+        /* Phone mockup container styled exactly like the screenshot */
+        .phone-container {
+            width: 100%;
+            max-width: 480px;
+            min-height: 100vh;
+            padding: 40px 24px 100px 24px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+            background: url('https://images.unsplash.com/photo-1590381105924-c72589b9ef3f?auto=format&fit=crop&q=80&w=600') no-repeat center center;
+            background-size: cover;
+        }
+
+        /* Overlay for background blur and dark green tint */
+        .phone-container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(180deg, rgba(15, 28, 18, 0.85) 0%, rgba(5, 10, 6, 0.95) 100%);
+            z-index: 1;
+            backdrop-filter: blur(10px);
+        }
+
+        .content-wrapper {
+            position: relative;
+            z-index: 2;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* Logo Avatar & Verification Badge */
+        .avatar-container {
+            position: relative;
+            width: 110px;
+            height: 110px;
+            margin-bottom: 16px;
+        }
+
+        .avatar {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            border: 3px solid var(--primary-green);
+            background: #111;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 0 20px rgba(21, 128, 61, 0.4);
+            font-size: 36px;
+            font-weight: 700;
+            color: var(--accent-gold);
+            overflow: hidden;
+        }
+
+        .avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .verified-badge {
+            position: absolute;
+            bottom: 2px;
+            right: 2px;
+            background: #22c55e;
+            color: white;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 12px;
+            border: 2px solid #0f1c12;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+
+        /* Titles and Bio */
+        .company-name {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .company-name i {
+            color: #22c55e;
+            font-size: 18px;
+        }
+
+        .company-bio {
+            font-size: 14px;
+            color: var(--text-muted);
+            text-align: center;
+            max-width: 320px;
+            line-height: 1.5;
+            margin-bottom: 24px;
+        }
+
+        /* Circular Social Row */
+        .social-icons-row {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+
+        .social-icon-btn {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-size: 20px;
+            text-decoration: none;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            backdrop-filter: blur(5px);
+        }
+
+        .social-icon-btn:hover {
+            transform: scale(1.15) translateY(-3px);
+            box-shadow: 0 8px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .social-icon-btn.instagram:hover { background: radial-gradient(circle at 30% 107%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285aeb 90%); }
+        .social-icon-btn.telegram:hover { background: #0088cc; }
+        .social-icon-btn.whatsapp:hover { background: #25d366; }
+        .social-icon-btn.youtube:hover { background: #ff0000; }
+        .social-icon-btn.website:hover { background: var(--primary-green); }
+
+        /* Large Link Buttons Stack */
+        .links-stack {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            margin-bottom: 40px;
+        }
+
+        .link-item {
+            width: 100%;
+            background: linear-gradient(135deg, rgba(21, 128, 61, 0.15) 0%, rgba(21, 128, 61, 0.05) 100%);
+            border: 1px solid rgba(21, 128, 61, 0.25);
+            border-radius: 16px;
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            text-decoration: none;
+            color: white;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .link-item::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent);
+            transform: translateX(-100%);
+            transition: transform 0.6s ease;
+        }
+
+        .link-item:hover::before {
+            transform: translateX(100%);
+        }
+
+        .link-item:hover {
+            transform: translateY(-2px);
+            border-color: var(--accent-gold);
+            box-shadow: 0 8px 20px rgba(234, 179, 8, 0.15);
+            background: linear-gradient(135deg, rgba(234, 179, 8, 0.15) 0%, rgba(21, 128, 61, 0.1) 100%);
+        }
+
+        .link-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            background: rgba(255,255,255,0.05);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 20px;
+            margin-right: 16px;
+            transition: transform 0.3s ease;
+        }
+
+        .link-item:hover .link-icon {
+            transform: scale(1.1);
+        }
+
+        .link-text {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .link-title {
+            font-size: 15px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .link-subtitle {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .link-arrow {
+            font-size: 16px;
+            color: var(--text-muted);
+            transition: transform 0.3s ease;
+        }
+
+        .link-item:hover .link-arrow {
+            transform: translateX(4px);
+            color: var(--accent-gold);
+        }
+
+        /* Specific link accent colors */
+        .link-item.website .link-icon { color: #38bdf8; }
+        .link-item.telegram .link-icon { color: #38bdf8; }
+        .link-item.instagram .link-icon { color: #f43f5e; }
+        .link-item.youtube .link-icon { color: #ef4444; }
+        .link-item.whatsapp .link-icon { color: #22c55e; }
+        .link-item.phone .link-icon { color: #a855f7; }
+
+        /* Slogan */
+        .slogan {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--accent-gold);
+            text-align: center;
+            letter-spacing: 1px;
+            margin-bottom: 20px;
+            text-transform: uppercase;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.4);
+        }
+
+        /* Bottom Quick Navigation Bar (Sticky/Fixed) */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100%;
+            max-width: 480px;
+            background: rgba(10, 20, 12, 0.85);
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(15px);
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            padding: 10px 4px;
+            z-index: 10;
+        }
+
+        .bottom-nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 9px;
+            font-weight: 600;
+            text-transform: uppercase;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .bottom-nav-item i {
+            font-size: 18px;
+            transition: transform 0.3s ease;
+        }
+
+        .bottom-nav-item:hover {
+            color: var(--accent-gold);
+        }
+
+        .bottom-nav-item:hover i {
+            transform: scale(1.15) translateY(-2px);
+        }
+
+        /* Shimmer loading layout */
+        .loading-screen {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: #050a06;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(255,255,255,0.05);
+            border-top: 4px solid var(--accent-gold);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Loading Screen -->
+    <div id="loading" class="loading-screen">
+        <div class="spinner"></div>
+        <p style="font-size: 14px; color: var(--text-muted); font-weight: 500;">Yuklanmoqda...</p>
+    </div>
+
+    <!-- Phone mockup container -->
+    <div class="phone-container" id="main-content" style="display: none;">
+        <div class="content-wrapper">
+            
+            <!-- Avatar / Logo -->
+            <div class="avatar-container">
+                <div class="avatar" id="company-avatar">
+                    <!-- Initials or Logo image dynamically loaded -->
+                </div>
+                <div class="verified-badge">
+                    <i class="fas fa-check"></i>
+                </div>
+            </div>
+
+            <!-- Company name & description -->
+            <h1 class="company-name" id="company-name">Giper Brend Stroy</h1>
+            <p class="company-bio" id="company-bio"></p>
+
+            <!-- Social Icon Row -->
+            <div class="social-icons-row" id="social-icons">
+                <!-- Dynamically filled icons -->
+            </div>
+
+            <!-- Links stack -->
+            <div class="links-stack" id="links-stack">
+                <!-- Dynamically loaded large button items -->
+            </div>
+
+            <!-- Bottom slogan -->
+            <div class="slogan" id="company-slogan"></div>
+
+        </div>
+
+        <!-- Sticky Bottom Quick Navigation Catalog Bar -->
+        <div class="bottom-nav">
+            <a href="#" class="bottom-nav-item">
+                <i class="fa-solid fa-sack-dollar"></i>
+                <span>OQ SEMENT</span>
+            </a>
+            <a href="#" class="bottom-nav-item">
+                <i class="fa-solid fa-cubes"></i>
+                <span>QURILISH</span>
+            </a>
+            <a href="#" class="bottom-nav-item">
+                <i class="fa-solid fa-tags"></i>
+                <span>OPTOM NARX</span>
+            </a>
+            <a href="#" class="bottom-nav-item">
+                <i class="fa-solid fa-truck-fast"></i>
+                <span>TEZKOR ELTISH</span>
+            </a>
+        </div>
+    </div>
+
+    <script>
+        async function init() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const companyId = urlParams.get('company_id');
+
+            if (!companyId) {
+                alert("Xatolik: Havolada kompaniya ID-si ko'rsatilmagan!");
+                document.getElementById('loading').innerHTML = `
+                    <div style="font-size: 48px; color: #ef4444;"><i class="fas fa-exclamation-triangle"></i></div>
+                    <p style="color:#ef4444; font-weight:600; margin-top:10px;">Havolada xatolik bor!</p>
+                `;
+                return;
+            }
+
+            try {
+                const res = await fetch(`/api/public/taplink/${companyId}`);
+                if (!res.ok) throw new Error("Settings fetch failed");
+                const data = await res.json();
+
+                // 1. Set Company name
+                document.title = data.company_name + " - Taplink";
+                document.getElementById('company-name').innerHTML = `${data.company_name} <i class="fas fa-check-circle"></i>`;
+                
+                // Set avatar initials or placeholder
+                const initials = data.company_name ? data.company_name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 'GP';
+                document.getElementById('company-avatar').textContent = initials;
+
+                // 2. Set Bio / Description
+                document.getElementById('company-bio').textContent = data.taplink_desc || "Kompaniyamizning rasmiy ijtimoiy sahifalari va bog'lanish yo'llari.";
+
+                // 3. Render social icons row
+                const socialContainer = document.getElementById('social-icons');
+                socialContainer.innerHTML = '';
+                
+                // 4. Render large buttons stack
+                const linksStack = document.getElementById('links-stack');
+                linksStack.innerHTML = '';
+
+                // Web Link
+                if (data.taplink_web) {
+                    const cleanUrl = data.taplink_web.replace(/^(https?:\/\/)?(www\.)?/, '');
+                    const fullUrl = data.taplink_web.match(/^https?:\/\//) ? data.taplink_web : 'https://' + data.taplink_web;
+                    
+                    socialContainer.innerHTML += `<a href="${fullUrl}" target="_blank" class="social-icon-btn website"><i class="fas fa-globe"></i></a>`;
+                    linksStack.innerHTML += `
+                        <a href="${fullUrl}" target="_blank" class="link-item website">
+                            <div class="link-icon"><i class="fas fa-globe"></i></div>
+                            <div class="link-text">
+                                <span class="link-title">RASMIY VEB-SAYT</span>
+                                <span class="link-subtitle">${cleanUrl}</span>
+                            </div>
+                            <div class="link-arrow"><i class="fas fa-chevron-right"></i></div>
+                        </a>
+                    `;
+                }
+
+                // Telegram Link
+                if (data.taplink_telegram) {
+                    let cleanUrl = data.taplink_telegram.replace(/^(https?:\/\/)?(www\.)?t\.me\//, '');
+                    let fullUrl = data.taplink_telegram.match(/^https?:\/\//) ? data.taplink_telegram : 'https://t.me/' + cleanUrl;
+                    
+                    socialContainer.innerHTML += `<a href="${fullUrl}" target="_blank" class="social-icon-btn telegram"><i class="fab fa-telegram-plane"></i></a>`;
+                    linksStack.innerHTML += `
+                        <a href="${fullUrl}" target="_blank" class="link-item telegram">
+                            <div class="link-icon"><i class="fab fa-telegram-plane"></i></div>
+                            <div class="link-text">
+                                <span class="link-title">TELEGRAM KANAL</span>
+                                <span class="link-subtitle">t.me/${cleanUrl}</span>
+                            </div>
+                            <div class="link-arrow"><i class="fas fa-chevron-right"></i></div>
+                        </a>
+                    `;
+                }
+
+                // Instagram Link
+                if (data.taplink_instagram) {
+                    let cleanUrl = data.taplink_instagram.replace(/^(https?:\/\/)?(www\.)?instagram\.com\//, '').replace(/\/$/, '');
+                    let fullUrl = data.taplink_instagram.match(/^https?:\/\//) ? data.taplink_instagram : 'https://instagram.com/' + cleanUrl;
+                    
+                    socialContainer.innerHTML += `<a href="${fullUrl}" target="_blank" class="social-icon-btn instagram"><i class="fab fa-instagram"></i></a>`;
+                    linksStack.innerHTML += `
+                        <a href="${fullUrl}" target="_blank" class="link-item instagram">
+                            <div class="link-icon"><i class="fab fa-instagram"></i></div>
+                            <div class="link-text">
+                                <span class="link-title">INSTAGRAM SAHIFAMIZ</span>
+                                <span class="link-subtitle">@${cleanUrl}</span>
+                            </div>
+                            <div class="link-arrow"><i class="fas fa-chevron-right"></i></div>
+                        </a>
+                    `;
+                }
+
+                // YouTube Link
+                if (data.taplink_youtube) {
+                    let cleanUrl = data.taplink_youtube.replace(/^(https?:\/\/)?(www\.)?youtube\.com\//, '');
+                    let fullUrl = data.taplink_youtube.match(/^https?:\/\//) ? data.taplink_youtube : 'https://youtube.com/' + cleanUrl;
+                    
+                    socialContainer.innerHTML += `<a href="${fullUrl}" target="_blank" class="social-icon-btn youtube"><i class="fab fa-youtube"></i></a>`;
+                    linksStack.innerHTML += `
+                        <a href="${fullUrl}" target="_blank" class="link-item youtube">
+                            <div class="link-icon"><i class="fab fa-youtube"></i></div>
+                            <div class="link-text">
+                                <span class="link-title">YOUTUBE KANALIMIZ</span>
+                                <span class="link-subtitle">${data.company_name}</span>
+                            </div>
+                            <div class="link-arrow"><i class="fas fa-chevron-right"></i></div>
+                        </a>
+                    `;
+                }
+
+                // WhatsApp Link
+                if (data.taplink_whatsapp) {
+                    let cleanUrl = data.taplink_whatsapp.replace(/^(https?:\/\/)?(www\.)?wa\.me\//, '');
+                    let fullUrl = data.taplink_whatsapp.match(/^https?:\/\//) ? data.taplink_whatsapp : 'https://wa.me/' + cleanUrl;
+                    
+                    socialContainer.innerHTML += `<a href="${fullUrl}" target="_blank" class="social-icon-btn whatsapp"><i class="fab fa-whatsapp"></i></a>`;
+                    linksStack.innerHTML += `
+                        <a href="${fullUrl}" target="_blank" class="link-item whatsapp">
+                            <div class="link-icon"><i class="fab fa-whatsapp"></i></div>
+                            <div class="link-text">
+                                <span class="link-title">WHATSAPP CHAT</span>
+                                <span class="link-subtitle">Biz bilan bog'laning</span>
+                            </div>
+                            <div class="link-arrow"><i class="fas fa-chevron-right"></i></div>
+                        </a>
+                    `;
+                }
+
+                // Phone Contact Link
+                if (data.taplink_phone) {
+                    let cleanPhone = data.taplink_phone.replace(/\s+/g, '');
+                    linksStack.innerHTML += `
+                        <a href="tel:${cleanPhone}" class="link-item phone">
+                            <div class="link-icon"><i class="fas fa-phone-alt"></i></div>
+                            <div class="link-text">
+                                <span class="link-title">TELEFON ALOQA</span>
+                                <span class="link-subtitle">${data.taplink_phone}</span>
+                            </div>
+                            <div class="link-arrow"><i class="fas fa-chevron-right"></i></div>
+                        </a>
+                    `;
+                }
+
+                // 5. Set Bottom Slogan
+                document.getElementById('company-slogan').textContent = data.taplink_slogan || "SIFATLI MAHSULOT - ISHONCHLI HAMKORLIK!";
+
+                // Show Content and Hide Loading
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('main-content').style.display = 'block';
+
+            } catch (err) {
+                console.error("Taplink load error:", err);
+                document.getElementById('loading').innerHTML = `
+                    <div style="font-size: 48px; color: #ef4444;"><i class="fas fa-times-circle"></i></div>
+                    <p style="color:#ef4444; font-weight:600; margin-top:10px;">Yuklashda xatolik yuz berdi!</p>
+                `;
+            }
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>

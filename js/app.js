@@ -249,6 +249,31 @@ window.App = {
             amocrmWebhookInput.value = window.location.origin + '/api/integration/amocrm/webhook' + suffix;
         }
 
+        // Taplink formalarini to'ldirish
+        const tlDescInput = document.getElementById('settings-taplink-desc');
+        if (tlDescInput) tlDescInput.value = data.settings.taplinkDesc || '';
+
+        const tlWebInput = document.getElementById('settings-taplink-web');
+        if (tlWebInput) tlWebInput.value = data.settings.taplinkWeb || '';
+
+        const tlTelegramInput = document.getElementById('settings-taplink-telegram');
+        if (tlTelegramInput) tlTelegramInput.value = data.settings.taplinkTelegram || '';
+
+        const tlInstagramInput = document.getElementById('settings-taplink-instagram');
+        if (tlInstagramInput) tlInstagramInput.value = data.settings.taplinkInstagram || '';
+
+        const tlYoutubeInput = document.getElementById('settings-taplink-youtube');
+        if (tlYoutubeInput) tlYoutubeInput.value = data.settings.taplinkYoutube || '';
+
+        const tlWhatsappInput = document.getElementById('settings-taplink-whatsapp');
+        if (tlWhatsappInput) tlWhatsappInput.value = data.settings.taplinkWhatsapp || '';
+
+        const tlPhoneInput = document.getElementById('settings-taplink-phone');
+        if (tlPhoneInput) tlPhoneInput.value = data.settings.taplinkPhone || '';
+
+        const tlSloganInput = document.getElementById('settings-taplink-slogan');
+        if (tlSloganInput) tlSloganInput.value = data.settings.taplinkSlogan || '';
+
         this.renderAmoCRMOperatorsMapping();
         this.onAIProviderChange();
     },
@@ -731,6 +756,15 @@ window.App = {
                  const regosToken = document.getElementById('settings-regos-token')?.value.trim() || '';
                  const amocrmSubdomain = document.getElementById('settings-amocrm-subdomain')?.value.trim() || '';
                  const amocrmToken = document.getElementById('settings-amocrm-token')?.value.trim() || '';
+                  
+                 const taplinkDesc = document.getElementById('settings-taplink-desc')?.value.trim() || '';
+                 const taplinkWeb = document.getElementById('settings-taplink-web')?.value.trim() || '';
+                 const taplinkTelegram = document.getElementById('settings-taplink-telegram')?.value.trim() || '';
+                 const taplinkInstagram = document.getElementById('settings-taplink-instagram')?.value.trim() || '';
+                 const taplinkYoutube = document.getElementById('settings-taplink-youtube')?.value.trim() || '';
+                 const taplinkWhatsapp = document.getElementById('settings-taplink-whatsapp')?.value.trim() || '';
+                 const taplinkPhone = document.getElementById('settings-taplink-phone')?.value.trim() || '';
+                 const taplinkSlogan = document.getElementById('settings-taplink-slogan')?.value.trim() || '';
                 
                 // Sozlamalar o'zgarganligini aniqlash
                 const sbChanged = data.settings.supabaseUrl !== sbUrl || data.settings.supabaseKey !== sbKey;
@@ -796,6 +830,15 @@ window.App = {
                 data.settings.amocrmSubdomain = amocrmSubdomain;
                 data.settings.amocrmToken = amocrmToken;
                 data.settings.amocrmOperatorsMap = amocrmOperatorsMap;
+                 
+                 data.settings.taplinkDesc = taplinkDesc;
+                 data.settings.taplinkWeb = taplinkWeb;
+                 data.settings.taplinkTelegram = taplinkTelegram;
+                 data.settings.taplinkInstagram = taplinkInstagram;
+                 data.settings.taplinkYoutube = taplinkYoutube;
+                 data.settings.taplinkWhatsapp = taplinkWhatsapp;
+                 data.settings.taplinkPhone = taplinkPhone;
+                 data.settings.taplinkSlogan = taplinkSlogan;
                 
                 AppStorage.save(data);
 
@@ -826,7 +869,15 @@ window.App = {
                             supabase_url: sbUrl,
                             supabase_key: sbKey,
                             roles: data.settings.roles || [],
-                            amocrm_operators_map: amocrmOperatorsMap
+                            amocrm_operators_map: amocrmOperatorsMap,
+                            taplink_desc: taplinkDesc,
+                            taplink_web: taplinkWeb,
+                            taplink_telegram: taplinkTelegram,
+                            taplink_instagram: taplinkInstagram,
+                            taplink_youtube: taplinkYoutube,
+                            taplink_whatsapp: taplinkWhatsapp,
+                            taplink_phone: taplinkPhone,
+                            taplink_slogan: taplinkSlogan
                         })
                     });
                 } catch(err) {
@@ -1957,5 +2008,41 @@ window.SuperAdmin = {
             pwLabel.textContent = '••••••';
             if (pwBtn) pwBtn.innerHTML = '<i class="fas fa-eye"></i>';
         }
+    },
+
+    generateTaplinkLink: function() {
+        const companyId = localStorage.getItem('activeCompanyId') || localStorage.getItem('company_id') || '';
+        if (!companyId) {
+            alert("Kompaniya ID topilmadi! Iltimos, qaytadan tizimga kiring.");
+            return;
+        }
+        
+        // Generate public URL
+        const taplinkUrl = window.location.origin + `/taplink.html?company_id=${companyId}`;
+        
+        const container = document.getElementById('taplink-link-container');
+        const input = document.getElementById('taplink-generated-url');
+        
+        if (container && input) {
+            input.value = taplinkUrl;
+            container.style.display = 'block';
+        }
+    },
+
+    copyTaplinkUrl: function() {
+        const input = document.getElementById('taplink-generated-url');
+        if (!input || !input.value) return;
+        
+        input.select();
+        input.setSelectionRange(0, 99999); // For mobile devices
+        
+        navigator.clipboard.writeText(input.value)
+            .then(() => {
+                alert("Taplink havolasi buferga nusxalandi!");
+            })
+            .catch(err => {
+                console.error("Failed to copy link:", err);
+                alert("Nusxalashda xatolik yuz berdi. Havolani o'zingiz belgilab nusxalab oling.");
+            });
     }
 };

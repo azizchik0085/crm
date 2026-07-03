@@ -1178,6 +1178,57 @@
                                 <!-- Dinamik ravishda to'ldiriladi -->
                             </div>
                         </div>
+                        
+                        <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 24px 0;">
+                        <h4 style="margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+                            <i class="fas fa-link" style="color: #a855f7"></i> Taplink Sahifa Sozlamalari
+                        </h4>
+                        <div class="form-group">
+                            <label for="settings-taplink-desc">Taplink Tavsifi (Bio)</label>
+                            <textarea id="settings-taplink-desc" class="form-control" placeholder="Masalan: Qurilish materiallari optom va chakana yetkazib berish bo'yicha ishonchli hamkor!" rows="2"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="settings-taplink-web">Veb-sayt manzili (Official Web Link)</label>
+                            <input type="text" id="settings-taplink-web" class="form-control" placeholder="Masalan: gbstroy.uz">
+                        </div>
+                        <div class="form-group">
+                            <label for="settings-taplink-telegram">Telegram kanal manzili (Link)</label>
+                            <input type="text" id="settings-taplink-telegram" class="form-control" placeholder="Masalan: t.me/giperbrendstroy">
+                        </div>
+                        <div class="form-group">
+                            <label for="settings-taplink-instagram">Instagram profil manzili (Link)</label>
+                            <input type="text" id="settings-taplink-instagram" class="form-control" placeholder="Masalan: instagram.com/giperbrendstroy">
+                        </div>
+                        <div class="form-group">
+                            <label for="settings-taplink-youtube">YouTube kanal manzili (Link)</label>
+                            <input type="text" id="settings-taplink-youtube" class="form-control" placeholder="Masalan: youtube.com/@giperbrendstroy">
+                        </div>
+                        <div class="form-group">
+                            <label for="settings-taplink-whatsapp">WhatsApp raqami / manzili</label>
+                            <input type="text" id="settings-taplink-whatsapp" class="form-control" placeholder="Masalan: wa.me/998901234567">
+                        </div>
+                        <div class="form-group">
+                            <label for="settings-taplink-phone">Aloqa uchun telefon raqam</label>
+                            <input type="text" id="settings-taplink-phone" class="form-control" placeholder="Masalan: +998 90 123 45 67">
+                        </div>
+                        <div class="form-group">
+                            <label for="settings-taplink-slogan">Slo'gan matni (Pastdagi shior)</label>
+                            <input type="text" id="settings-taplink-slogan" class="form-control" placeholder="Masalan: SIFATLI MAHSULOT - ISHONCHLI HAMKORLIK!">
+                        </div>
+                        
+                        <div class="form-group" style="margin-top: 15px;">
+                            <button type="button" class="btn btn-secondary" onclick="App.generateTaplinkLink()" style="background: var(--accent-gradient); border:none; color: white;">
+                                <i class="fas fa-magic"></i> Taplink havolasini generatsiya qilish
+                            </button>
+                        </div>
+                        <div id="taplink-link-container" style="display:none; margin-top:10px; padding: 12px; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); border-radius: 6px;">
+                            <label style="font-size:12px; font-weight:600; color:var(--text-muted); display:block; margin-bottom:4px;">Sizning Taplink havolangiz:</label>
+                            <div style="display:flex; gap:8px;">
+                                <input type="text" id="taplink-generated-url" class="form-control" readonly style="font-family: monospace; font-size:12px; background:rgba(0,0,0,0.1);">
+                                <button type="button" class="btn btn-secondary" onclick="App.copyTaplinkUrl()" style="white-space:nowrap;"><i class="fas fa-copy"></i> Nusxalash</button>
+                            </div>
+                        </div>
+                        
                         <div style="margin-top: 24px; display:flex; gap:16px;">
                             <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Sozlamalarni saqlash</button>
                             <button type="button" id="settings-reset-data" class="btn btn-secondary" style="border-color:var(--danger); color:var(--danger);"><i class="fas fa-trash-restore"></i> Tizimni tozalash</button>
