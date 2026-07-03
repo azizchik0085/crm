@@ -449,7 +449,7 @@
             }
 
             try {
-                const res = await fetch(`/api/public/taplink/${companyId}`);
+                const res = await fetch(`/api/public/taplink/${companyId}?t=${Date.now()}`);
                 if (!res.ok) throw new Error("Settings fetch failed");
                 const data = await res.json();
 
@@ -546,7 +546,7 @@
 
                 // WhatsApp Link
                 if (data.taplink_whatsapp) {
-                    let cleanUrl = data.taplink_whatsapp.replace(/^(https?:\/\/)?(www\.)?wa\.me\//, '');
+                    let cleanUrl = data.taplink_whatsapp.replace(/^(https?:\/\/)?(www\.)?wa\.me\//, '').replace(/[\+\s]/g, '');
                     let fullUrl = data.taplink_whatsapp.match(/^https?:\/\//) ? data.taplink_whatsapp : 'https://wa.me/' + cleanUrl;
                     
                     socialContainer.innerHTML += `<a href="${fullUrl}" target="_blank" class="social-icon-btn whatsapp"><i class="fab fa-whatsapp"></i></a>`;
