@@ -639,6 +639,17 @@ body.light-theme .form-control {
     background-color: #FFFFFF;
 }
 
+/* Dropdown select options styling for high contrast readability */
+select.form-control, select.form-control option {
+    background-color: #1e293b !important;
+    color: #f8fafc !important;
+}
+
+body.light-theme select.form-control, body.light-theme select.form-control option {
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+}
+
 .form-control:focus {
     outline: none;
     border-color: var(--accent);
