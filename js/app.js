@@ -27,6 +27,25 @@ window.App = {
     currentView: 'dashboard',
     chartInstance: null,
 
+    switchCEOTab: function(tabName) {
+        // Hide all tabs
+        document.querySelectorAll('.ceo-tab-content').forEach(el => el.style.display = 'none');
+        // Remove active class from buttons
+        document.querySelectorAll('.ceo-tab-btn').forEach(btn => btn.classList.remove('active'));
+        
+        // Show target tab
+        const targetTab = document.getElementById('ceo-tab-' + tabName);
+        if (targetTab) {
+            targetTab.style.display = 'grid';
+        }
+        
+        // Add active class to clicked button
+        const clickedBtn = document.getElementById('ceo-btn-' + tabName);
+        if (clickedBtn) {
+            clickedBtn.classList.add('active');
+        }
+    },
+
     init: async function() {
         const cachedCompanyId = localStorage.getItem('activeCompanyId');
         if (cachedCompanyId) {
@@ -1110,24 +1129,70 @@ window.App = {
                 });
                 if (ceoRes.ok) {
                     const ceoData = await ceoRes.json();
-                    document.getElementById('ceo-plan-percent').textContent = ceoData.plan_percent + '%';
-                    document.getElementById('ceo-sales-plan').textContent = 'Plan: ' + parseFloat(ceoData.sales_plan).toLocaleString() + ' UZS';
-                    document.getElementById('ceo-net-profit').textContent = parseFloat(ceoData.net_profit).toLocaleString() + ' UZS';
-                    document.getElementById('ceo-cash-flow').textContent = parseFloat(ceoData.cash_flow).toLocaleString() + ' UZS';
-                    document.getElementById('ceo-bank-balance').textContent = parseFloat(ceoData.bank_balance).toLocaleString() + ' UZS';
-                    document.getElementById('ceo-cash-balance').textContent = parseFloat(ceoData.cash_balance).toLocaleString() + ' UZS';
-                    document.getElementById('ceo-receivables').textContent = parseFloat(ceoData.accounts_receivable).toLocaleString() + ' UZS';
-                    document.getElementById('ceo-payables').textContent = parseFloat(ceoData.accounts_payable).toLocaleString() + ' UZS';
-                    document.getElementById('ceo-warehouse-value').textContent = parseFloat(ceoData.warehouse_value).toLocaleString() + ' UZS';
-                    document.getElementById('ceo-low-stock').textContent = ceoData.low_stock + ' ta';
-                    document.getElementById('ceo-dead-stock').textContent = ceoData.dead_stock + ' ta';
-                    document.getElementById('ceo-marketing-leads').textContent = ceoData.marketing_leads + ' ta';
-                    document.getElementById('ceo-lead-cost').textContent = 'CPL: ' + parseFloat(ceoData.lead_cost).toLocaleString() + ' UZS';
-                    document.getElementById('ceo-marketing-roi').textContent = ceoData.roi + '% / ' + ceoData.roas;
-                    document.getElementById('ceo-attendance').textContent = ceoData.attendance + ' ta xodim';
-                    document.getElementById('ceo-open-tasks').textContent = ceoData.open_tasks + ' ta';
-                    document.getElementById('ceo-tax-status').textContent = ceoData.tax_status;
-                    document.getElementById('ceo-quality-issues').textContent = ceoData.quality_issues + ' ta';
+                    
+                    const setVal = (id, val) => {
+                        const el = document.getElementById(id);
+                        if (el) el.textContent = val;
+                    };
+                    
+                    // Tab 1: Finance
+                    setVal('ceo-plan-percent', ceoData.plan_percent + '%');
+                    setVal('ceo-sales-plan', 'Plan: ' + parseFloat(ceoData.sales_plan || 0).toLocaleString() + ' UZS');
+                    setVal('ceo-sales-today', parseFloat(ceoData.sales_today || 0).toLocaleString() + ' UZS');
+                    setVal('ceo-sales-monthly', parseFloat(ceoData.monthly_sales || 0).toLocaleString() + ' UZS');
+                    setVal('ceo-sales-yearly', parseFloat(ceoData.yearly_sales || 0).toLocaleString() + ' UZS');
+                    setVal('ceo-net-profit', parseFloat(ceoData.net_profit || 0).toLocaleString() + ' UZS');
+                    setVal('ceo-cash-flow', parseFloat(ceoData.cash_flow || 0).toLocaleString() + ' UZS');
+                    setVal('ceo-bank-balance', parseFloat(ceoData.bank_balance || 0).toLocaleString() + ' UZS');
+                    setVal('ceo-cash-balance', parseFloat(ceoData.cash_balance || 0).toLocaleString() + ' UZS');
+                    setVal('ceo-receivables', parseFloat(ceoData.accounts_receivable || 0).toLocaleString() + ' UZS');
+                    setVal('ceo-payables', parseFloat(ceoData.accounts_payable || 0).toLocaleString() + ' UZS');
+                    setVal('ceo-monthly-expenses', parseFloat(ceoData.monthly_expenses || 0).toLocaleString() + ' UZS');
+                    setVal('ceo-estimated-taxes', parseFloat(ceoData.estimated_taxes || 0).toLocaleString() + ' UZS');
+                    
+                    // Tab 2: Warehouse
+                    setVal('ceo-warehouse-value', parseFloat(ceoData.warehouse_value || 0).toLocaleString() + ' UZS');
+                    setVal('ceo-low-stock', (ceoData.low_stock || 0) + ' ta');
+                    setVal('ceo-dead-stock', (ceoData.dead_stock || 0) + ' ta');
+                    setVal('ceo-pending-purchases', (ceoData.pending_purchases || 0) + ' ta');
+                    setVal('ceo-received-goods-value', parseFloat(ceoData.received_goods_value || 0).toLocaleString() + ' UZS');
+                    setVal('ceo-active-transfers', (ceoData.active_transfers || 0) + ' ta');
+                    setVal('ceo-damaged-stock-value', parseFloat(ceoData.damaged_stock_value || 0).toLocaleString() + ' UZS');
+                    setVal('ceo-inventory-turnover', ceoData.inventory_turnover || 0);
+                    setVal('ceo-avg-lead-time', (ceoData.avg_lead_time || 0) + ' kun');
+                    setVal('ceo-avg-supplier-rating', (ceoData.avg_supplier_rating || 0) + ' / 5');
+                    setVal('ceo-serial-tracked-stock', (ceoData.serial_tracked_stock || 0) + ' ta');
+                    setVal('ceo-scan-events-today', (ceoData.scan_events_today || 0) + ' ta');
+                    
+                    // Tab 3: CRM, Sales & Marketing
+                    setVal('ceo-new-leads-today', (ceoData.new_leads_today || 0) + ' ta');
+                    setVal('ceo-leads-by-stage-lead', (ceoData.leads_by_stage?.lead || 0) + ' ta');
+                    setVal('ceo-leads-by-stage-contacted', (ceoData.leads_by_stage?.contacted || 0) + ' ta');
+                    setVal('ceo-leads-by-stage-won', (ceoData.leads_by_stage?.won || 0) + ' ta');
+                    setVal('ceo-avg-deal-value', parseFloat(ceoData.avg_deal_value || 0).toLocaleString() + ' UZS');
+                    setVal('ceo-avg-sales-cycle', (ceoData.avg_sales_cycle || 0) + ' kun');
+                    setVal('ceo-marketing-budget-used', parseFloat(ceoData.marketing_budget_used || 0).toLocaleString() + ' UZS');
+                    setVal('ceo-marketing-roi', (ceoData.roi || 0) + '%');
+                    setVal('ceo-marketing-roas', ceoData.roas || 0);
+                    setVal('ceo-marketing-leads', (ceoData.marketing_leads || 0) + ' ta');
+                    setVal('ceo-lead-cost', parseFloat(ceoData.lead_cost || 0).toLocaleString() + ' UZS');
+                    setVal('ceo-social-leads', (ceoData.social_leads || 0) + ' ta');
+                    
+                    // Tab 4: HR, Quality & Security
+                    setVal('ceo-attendance', (ceoData.attendance || 0) + ' ta xodim');
+                    setVal('ceo-late-employees', (ceoData.late_employees || 0) + ' ta');
+                    setVal('ceo-on-leave-employees', (ceoData.on_leave_employees || 0) + ' ta');
+                    setVal('ceo-open-vacancies', (ceoData.open_vacancies || 0) + ' ta');
+                    setVal('ceo-active-candidates', (ceoData.active_candidates || 0) + ' ta');
+                    setVal('ceo-avg-kpi-score', (ceoData.avg_kpi_score || 0) + '%');
+                    setVal('ceo-security-incidents', (ceoData.security_incidents || 0) + ' ta');
+                    setVal('ceo-visitor-count', (ceoData.visitor_count || 0) + ' ta');
+                    setVal('ceo-active-cameras', (ceoData.active_cameras || 0) + ' ta');
+                    setVal('ceo-active-vehicles-tracked', (ceoData.active_vehicles_tracked || 0) + ' ta');
+                    setVal('ceo-customer-complaints', (ceoData.customer_complaints || 0) + ' ta');
+                    setVal('ceo-failed-quality-checks', (ceoData.failed_quality_checks || 0) + ' ta');
+                    setVal('ceo-avg-course-progress', (ceoData.avg_course_progress || 0) + '%');
+                    setVal('ceo-active-tasks-count', (ceoData.active_tasks_count || 0) + ' ta');
                     
                     // Render AI recommendations
                     const recList = document.getElementById('ceo-ai-recommendations-list');

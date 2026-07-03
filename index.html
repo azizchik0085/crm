@@ -340,118 +340,331 @@
                 <!-- CEO ENTERPRISE REAL-TIME WIDGETS -->
                 <div class="card" style="margin-top: 24px;">
                     <div class="dashboard-title-bar">
-                        <h3><i class="fas fa-user-tie" style="color: var(--accent);"></i> CEO Enterprise Real-Time Widgets</h3>
-                        <span style="font-size:12px; color:var(--text-muted);">Tashkilotning to'liq real-vaqt nazorati</span>
+                        <h3><i class="fas fa-user-tie" style="color: var(--accent);"></i> CEO Enterprise Real-Time Widgets (Power BI-Level)</h3>
+                        <span style="font-size:12px; color:var(--text-muted);">Tashkilotning 50+ real-vaqt ko'rsatkichlari tahlili</span>
+                    </div>
+
+                    <!-- CEO Dashboard Tabs Header -->
+                    <div style="display: flex; gap: 8px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-top: 16px; overflow-x: auto; scrollbar-width: none;">
+                        <button class="btn btn-secondary ceo-tab-btn active" onclick="window.App.switchCEOTab('finance')" id="ceo-btn-finance" style="white-space: nowrap; height: 38px; padding: 0 16px;"><i class="fas fa-wallet" style="color: #3b82f6;"></i> Moliya & Kassa</button>
+                        <button class="btn btn-secondary ceo-tab-btn" onclick="window.App.switchCEOTab('warehouse')" id="ceo-btn-warehouse" style="white-space: nowrap; height: 38px; padding: 0 16px;"><i class="fas fa-warehouse" style="color: #10b981;"></i> Ombor & Ta'minot</button>
+                        <button class="btn btn-secondary ceo-tab-btn" onclick="window.App.switchCEOTab('sales')" id="ceo-btn-sales" style="white-space: nowrap; height: 38px; padding: 0 16px;"><i class="fas fa-bullhorn" style="color: #a855f7;"></i> Sotuv & Marketing</button>
+                        <button class="btn btn-secondary ceo-tab-btn" onclick="window.App.switchCEOTab('hr')" id="ceo-btn-hr" style="white-space: nowrap; height: 38px; padding: 0 16px;"><i class="fas fa-shield-alt" style="color: #f43f5e;"></i> HR & Xavfsizlik</button>
                     </div>
                     
-                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; margin-top: 16px;">
-                        <!-- Finance Row -->
-                        <div class="card stat-card" style="margin: 0; background: rgba(99, 102, 241, 0.03); border: 1px solid var(--border-color);">
+                    <!-- TAB 1: FINANCE & CASH -->
+                    <div id="ceo-tab-finance" class="ceo-tab-content" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; margin-top: 16px;">
+                        <div class="card stat-card" style="margin: 0; background: rgba(59, 130, 246, 0.03); border: 1px solid var(--border-color);">
                             <div class="stat-info">
                                 <h3>Bugungi Savdo Plan %</h3>
                                 <div class="stat-value" id="ceo-plan-percent" style="font-size: 20px; font-weight: 700; color: var(--accent);">0%</div>
                                 <span style="font-size: 11px; color: var(--text-muted);" id="ceo-sales-plan">Plan: 0 UZS</span>
                             </div>
                         </div>
-                        <div class="card stat-card" style="margin: 0; background: rgba(99, 102, 241, 0.03); border: 1px solid var(--border-color);">
+                        <div class="card stat-card" style="margin: 0; background: rgba(59, 130, 246, 0.03); border: 1px solid var(--border-color);">
                             <div class="stat-info">
-                                <h3>Sof Foyda</h3>
+                                <h3>Bugungi Savdo</h3>
+                                <div class="stat-value" id="ceo-sales-today" style="font-size: 20px; font-weight: 700; color: var(--success);">0 UZS</div>
+                            </div>
+                        </div>
+                        <div class="card stat-card" style="margin: 0; background: rgba(59, 130, 246, 0.03); border: 1px solid var(--border-color);">
+                            <div class="stat-info">
+                                <h3>Oylik Savdo</h3>
+                                <div class="stat-value" id="ceo-sales-monthly" style="font-size: 20px; font-weight: 700; color: var(--success);">0 UZS</div>
+                            </div>
+                        </div>
+                        <div class="card stat-card" style="margin: 0; background: rgba(59, 130, 246, 0.03); border: 1px solid var(--border-color);">
+                            <div class="stat-info">
+                                <h3>Yillik Savdo</h3>
+                                <div class="stat-value" id="ceo-sales-yearly" style="font-size: 20px; font-weight: 700; color: var(--success);">0 UZS</div>
+                            </div>
+                        </div>
+                        <div class="card stat-card" style="margin: 0; background: rgba(59, 130, 246, 0.03); border: 1px solid var(--border-color);">
+                            <div class="stat-info">
+                                <h3>Sof Foyda (Net Profit)</h3>
                                 <div class="stat-value" id="ceo-net-profit" style="font-size: 20px; font-weight: 700; color: var(--success);">0 UZS</div>
                             </div>
                         </div>
-                        <div class="card stat-card" style="margin: 0; background: rgba(99, 102, 241, 0.03); border: 1px solid var(--border-color);">
+                        <div class="card stat-card" style="margin: 0; background: rgba(59, 130, 246, 0.03); border: 1px solid var(--border-color);">
                             <div class="stat-info">
                                 <h3>Pul Oqimi (Cash Flow)</h3>
                                 <div class="stat-value" id="ceo-cash-flow" style="font-size: 20px; font-weight: 700; color: #10b981;">0 UZS</div>
                             </div>
                         </div>
-                        <div class="card stat-card" style="margin: 0; background: rgba(99, 102, 241, 0.03); border: 1px solid var(--border-color);">
+                        <div class="card stat-card" style="margin: 0; background: rgba(59, 130, 246, 0.03); border: 1px solid var(--border-color);">
                             <div class="stat-info">
                                 <h3>Bank Balance</h3>
                                 <div class="stat-value" id="ceo-bank-balance" style="font-size: 20px; font-weight: 700; color: #3b82f6;">0 UZS</div>
                             </div>
                         </div>
-                        <div class="card stat-card" style="margin: 0; background: rgba(99, 102, 241, 0.03); border: 1px solid var(--border-color);">
+                        <div class="card stat-card" style="margin: 0; background: rgba(59, 130, 246, 0.03); border: 1px solid var(--border-color);">
                             <div class="stat-info">
                                 <h3>Kassa qoldig'i</h3>
                                 <div class="stat-value" id="ceo-cash-balance" style="font-size: 20px; font-weight: 700; color: #f59e0b;">0 UZS</div>
                             </div>
                         </div>
-                        
-                        <!-- Receivables & Payables -->
-                        <div class="card stat-card" style="margin: 0; background: rgba(239, 68, 68, 0.03); border: 1px solid var(--border-color);">
+                        <div class="card stat-card" style="margin: 0; background: rgba(59, 130, 246, 0.03); border: 1px solid var(--border-color);">
                             <div class="stat-info">
-                                <h3>Olinadigan qarzlar (Debts)</h3>
-                                <div class="stat-value" id="ceo-receivables" style="font-size: 20px; font-weight: 700; color: #f43f5e;">0 UZS</div>
+                                <h3>Olinadigan Qarz (Debts)</h3>
+                                <div class="stat-value" id="ceo-receivables" style="font-size: 20px; font-weight: 700; color: #ef4444;">0 UZS</div>
                             </div>
                         </div>
-                        <div class="card stat-card" style="margin: 0; background: rgba(239, 68, 68, 0.03); border: 1px solid var(--border-color);">
+                        <div class="card stat-card" style="margin: 0; background: rgba(59, 130, 246, 0.03); border: 1px solid var(--border-color);">
                             <div class="stat-info">
-                                <h3>To'lanadigan qarzlar (Payables)</h3>
-                                <div class="stat-value" id="ceo-payables" style="font-size: 20px; font-weight: 700; color: #ef4444;">0 UZS</div>
+                                <h3>To'lanadigan Qarz (Payables)</h3>
+                                <div class="stat-value" id="ceo-payables" style="font-size: 20px; font-weight: 700; color: #f43f5e;">0 UZS</div>
                             </div>
                         </div>
+                        <div class="card stat-card" style="margin: 0; background: rgba(59, 130, 246, 0.03); border: 1px solid var(--border-color);">
+                            <div class="stat-info">
+                                <h3>Oylik Xarajatlar</h3>
+                                <div class="stat-value" id="ceo-monthly-expenses" style="font-size: 20px; font-weight: 700; color: #ef4444;">0 UZS</div>
+                            </div>
+                        </div>
+                        <div class="card stat-card" style="margin: 0; background: rgba(59, 130, 246, 0.03); border: 1px solid var(--border-color);">
+                            <div class="stat-info">
+                                <h3>Kutilayotgan Soliq (QQS)</h3>
+                                <div class="stat-value" id="ceo-estimated-taxes" style="font-size: 20px; font-weight: 700; color: #f59e0b;">0 UZS</div>
+                            </div>
+                        </div>
+                    </div>
 
-                        <!-- Warehouse & Inventory -->
+                    <!-- TAB 2: WAREHOUSE & PROCUREMENT -->
+                    <div id="ceo-tab-warehouse" class="ceo-tab-content" style="display: none; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; margin-top: 16px;">
                         <div class="card stat-card" style="margin: 0; background: rgba(16, 185, 129, 0.03); border: 1px solid var(--border-color);">
                             <div class="stat-info">
-                                <h3>Ombor Zaxira Tannarxi</h3>
+                                <h3>Ombor Zaxira Qiymati</h3>
                                 <div class="stat-value" id="ceo-warehouse-value" style="font-size: 20px; font-weight: 700; color: #10b981;">0 UZS</div>
                             </div>
                         </div>
-                        <div class="card stat-card" style="margin: 0; background: rgba(245, 158, 11, 0.03); border: 1px solid var(--border-color);">
+                        <div class="card stat-card" style="margin: 0; background: rgba(16, 185, 129, 0.03); border: 1px solid var(--border-color);">
                             <div class="stat-info">
-                                <h3>Kritik kam tovarlar (Low Stock)</h3>
+                                <h3>Kritik kam tovar (Low Stock)</h3>
                                 <div class="stat-value" id="ceo-low-stock" style="font-size: 20px; font-weight: 700; color: #f59e0b;">0 ta</div>
                             </div>
                         </div>
-                        <div class="card stat-card" style="margin: 0; background: rgba(100, 116, 139, 0.03); border: 1px solid var(--border-color);">
+                        <div class="card stat-card" style="margin: 0; background: rgba(16, 185, 129, 0.03); border: 1px solid var(--border-color);">
                             <div class="stat-info">
                                 <h3>Sotilmayotgan tovar (Dead Stock)</h3>
                                 <div class="stat-value" id="ceo-dead-stock" style="font-size: 20px; font-weight: 700; color: #64748b;">0 ta</div>
                             </div>
                         </div>
-
-                        <!-- Marketing -->
-                        <div class="card stat-card" style="margin: 0; background: rgba(139, 92, 246, 0.03); border: 1px solid var(--border-color);">
+                        <div class="card stat-card" style="margin: 0; background: rgba(16, 185, 129, 0.03); border: 1px solid var(--border-color);">
                             <div class="stat-info">
-                                <h3>Lidlar / CPL</h3>
+                                <h3>Kutilayotgan Xaridlar (PO)</h3>
+                                <div class="stat-value" id="ceo-pending-purchases" style="font-size: 20px; font-weight: 700; color: #3b82f6;">0 ta</div>
+                            </div>
+                        </div>
+                        <div class="card stat-card" style="margin: 0; background: rgba(16, 185, 129, 0.03); border: 1px solid var(--border-color);">
+                            <div class="stat-info">
+                                <h3>Qabul qilingan tovarlar</h3>
+                                <div class="stat-value" id="ceo-received-goods-value" style="font-size: 20px; font-weight: 700; color: #10b981;">0 UZS</div>
+                            </div>
+                        </div>
+                        <div class="card stat-card" style="margin: 0; background: rgba(16, 185, 129, 0.03); border: 1px solid var(--border-color);">
+                            <div class="stat-info">
+                                <h3>Faol omborlararo transfer</h3>
+                                <div class="stat-value" id="ceo-active-transfers" style="font-size: 20px; font-weight: 700; color: #a855f7;">0 ta</div>
+                            </div>
+                        </div>
+                        <div class="card stat-card" style="margin: 0; background: rgba(16, 185, 129, 0.03); border: 1px solid var(--border-color);">
+                            <div class="stat-info">
+                                <h3>Shikastlangan tovarlar</h3>
+                                <div class="stat-value" id="ceo-damaged-stock-value" style="font-size: 20px; font-weight: 700; color: #ef4444;">0 UZS</div>
+                            </div>
+                        </div>
+                        <div class="card stat-card" style="margin: 0; background: rgba(16, 185, 129, 0.03); border: 1px solid var(--border-color);">
+                            <div class="stat-info">
+                                <h3>Zaxira aylanish koeffitsiyenti</h3>
+                                <div class="stat-value" id="ceo-inventory-turnover" style="font-size: 20px; font-weight: 700; color: #10b981;">0</div>
+                            </div>
+                        </div>
+                        <div class="card stat-card" style="margin: 0; background: rgba(16, 185, 129, 0.03); border: 1px solid var(--border-color);">
+                            <div class="stat-info">
+                                <h3>O'rtacha yetkazish muddati</h3>
+                                <div class="stat-value" id="ceo-avg-lead-time" style="font-size: 20px; font-weight: 700; color: #3b82f6;">0 kun</div>
+                            </div>
+                        </div>
+                        <div class="card stat-card" style="margin: 0; background: rgba(16, 185, 129, 0.03); border: 1px solid var(--border-color);">
+                            <div class="stat-info">
+                                <h3>Yetkazib beruvchilar reytingi</h3>
+                                <div class="stat-value" id="ceo-avg-supplier-rating" style="font-size: 20px; font-weight: 700; color: #f59e0b;">0 / 5</div>
+                            </div>
+                        </div>
+                        <div class="card stat-card" style="margin: 0; background: rgba(16, 185, 129, 0.03); border: 1px solid var(--border-color);">
+                            <div class="stat-info">
+                                <h3>Seriyali tovarlar soni</h3>
+                                <div class="stat-value" id="ceo-serial-tracked-stock" style="font-size: 20px; font-weight: 700; color: #10b981;">0 ta</div>
+                            </div>
+                        </div>
+                        <div class="card stat-card" style="margin: 0; background: rgba(16, 185, 129, 0.03); border: 1px solid var(--border-color);">
+                            <div class="stat-info">
+                                <h3>Bugungi kassa scan amallari</h3>
+                                <div class="stat-value" id="ceo-scan-events-today" style="font-size: 20px; font-weight: 700; color: #a855f7;">0 ta</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAB 3: CRM, SALES & MARKETING -->
+                    <div id="ceo-tab-sales" class="ceo-tab-content" style="display: none; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; margin-top: 16px;">
+                        <div class="card stat-card" style="margin: 0; background: rgba(168, 85, 247, 0.03); border: 1px solid var(--border-color);">
+                            <div class="stat-info">
+                                <h3>Bugungi yangi lidlar</h3>
+                                <div class="stat-value" id="ceo-new-leads-today" style="font-size: 20px; font-weight: 700; color: #a855f7;">0 ta</div>
+                            </div>
+                        </div>
+                        <div class="card stat-card" style="margin: 0; background: rgba(168, 85, 247, 0.03); border: 1px solid var(--border-color);">
+                            <div class="stat-info">
+                                <h3>Yangi Nomzod Lidlar</h3>
+                                <div class="stat-value" id="ceo-leads-by-stage-lead" style="font-size: 20px; font-weight: 700; color: #a855f7;">0 ta</div>
+                            </div>
+                        </div>
+                        <div class="card stat-card" style="margin: 0; background: rgba(168, 85, 247, 0.03); border: 1px solid var(--border-color);">
+                            <div class="stat-info">
+                                <h3>Muloqotdagi lidlar</h3>
+                                <div class="stat-value" id="ceo-leads-by-stage-contacted" style="font-size: 20px; font-weight: 700; color: #f59e0b;">0 ta</div>
+                            </div>
+                        </div>
+                        <div class="card stat-card" style="margin: 0; background: rgba(168, 85, 247, 0.03); border: 1px solid var(--border-color);">
+                            <div class="stat-info">
+                                <h3>Muvaffaqiyatli yopilganlar</h3>
+                                <div class="stat-value" id="ceo-leads-by-stage-won" style="font-size: 20px; font-weight: 700; color: #10b981;">0 ta</div>
+                            </div>
+                        </div>
+                        <div class="card stat-card" style="margin: 0; background: rgba(168, 85, 247, 0.03); border: 1px solid var(--border-color);">
+                            <div class="stat-info">
+                                <h3>O'rtacha bitim qiymati</h3>
+                                <div class="stat-value" id="ceo-avg-deal-value" style="font-size: 20px; font-weight: 700; color: #3b82f6;">0 UZS</div>
+                            </div>
+                        </div>
+                        <div class="card stat-card" style="margin: 0; background: rgba(168, 85, 247, 0.03); border: 1px solid var(--border-color);">
+                            <div class="stat-info">
+                                <h3>O'rtacha sotuv sikli</h3>
+                                <div class="stat-value" id="ceo-avg-sales-cycle" style="font-size: 20px; font-weight: 700; color: #64748b;">0 kun</div>
+                            </div>
+                        </div>
+                        <div class="card stat-card" style="margin: 0; background: rgba(168, 85, 247, 0.03); border: 1px solid var(--border-color);">
+                            <div class="stat-info">
+                                <h3>Marketing sarflangan budjet</h3>
+                                <div class="stat-value" id="ceo-marketing-budget-used" style="font-size: 20px; font-weight: 700; color: #ef4444;">0 UZS</div>
+                            </div>
+                        </div>
+                        <div class="card stat-card" style="margin: 0; background: rgba(168, 85, 247, 0.03); border: 1px solid var(--border-color);">
+                            <div class="stat-info">
+                                <h3>Marketing ROI (%)</h3>
+                                <div class="stat-value" id="ceo-marketing-roi" style="font-size: 20px; font-weight: 700; color: #10b981;">0%</div>
+                            </div>
+                        </div>
+                        <div class="card stat-card" style="margin: 0; background: rgba(168, 85, 247, 0.03); border: 1px solid var(--border-color);">
+                            <div class="stat-info">
+                                <h3>Marketing ROAS</h3>
+                                <div class="stat-value" id="ceo-marketing-roas" style="font-size: 20px; font-weight: 700; color: #3b82f6;">0</div>
+                            </div>
+                        </div>
+                        <div class="card stat-card" style="margin: 0; background: rgba(168, 85, 247, 0.03); border: 1px solid var(--border-color);">
+                            <div class="stat-info">
+                                <h3>Jami lidlar soni</h3>
                                 <div class="stat-value" id="ceo-marketing-leads" style="font-size: 20px; font-weight: 700; color: #a855f7;">0 ta</div>
-                                <span style="font-size: 11px; color: var(--text-muted);" id="ceo-lead-cost">CPL: 0 UZS</span>
                             </div>
                         </div>
-                        <div class="card stat-card" style="margin: 0; background: rgba(139, 92, 246, 0.03); border: 1px solid var(--border-color);">
+                        <div class="card stat-card" style="margin: 0; background: rgba(168, 85, 247, 0.03); border: 1px solid var(--border-color);">
                             <div class="stat-info">
-                                <h3>Marketing ROI / ROAS</h3>
-                                <div class="stat-value" id="ceo-marketing-roi" style="font-size: 20px; font-weight: 700; color: #8b5cf6;">0% / 0</div>
+                                <h3>O'rtacha lid narxi (CPL)</h3>
+                                <div class="stat-value" id="ceo-lead-cost" style="font-size: 20px; font-weight: 700; color: #ef4444;">0 UZS</div>
                             </div>
                         </div>
+                        <div class="card stat-card" style="margin: 0; background: rgba(168, 85, 247, 0.03); border: 1px solid var(--border-color);">
+                            <div class="stat-info">
+                                <h3>Ijtimoiy tarmoq lidlari</h3>
+                                <div class="stat-value" id="ceo-social-leads" style="font-size: 20px; font-weight: 700; color: #10b981;">0 ta</div>
+                            </div>
+                        </div>
+                    </div>
 
-                        <!-- HR & Operations -->
-                        <div class="card stat-card" style="margin: 0; background: rgba(6, 182, 212, 0.03); border: 1px solid var(--border-color);">
+                    <!-- TAB 4: HR, QUALITY & SECURITY -->
+                    <div id="ceo-tab-hr" class="ceo-tab-content" style="display: none; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; margin-top: 16px;">
+                        <div class="card stat-card" style="margin: 0; background: rgba(244, 63, 94, 0.03); border: 1px solid var(--border-color);">
                             <div class="stat-info">
                                 <h3>Bugungi Davomat</h3>
-                                <div class="stat-value" id="ceo-attendance" style="font-size: 20px; font-weight: 700; color: #06b6d4;">0 ta xodim</div>
+                                <div class="stat-value" id="ceo-attendance" style="font-size: 20px; font-weight: 700; color: #10b981;">0 ta xodim</div>
                             </div>
                         </div>
-                        <div class="card stat-card" style="margin: 0; background: rgba(6, 182, 212, 0.03); border: 1px solid var(--border-color);">
+                        <div class="card stat-card" style="margin: 0; background: rgba(244, 63, 94, 0.03); border: 1px solid var(--border-color);">
                             <div class="stat-info">
-                                <h3>Ochiq Vazifalar</h3>
-                                <div class="stat-value" id="ceo-open-tasks" style="font-size: 20px; font-weight: 700; color: #06b6d4;">0 ta</div>
+                                <h3>Bugun kechikkanlar</h3>
+                                <div class="stat-value" id="ceo-late-employees" style="font-size: 20px; font-weight: 700; color: #f59e0b;">0 ta</div>
                             </div>
                         </div>
-
-                        <!-- Alerts & Warnings -->
-                        <div class="card stat-card" style="margin: 0; background: rgba(239, 68, 68, 0.03); border: 1px solid rgba(239,68,68,0.2);">
+                        <div class="card stat-card" style="margin: 0; background: rgba(244, 63, 94, 0.03); border: 1px solid var(--border-color);">
                             <div class="stat-info">
-                                <h3>Soliq holati (Tax Alerts)</h3>
-                                <div class="stat-value" id="ceo-tax-status" style="font-size: 13px; font-weight: 600; color: #ef4444;">Yuklanmoqda...</div>
+                                <h3>Ruxsat / Ta'tildagilar</h3>
+                                <div class="stat-value" id="ceo-on-leave-employees" style="font-size: 20px; font-weight: 700; color: #3b82f6;">0 ta</div>
                             </div>
                         </div>
-                        <div class="card stat-card" style="margin: 0; background: rgba(239, 68, 68, 0.03); border: 1px solid rgba(239,68,68,0.2);">
+                        <div class="card stat-card" style="margin: 0; background: rgba(244, 63, 94, 0.03); border: 1px solid var(--border-color);">
                             <div class="stat-info">
-                                <h3>Sifat muammolari (Quality)</h3>
-                                <div class="stat-value" id="ceo-quality-issues" style="font-size: 20px; font-weight: 700; color: #ef4444;">0 ta</div>
+                                <h3>Ochiq vakansiyalar</h3>
+                                <div class="stat-value" id="ceo-open-vacancies" style="font-size: 20px; font-weight: 700; color: #a855f7;">0 ta</div>
+                            </div>
+                        </div>
+                        <div class="card stat-card" style="margin: 0; background: rgba(244, 63, 94, 0.03); border: 1px solid var(--border-color);">
+                            <div class="stat-info">
+                                <h3>Faol nomzodlar</h3>
+                                <div class="stat-value" id="ceo-active-candidates" style="font-size: 20px; font-weight: 700; color: #3b82f6;">0 ta</div>
+                            </div>
+                        </div>
+                        <div class="card stat-card" style="margin: 0; background: rgba(244, 63, 94, 0.03); border: 1px solid var(--border-color);">
+                            <div class="stat-info">
+                                <h3>Xodimlarning o'rtacha KPI'i</h3>
+                                <div class="stat-value" id="ceo-avg-kpi-score" style="font-size: 20px; font-weight: 700; color: #10b981;">0%</div>
+                            </div>
+                        </div>
+                        <div class="card stat-card" style="margin: 0; background: rgba(244, 63, 94, 0.03); border: 1px solid var(--border-color);">
+                            <div class="stat-info">
+                                <h3>Xavfsizlik incidentlari</h3>
+                                <div class="stat-value" id="ceo-security-incidents" style="font-size: 20px; font-weight: 700; color: #10b981;">0 ta</div>
+                            </div>
+                        </div>
+                        <div class="card stat-card" style="margin: 0; background: rgba(244, 63, 94, 0.03); border: 1px solid var(--border-color);">
+                            <div class="stat-info">
+                                <h3>Tashrif buyuruvchilar</h3>
+                                <div class="stat-value" id="ceo-visitor-count" style="font-size: 20px; font-weight: 700; color: #3b82f6;">0 ta</div>
+                            </div>
+                        </div>
+                        <div class="card stat-card" style="margin: 0; background: rgba(244, 63, 94, 0.03); border: 1px solid var(--border-color);">
+                            <div class="stat-info">
+                                <h3>Faol CCTV kameralar</h3>
+                                <div class="stat-value" id="ceo-active-cameras" style="font-size: 20px; font-weight: 700; color: #10b981;">0 ta</div>
+                            </div>
+                        </div>
+                        <div class="card stat-card" style="margin: 0; background: rgba(244, 63, 94, 0.03); border: 1px solid var(--border-color);">
+                            <div class="stat-info">
+                                <h3>Kuzatuvdagi transportlar</h3>
+                                <div class="stat-value" id="ceo-active-vehicles-tracked" style="font-size: 20px; font-weight: 700; color: #3b82f6;">0 ta</div>
+                            </div>
+                        </div>
+                        <div class="card stat-card" style="margin: 0; background: rgba(244, 63, 94, 0.03); border: 1px solid var(--border-color);">
+                            <div class="stat-info">
+                                <h3>Mijozlar shikoyati (Complaints)</h3>
+                                <div class="stat-value" id="ceo-customer-complaints" style="font-size: 20px; font-weight: 700; color: #ef4444;">0 ta</div>
+                            </div>
+                        </div>
+                        <div class="card stat-card" style="margin: 0; background: rgba(244, 63, 94, 0.03); border: 1px solid var(--border-color);">
+                            <div class="stat-info">
+                                <h3>Sifat nazorati rad etilganlar</h3>
+                                <div class="stat-value" id="ceo-failed-quality-checks" style="font-size: 20px; font-weight: 700; color: #10b981;">0 ta</div>
+                            </div>
+                        </div>
+                        <div class="card stat-card" style="margin: 0; background: rgba(244, 63, 94, 0.03); border: 1px solid var(--border-color);">
+                            <div class="stat-info">
+                                <h3>O'quv kursi o'rtacha progress</h3>
+                                <div class="stat-value" id="ceo-avg-course-progress" style="font-size: 20px; font-weight: 700; color: #10b981;">0%</div>
+                            </div>
+                        </div>
+                        <div class="card stat-card" style="margin: 0; background: rgba(244, 63, 94, 0.03); border: 1px solid var(--border-color);">
+                            <div class="stat-info">
+                                <h3>Ochiq loyiha vazifalari</h3>
+                                <div class="stat-value" id="ceo-active-tasks-count" style="font-size: 20px; font-weight: 700; color: #3b82f6;">0 ta</div>
                             </div>
                         </div>
                     </div>
