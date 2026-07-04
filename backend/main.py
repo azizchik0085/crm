@@ -3611,6 +3611,50 @@ def create_regos_order(order_data: dict, request: Request):
                 except Exception as status_err:
                     print(f"Exception during auto-approve order {new_id}: {status_err}")
                 
+                try:
+                    # Save order details in local database so it shows up in the list
+                    local_order_id = f"regos_{new_id}"
+                    total_amount = sum(float(item.get("quantity", 1)) * float(item.get("price", 0)) for item in items)
+                    
+                    # Format notes with customer details
+                    cust_notes = f"Mijoz: {order_data.get('customer_name', '')}"
+                    if order_data.get("customer_phone"):
+                        cust_notes += f" ({order_data.get('customer_phone')})"
+                    
+                    details = []
+                    if order_data.get("delivery_address"):
+                        details.append(f"Manzil: {order_data.get('delivery_address')}")
+                    if order_data.get("description"):
+                        details.append(f"Izoh: {order_data.get('description')}")
+                    if details:
+                        cust_notes += " | " + " | ".join(details)
+                    
+                    local_order_data = {
+                        "id": local_order_id,
+                        "company_id": company_id,
+                        "supplier_id": None,
+                        "notes": cust_notes,
+                        "expected_delivery_date": order_data.get("delivery_date"),
+                        "status": "approved",
+                        "total_amount": total_amount
+                    }
+                    
+                    # Insert order
+                    supabase_req("POST", "purchase_orders", json_data=local_order_data)
+                    
+                    # Insert items
+                    for item in items:
+                        local_item_data = {
+                            "id": str(uuid.uuid4()),
+                            "purchase_order_id": local_order_id,
+                            "inventory_id": item.get("product_id"),
+                            "quantity": float(item.get("quantity", 1)),
+                            "price": float(item.get("price", 0))
+                        }
+                        supabase_req("POST", "purchase_items", json_data=local_item_data)
+                except Exception as db_err:
+                    print(f"Failed to save REGOS order locally in DB: {db_err}")
+                
                 return {
                     "status": "success",
                     "message": "Buyurtma muvaffaqiyatli REGOS POS-ga yuborildi va tasdiqlandi!",

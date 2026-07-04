@@ -160,7 +160,16 @@ def get_purchase_orders(request: Request):
     suppliers = supabase_req("GET", "suppliers?deleted_at=is.null") or []
     sup_map = {s["id"]: s["name"] for s in suppliers}
     for o in orders:
-        o["supplier_name"] = sup_map.get(o["supplier_id"], "Noma'lum")
+        supplier_id = o.get("supplier_id")
+        if supplier_id and supplier_id in sup_map:
+            o["supplier_name"] = sup_map[supplier_id]
+        else:
+            notes = o.get("notes") or ""
+            if notes.startswith("Mijoz: "):
+                parts = notes.split(" | ")
+                o["supplier_name"] = parts[0]
+            else:
+                o["supplier_name"] = "Noma'lum"
     return orders
 
 @router.post("/purchase-orders")

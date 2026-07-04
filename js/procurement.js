@@ -460,6 +460,7 @@ window.Procurement = {
                 const data = await res.json();
                 alert(`Muvaffaqiyatli! Buyurtma REGOS POS-ga yuborildi. REGOS Buyurtma ID: #${data.regos_order_id}`);
                 window.closeModal("procurement-order-modal");
+                this.loadPurchaseOrders();
             } else {
                 const err = await res.json();
                 alert("Xatolik yuz berdi: " + (err.detail || JSON.stringify(err)));
