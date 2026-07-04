@@ -2732,6 +2732,16 @@
                         <textarea id="p-order-notes" class="form-control" placeholder="Qo'shimcha izohlar..." style="min-height: 60px; background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255, 255, 255, 0.1); color: #f8fafc;"></textarea>
                     </div>
 
+                    <!-- Search Input -->
+                    <div style="position: relative; margin-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 15px;">
+                        <label style="display:block; margin-bottom: 6px; font-weight:600; font-size: 13px; color: #cbd5e1;">Mahsulotlarni shtrix-kod yoki nomi bo'yicha qidirish:</label>
+                        <div style="position: relative; width: 100%;">
+                            <input type="text" id="p-order-search-input" class="form-control" placeholder="Shtrix-kodni skanerlang yoki mahsulot nomini yozing..." style="background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255, 255, 255, 0.1); color: #f8fafc; padding-left: 35px;" autocomplete="off">
+                            <i class="fas fa-search" style="position: absolute; left: 12px; top: 12px; color: #64748b;"></i>
+                        </div>
+                        <div id="p-order-search-suggestions" style="display: none; position: absolute; left: 0; right: 0; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; z-index: 1000; max-height: 220px; overflow-y: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.6); margin-top: 4px;"></div>
+                    </div>
+
                     <!-- Products Table -->
                     <div style="border-top: 1px solid rgba(255,255,255,0.08); padding-top: 15px; margin-top: 5px;">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">

@@ -209,6 +209,119 @@ window.Procurement = {
             };
         }
 
+        // 5. Setup search / barcode scanner functionality
+        const searchInput = document.getElementById("p-order-search-input");
+        const suggestionsBox = document.getElementById("p-order-search-suggestions");
+
+        if (searchInput && suggestionsBox) {
+            searchInput.value = "";
+            suggestionsBox.style.display = "none";
+            suggestionsBox.innerHTML = "";
+
+            // Handle typing / scanning
+            searchInput.oninput = (e) => {
+                const query = e.target.value.trim().toLowerCase();
+                if (!query) {
+                    suggestionsBox.style.display = "none";
+                    suggestionsBox.innerHTML = "";
+                    return;
+                }
+
+                // Filter products
+                const matches = this.inventory.filter(item => {
+                    const nameMatch = (item.name || "").toLowerCase().includes(query);
+                    const skuMatch = (item.sku || "").toLowerCase().includes(query);
+                    const idMatch = String(item.id).toLowerCase().includes(query);
+                    return nameMatch || skuMatch || idMatch;
+                });
+
+                if (matches.length === 0) {
+                    suggestionsBox.innerHTML = '<div style="padding: 10px; color: #94a3b8; font-size: 12px; text-align: center;">Mos keladigan mahsulot topilmadi</div>';
+                    suggestionsBox.style.display = "block";
+                    return;
+                }
+
+                // Render suggestions
+                suggestionsBox.innerHTML = "";
+                matches.slice(0, 15).forEach(item => {
+                    const div = document.createElement("div");
+                    div.style.padding = "10px 15px";
+                    div.style.cursor = "pointer";
+                    div.style.borderBottom = "1px solid rgba(255,255,255,0.04)";
+                    div.style.fontSize = "12.5px";
+                    div.style.transition = "background 0.2s";
+                    div.style.display = "flex";
+                    div.style.justifyContent = "space-between";
+                    div.style.alignItems = "center";
+                    
+                    div.innerHTML = `
+                        <div>
+                            <div style="font-weight: 600; color: #f8fafc;">${item.name}</div>
+                            <div style="font-size: 11px; color: #94a3b8;">Artikul: ${item.sku || "RE-" + item.id}</div>
+                        </div>
+                        <div style="font-weight: 700; color: #10b981;">${parseFloat(item.price || 0).toLocaleString()} UZS</div>
+                    `;
+                    
+                    div.onmouseover = () => {
+                        div.style.background = "rgba(99, 102, 241, 0.15)";
+                    };
+                    div.onmouseout = () => {
+                        div.style.background = "transparent";
+                    };
+                    
+                    div.onclick = () => {
+                        this.addSelectedProductToOrder(item);
+                        searchInput.value = "";
+                        suggestionsBox.style.display = "none";
+                        searchInput.focus();
+                    };
+                    suggestionsBox.appendChild(div);
+                });
+                suggestionsBox.style.display = "block";
+            };
+
+            // Close suggestions when clicking outside
+            document.addEventListener("click", (e) => {
+                if (!searchInput.contains(e.target) && !suggestionsBox.contains(e.target)) {
+                    suggestionsBox.style.display = "none";
+                }
+            });
+
+            // Handle scanner Enter event
+            searchInput.onkeydown = (e) => {
+                if (e.key === "Enter") {
+                    e.preventDefault(); // Prevent submitting order form
+                    const query = searchInput.value.trim().toLowerCase();
+                    if (!query) return;
+
+                    // First try exact match on SKU/Barcode
+                    let match = this.inventory.find(item => (item.sku || "").toLowerCase() === query);
+                    
+                    // If not found, try exact match on name
+                    if (!match) {
+                        match = this.inventory.find(item => (item.name || "").toLowerCase() === query);
+                    }
+
+                    // If still not found, take first suggestion if suggestions are visible
+                    if (!match && suggestionsBox.style.display === "block" && suggestionsBox.firstChild) {
+                        const firstChild = suggestionsBox.firstChild;
+                        if (firstChild && firstChild.onclick) {
+                            firstChild.onclick();
+                            return;
+                        }
+                    }
+
+                    if (match) {
+                        this.addSelectedProductToOrder(match);
+                        searchInput.value = "";
+                        suggestionsBox.style.display = "none";
+                    } else {
+                        alert("Mahsulot topilmadi");
+                    }
+                }
+            };
+        }
+
         window.showModal("procurement-order-modal");
     },
 
@@ -357,6 +470,81 @@ window.Procurement = {
         } finally {
             submitBtn.disabled = false;
             submitBtn.innerHTML = originalBtnHtml;
+        }
+    },
+
+    addSelectedProductToOrder(item) {
+        const tbody = document.getElementById("p-order-items-tbody");
+        if (!tbody) return;
+
+        // Check if item is already added
+        const rows = tbody.querySelectorAll("tr");
+        let existingRow = null;
+        rows.forEach(row => {
+            const select = row.querySelector(".item-select");
+            if (select && select.value === String(item.id)) {
+                existingRow = row;
+            }
+        });
+
+        if (existingRow) {
+            const qtyInput = existingRow.querySelector(".item-qty");
+            qtyInput.value = parseInt(qtyInput.value || 0) + 1;
+            this.updateOrderTotals();
+        } else {
+            // Add new row
+            const rowId = "row_" + Math.random().toString(36).substr(2, 9);
+            const tr = document.createElement("tr");
+            tr.id = rowId;
+
+            // Generate product options
+            let productOptions = '<option value="">-- Mahsulotni tanlang --</option>';
+            this.inventory.forEach(invItem => {
+                const selected = String(invItem.id) === String(item.id) ? 'selected' : '';
+                productOptions += `<option value="${invItem.id}" data-price="${invItem.price || 0}" ${selected}>${invItem.name} (${invItem.sku || "RE-" + invItem.id}) - ${parseFloat(invItem.price || 0).toLocaleString()} UZS</option>`;
+            });
+
+            tr.innerHTML = `
+                <td style="padding: 6px;">
+                    <select class="form-control item-select" required style="width:100%; font-size:12px; background: rgba(15, 23, 42, 0.4); border: 1px solid rgba(255, 255, 255, 0.1); color: #f8fafc;">
+                        ${productOptions}
+                    </select>
+                </td>
+                <td style="padding: 6px; text-align: center;">
+                    <input type="number" class="form-control item-qty" required min="1" value="1" style="width:100%; text-align:center; font-size:12px; background: rgba(15, 23, 42, 0.4); border: 1px solid rgba(255, 255, 255, 0.1); color: #f8fafc; padding: 4px;">
+                </td>
+                <td style="padding: 6px; text-align: right;">
+                    <input type="number" class="form-control item-price" required min="0" value="${item.price || 0}" style="width:100%; text-align:right; font-size:12px; background: rgba(15, 23, 42, 0.4); border: 1px solid rgba(255, 255, 255, 0.1); color: #f8fafc; padding: 4px;">
+                </td>
+                <td style="padding: 6px; text-align: right; font-weight: 600; color: #cbd5e1; vertical-align: middle;" class="item-subtotal">0 UZS</td>
+                <td style="padding: 6px; text-align: center; vertical-align: middle;">
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('${rowId}').remove(); window.Procurement.updateOrderTotals();" style="padding: 4px 8px; font-size: 11px; background:rgba(239,68,68,0.15); color:#f87171; border-color:rgba(239,68,68,0.2);">
+                        <i class="fas fa-trash-alt"></i>
+                    </button>
+                </td>
+            `;
+
+            tbody.appendChild(tr);
+
+            const select = tr.querySelector(".item-select");
+            const qtyInput = tr.querySelector(".item-qty");
+            const priceInput = tr.querySelector(".item-price");
+
+            select.onchange = (e) => {
+                const selectedOpt = select.options[select.selectedIndex];
+                if (selectedOpt && selectedOpt.value) {
+                    const defaultPrice = parseFloat(selectedOpt.getAttribute("data-price") || 0);
+                    priceInput.value = defaultPrice;
+                } else {
+                    priceInput.value = 0;
+                }
+                this.updateOrderTotals();
+            };
+
+            qtyInput.oninput = () => this.updateOrderTotals();
+            priceInput.oninput = () => this.updateOrderTotals();
+
+            this.updateOrderTotals();
         }
     }
 };
