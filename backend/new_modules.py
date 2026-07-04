@@ -243,6 +243,49 @@ def save_purchase_order(payload: PurchaseOrderModel, request: Request):
     log_audit(request, action, "purchase_orders", order_id, None, order_data)
     return {"status": "success", "id": order_id}
 
+@router.delete("/purchase-orders/{id}")
+def delete_purchase_order(id: str, request: Request):
+    from backend.main import supabase_req, get_company_id, get_company_settings
+    from datetime import datetime
+    import re
+    import requests
+    
+    company_id = get_company_id(request)
+    now_str = datetime.utcnow().isoformat()
+    
+    orders = supabase_req("GET", f"purchase_orders?id=eq.{id}", company_id=company_id) or []
+    if orders:
+        order = orders[0]
+        supplier_id = order.get("supplier_id")
+        if supplier_id:
+            suppliers = supabase_req("GET", f"suppliers?id=eq.{supplier_id}", company_id=company_id) or []
+            if suppliers:
+                supplier_name = suppliers[0].get("name") or ""
+                match = re.search(r"REGOS #(\d+)", supplier_name)
+                if match:
+                    regos_order_id = int(match.group(1))
+                    try:
+                        settings = get_company_settings(company_id, bypass_cache=True)
+                        regos_endpoint = settings.get("regos_endpoint", "")
+                        regos_token = settings.get("regos_token", "")
+                        if regos_endpoint and regos_token:
+                            endpoint = regos_endpoint.strip().rstrip("/")
+                            if not endpoint.startswith(("http://", "https://")):
+                                endpoint = "https://" + endpoint
+                            status_url = f"{endpoint}/v1/docorderdelivery/setstatus" if "/v1" not in endpoint else f"{endpoint}/docorderdelivery/setstatus"
+                            
+                            headers = {
+                                "Authorization": f"Bearer {regos_token}",
+                                "Content-Type": "application/json;charset=utf-8"
+                            }
+                            requests.post(status_url, headers=headers, json={"id": regos_order_id, "status": "Canceled"}, timeout=5)
+                    except Exception as e_regos:
+                        print(f"Failed to cancel order {regos_order_id} in REGOS: {e_regos}")
+    
+    res = supabase_req("PATCH", f"purchase_orders?id=eq.{id}", json_data={"deleted_at": now_str}, company_id=company_id)
+    log_audit(request, "DELETE", "purchase_orders", id, None, {"deleted_at": now_str})
+    return {"status": "success", "message": "Buyurtma o'chirildi"}
+
 @router.post("/purchase-orders/{id}/approve")
 def approve_purchase_order(id: str, request: Request):
     from backend.main import supabase_req

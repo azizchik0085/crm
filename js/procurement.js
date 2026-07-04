@@ -43,9 +43,10 @@ window.Procurement = {
                 <td><strong>${formatMoney(o.total_amount)}</strong></td>
                 <td>${new Date(o.created_at).toLocaleDateString()}</td>
                 <td>${statusBadge}</td>
-                <td style="text-align: right;">
+                <td style="text-align: right; white-space: nowrap;">
                     <button class="btn btn-secondary btn-sm" onclick="window.Procurement.editOrder('${o.id}')" style="margin-right: 5px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); color: #f8fafc;"><i class="fas fa-edit"></i> Tahrirlash</button>
-                    <button class="btn btn-primary btn-sm" onclick="window.Procurement.resendToRegos('${o.id}')" style="background: linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%); border: none;"><i class="fas fa-paper-plane"></i> Qayta jo'natish</button>
+                    <button class="btn btn-primary btn-sm" onclick="window.Procurement.resendToRegos('${o.id}')" style="margin-right: 5px; background: linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%); border: none;"><i class="fas fa-paper-plane"></i> Qayta jo'natish</button>
+                    <button class="btn btn-danger btn-sm" onclick="window.Procurement.deleteOrder('${o.id}')" style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.2);"><i class="fas fa-trash-alt"></i> O'chirish</button>
                 </td>
             `;
             tbody.appendChild(tr);
@@ -665,6 +666,28 @@ window.Procurement = {
         } catch (e) {
             console.error("Failed to resend order", e);
             alert("Qayta yuborishda xatolik yuz berdi.");
+        }
+    },
+
+    async deleteOrder(id) {
+        if (!confirm("Haqiqatan ham ushbu buyurtmani o'chirmoqchimisiz? (Bu buyurtmani REGOS POS-da ham bekor qiladi)")) return;
+        try {
+            const res = await fetch(`/api/purchase-orders/${id}`, {
+                method: "DELETE",
+                headers: {
+                    "x-company-id": localStorage.getItem("company_id") || "admin"
+                }
+            });
+            if (res.ok) {
+                alert("Buyurtma muvaffaqiyatli o'chirildi!");
+                this.loadPurchaseOrders();
+            } else {
+                const err = await res.json();
+                alert("O'chirishda xatolik yuz berdi: " + (err.detail || JSON.stringify(err)));
+            }
+        } catch (e) {
+            console.error("Failed to delete order", e);
+            alert("Ulanish xatoligi: buyurtmani o'chirish imkoni bo'lmadi.");
         }
     }
 };
