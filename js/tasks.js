@@ -98,6 +98,14 @@ window.Tasks = {
                 </div>
             `;
             
+            // View details on click
+            card.addEventListener('click', (e) => {
+                if (e.target.closest('.kanban-status-select')) {
+                    return; // Ignore select changes
+                }
+                window.Tasks.viewTaskDetails(t);
+            });
+
             const col = columns[t.status];
             if (col) col.appendChild(card);
         });
@@ -109,6 +117,44 @@ window.Tasks = {
                 countEl.textContent = counts[key];
             }
         });
+    },
+
+    viewTaskDetails(t) {
+        document.getElementById("view-task-title").textContent = t.title || "Vazifa nomi";
+        document.getElementById("view-task-desc").textContent = t.description || "Tavsif kiritilmagan";
+        document.getElementById("view-task-project").innerHTML = `<i class="far fa-folder" style="color:#6366f1;"></i> ${t.project_name || "Loyiha tashqarisi"}`;
+        document.getElementById("view-task-assignee").innerHTML = `<i class="far fa-user-circle" style="color:#10b981;"></i> ${t.assigned_to_name || "Biriktirilmagan"}`;
+        
+        // Priority
+        let priorityLabel = t.priority;
+        if (t.priority === "critical") priorityLabel = "Kritik";
+        else if (t.priority === "high") priorityLabel = "Yuqori";
+        else if (t.priority === "medium") priorityLabel = "O'rta";
+        else if (t.priority === "low") priorityLabel = "Past";
+        
+        const prioBadge = document.getElementById("view-task-priority");
+        prioBadge.className = `priority-badge ${t.priority || 'low'}`;
+        prioBadge.textContent = priorityLabel;
+        
+        // Deadline
+        const deadlineEl = document.getElementById("view-task-deadline");
+        if (t.deadline) {
+            deadlineEl.innerHTML = `<i class="far fa-calendar-alt" style="color:#ef4444;"></i> ${t.deadline}`;
+        } else {
+            deadlineEl.innerHTML = `<i class="far fa-calendar-alt" style="color:#94a3b8;"></i> Muddat belgilanmagan`;
+        }
+        
+        // Status select dropdown inside modal
+        const statusSelect = document.getElementById("view-task-status-select");
+        statusSelect.value = t.status || "todo";
+        
+        // Onchange for status select in detail modal
+        statusSelect.onchange = async (e) => {
+            await this.changeStatus(t.id, e.target.value);
+            window.closeModal("view-task-modal");
+        };
+
+        window.showModal("view-task-modal");
     },
 
     async changeStatus(taskId, newStatus) {

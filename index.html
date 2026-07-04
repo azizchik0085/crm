@@ -2628,6 +2628,58 @@
         </div>
     </div>
 
+    <!-- 12. Vazifa Tafsilotlari modal oynasi (View Task Details) -->
+    <div class="modal" id="view-task-modal">
+        <div class="modal-content" style="max-width: 600px; width: 95vw; background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 18px; box-shadow: 0 20px 50px rgba(0,0,0,0.5);">
+            <div class="modal-header" style="border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 15px;">
+                <h3 id="view-task-title" style="font-weight: 700; color: #f8fafc; font-size: 18px; margin: 0; padding-right: 20px;">Vazifa nomi</h3>
+                <button class="close-modal-btn" onclick="closeModal('view-task-modal')" style="color: #94a3b8; background: transparent; border: none; font-size: 24px; cursor: pointer; transition: color 0.2s;">&times;</button>
+            </div>
+            <div class="modal-body" style="text-align: left; padding: 20px 0; color: #f1f5f9; display: flex; flex-direction: column; gap: 15px;">
+                <div class="task-detail-group">
+                    <span style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b; font-weight: bold; display: block; margin-bottom: 5px;">Tavsif / Texnik topshiriq:</span>
+                    <div id="view-task-desc" style="font-size: 13.5px; color: #cbd5e1; line-height: 1.6; white-space: pre-wrap; background: rgba(0, 0, 0, 0.2); padding: 15px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.04); max-height: 250px; overflow-y: auto;">
+                        Vazifa tavsifi bu yerda ko'rinadi...
+                    </div>
+                </div>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 5px;">
+                    <div class="task-detail-item">
+                        <span style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b; font-weight: bold; display: block; margin-bottom: 4px;">Loyiha:</span>
+                        <span id="view-task-project" style="font-size: 13px; color: #f8fafc; display: flex; align-items: center; gap: 6px;"><i class="far fa-folder" style="color:#6366f1;"></i> Loyiha nomi</span>
+                    </div>
+                    <div class="task-detail-item">
+                        <span style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b; font-weight: bold; display: block; margin-bottom: 4px;">Mas'ul xodim:</span>
+                        <span id="view-task-assignee" style="font-size: 13px; color: #f8fafc; display: flex; align-items: center; gap: 6px;"><i class="far fa-user-circle" style="color:#10b981;"></i> Xodim ismi</span>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                    <div class="task-detail-item">
+                        <span style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b; font-weight: bold; display: block; margin-bottom: 4px;">Prioritet:</span>
+                        <span id="view-task-priority" class="priority-badge low" style="margin-top: 2px;">Past</span>
+                    </div>
+                    <div class="task-detail-item">
+                        <span style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b; font-weight: bold; display: block; margin-bottom: 4px;">Muddat (Deadline):</span>
+                        <span id="view-task-deadline" style="font-size: 13px; color: #f8fafc; display: flex; align-items: center; gap: 6px;"><i class="far fa-calendar-alt" style="color:#ef4444;"></i> Muddat belgilanmagan</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 15px; margin-top: 5px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 12px; color: #94a3b8;">Holat:</span>
+                    <select id="view-task-status-select" class="kanban-status-select" style="padding: 4px 10px; font-size: 12px;">
+                        <option value="todo">Kutilmoqda</option>
+                        <option value="in_progress">Bajarilmoqda</option>
+                        <option value="review">Tekshirilmoqda</option>
+                        <option value="done">Bajarildi</option>
+                    </select>
+                </div>
+                <button type="button" class="btn btn-secondary" onclick="closeModal('view-task-modal')" style="padding: 8px 20px;">Yopish</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         // Modal tranzaksiya sanasini bugungi sanaga avtomatik moslash
         document.getElementById('tx-date').value = new Date().toISOString().split('T')[0];
