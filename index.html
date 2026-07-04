@@ -2680,6 +2680,99 @@
         </div>
     </div>
 
+    <!-- 13. Yangi Xarid/Mijoz Buyurtmasi Modal oynasi (REGOS POS uchun) -->
+    <div class="modal" id="procurement-order-modal">
+        <div class="modal-content" style="max-width: 750px; width: 95vw; background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 18px; box-shadow: 0 20px 50px rgba(0,0,0,0.5);">
+            <div class="modal-header" style="border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 15px;">
+                <h3 style="font-weight: 700; color: #f8fafc; font-size: 18px; margin: 0;"><i class="fas fa-shopping-cart" style="color:#6366f1; margin-right: 8px;"></i> Yangi Buyurtma Yaratish (REGOS POS-ga)</h3>
+                <button class="close-modal-btn" onclick="closeModal('procurement-order-modal')" style="color: #94a3b8; background: transparent; border: none; font-size: 24px; cursor: pointer;">&times;</button>
+            </div>
+            <form id="procurement-order-form">
+                <div class="modal-body" style="text-align: left; padding: 20px; color: #f1f5f9; display: flex; flex-direction: column; gap: 15px; max-height: 70vh; overflow-y: auto;">
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                        <div class="form-group">
+                            <label style="display:block; margin-bottom: 6px; font-weight:600; font-size: 13px; color: #cbd5e1;">Mijozni tanlang (Tizimdan):</label>
+                            <select id="p-order-customer-select" class="form-control" style="background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255, 255, 255, 0.1); color: #f8fafc;">
+                                <option value="">-- Yangi/Qo'lda kiritish --</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label style="display:block; margin-bottom: 6px; font-weight:600; font-size: 13px; color: #cbd5e1;">Filial / Ombor (REGOS) <span style="color:var(--danger)">*</span></label>
+                            <select id="p-order-stock-select" class="form-control" required style="background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255, 255, 255, 0.1); color: #f8fafc;">
+                                <option value="">Omborlar yuklanmoqda...</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                        <div class="form-group">
+                            <label style="display:block; margin-bottom: 6px; font-weight:600; font-size: 13px; color: #cbd5e1;">Mijoz ismi (Qo'lda) <span style="color:var(--danger)">*</span></label>
+                            <input type="text" id="p-order-cust-name" class="form-control" required placeholder="Masalan: Azizbek" style="background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255, 255, 255, 0.1); color: #f8fafc;">
+                        </div>
+                        <div class="form-group">
+                            <label style="display:block; margin-bottom: 6px; font-weight:600; font-size: 13px; color: #cbd5e1;">Mijoz telefoni (Qo'lda) <span style="color:var(--danger)">*</span></label>
+                            <input type="text" id="p-order-cust-phone" class="form-control" required placeholder="Masalan: +998901234567" style="background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255, 255, 255, 0.1); color: #f8fafc;">
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                        <div class="form-group">
+                            <label style="display:block; margin-bottom: 6px; font-weight:600; font-size: 13px; color: #cbd5e1;">Yetkazib berish manzili <span style="color:var(--danger)">*</span></label>
+                            <input type="text" id="p-order-address" class="form-control" required placeholder="Toshkent shahri, Yunusobod tumani..." style="background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255, 255, 255, 0.1); color: #f8fafc;">
+                        </div>
+                        <div class="form-group">
+                            <label style="display:block; margin-bottom: 6px; font-weight:600; font-size: 13px; color: #cbd5e1;">Yetkazib berish sanasi <span style="color:var(--danger)">*</span></label>
+                            <input type="date" id="p-order-delivery-date" class="form-control" required style="background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255, 255, 255, 0.1); color: #f8fafc;">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label style="display:block; margin-bottom: 6px; font-weight:600; font-size: 13px; color: #cbd5e1;">Izoh (Zakaz tafsilotlari):</label>
+                        <textarea id="p-order-notes" class="form-control" placeholder="Qo'shimcha izohlar..." style="min-height: 60px; background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255, 255, 255, 0.1); color: #f8fafc;"></textarea>
+                    </div>
+
+                    <!-- Products Table -->
+                    <div style="border-top: 1px solid rgba(255,255,255,0.08); padding-top: 15px; margin-top: 5px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                            <h4 style="font-size: 14px; font-weight: 600; color: #f8fafc; margin: 0;"><i class="fas fa-boxes" style="color:#10b981; margin-right: 6px;"></i> Buyurtma mahsulotlari</h4>
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="window.Procurement.addOrderItemRow()" style="padding: 4px 10px; font-size: 11px; background: rgba(99, 102, 241, 0.15); color: #818cf8; border-color: rgba(99,102,241,0.2);">
+                                <i class="fas fa-plus"></i> Mahsulot qo'shish
+                            </button>
+                        </div>
+
+                        <div class="table-responsive" style="max-height: 200px; overflow-y: auto; border: 1px solid rgba(255,255,255,0.05); border-radius: 8px;">
+                            <table class="custom-table" style="font-size: 12px; margin: 0;">
+                                <thead>
+                                    <tr>
+                                        <th style="padding: 8px;">Mahsulot (REGOS)</th>
+                                        <th style="width: 80px; padding: 8px; text-align: center;">Soni</th>
+                                        <th style="width: 130px; padding: 8px; text-align: right;">Narxi (UZS)</th>
+                                        <th style="width: 130px; padding: 8px; text-align: right;">Jami (UZS)</th>
+                                        <th style="width: 50px; padding: 8px; text-align: center;">Amallar</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="p-order-items-tbody">
+                                    <!-- Dynamic rows go here -->
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div style="display: flex; justify-content: flex-end; align-items: center; margin-top: 15px; padding-right: 15px;">
+                            <span style="font-size: 14px; font-weight: 600; color: #cbd5e1; margin-right: 10px;">Jami Summa:</span>
+                            <span id="p-order-total-span" style="font-size: 18px; font-weight: 700; color: #10b981;">0 UZS</span>
+                        </div>
+                    </div>
+
+                </div>
+                <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid rgba(255,255,255,0.08); padding: 15px 20px;">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('procurement-order-modal')" style="padding: 8px 20px;">Bekor qilish</button>
+                    <button type="submit" class="btn btn-primary" style="padding: 8px 20px;"><i class="fas fa-paper-plane"></i> REGOS POS-ga yuborish</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script>
         // Modal tranzaksiya sanasini bugungi sanaga avtomatik moslash
         document.getElementById('tx-date').value = new Date().toISOString().split('T')[0];

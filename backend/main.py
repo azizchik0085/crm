@@ -3482,6 +3482,125 @@ def sync_regos_receipts(background_tasks: BackgroundTasks, request: Request, day
 def get_sync_status():
     return sync_progress
 
+@app.post("/api/integration/regos/create-order")
+def create_regos_order(order_data: dict, request: Request):
+    company_id = get_company_id(request)
+    settings = get_company_settings(company_id, bypass_cache=True) if company_id else settings_state
+    regos_endpoint = settings.get("regos_endpoint", "")
+    regos_token = settings.get("regos_token", "")
+    
+    if not regos_endpoint or not regos_token:
+        raise HTTPException(status_code=400, detail="REGOS API sozlanmagan. Iltimos, sozlamalar sahifasida Endpoint va Access Tokenni kiriting.")
+        
+    endpoint = regos_endpoint.strip().rstrip("/")
+    if not endpoint.startswith(("http://", "https://")):
+        endpoint = "https://" + endpoint
+        
+    if "/v1" not in endpoint:
+        order_url = f"{endpoint}/v1/docorderdelivery/addfull"
+    else:
+        order_url = f"{endpoint}/docorderdelivery/addfull"
+        
+    # Parse stock_id
+    raw_stock_id = order_data.get("stock_id", "regos_1")
+    stock_id = 1
+    if "regos_" in str(raw_stock_id):
+        try:
+            stock_id = int(str(raw_stock_id).replace("regos_", ""))
+        except ValueError:
+            stock_id = 1
+    else:
+        try:
+            stock_id = int(raw_stock_id)
+        except ValueError:
+            stock_id = 1
+
+    # Format delivery_date to timestamp
+    delivery_date_str = order_data.get("delivery_date")
+    now_ts = int(time.time())
+    delivery_ts = now_ts + 24 * 3600
+    if delivery_date_str:
+        try:
+            dt = datetime.strptime(delivery_date_str, "%Y-%m-%d")
+            delivery_ts = int(dt.timestamp())
+        except Exception:
+            pass
+
+    # Build operations list
+    operations = []
+    items = order_data.get("items", [])
+    for item in items:
+        raw_product_id = item.get("product_id", "")
+        item_id = 1
+        if "regos_" in str(raw_product_id):
+            try:
+                clean_id = str(raw_product_id).replace("i_regos_", "").replace("regos_", "")
+                item_id = int(clean_id)
+            except ValueError:
+                continue
+        else:
+            try:
+                item_id = int(raw_product_id)
+            except ValueError:
+                continue
+                
+        operations.append({
+            "item_id": item_id,
+            "quantity": float(item.get("quantity", 1)),
+            "price": float(item.get("price", 0))
+        })
+        
+    if not operations:
+        raise HTTPException(status_code=400, detail="Buyurtmada hech qanday mahsulot mavjud emas yoki mahsulotlar REGOS tizimiga mos kelmaydi.")
+
+    # Build customer description
+    description = f"PRO-TECH ERP orqali yaratildi. Mijoz: {order_data.get('customer_name', '')}"
+    if order_data.get("description"):
+        description += f" | Izoh: {order_data.get('description')}"
+
+    # Build document object
+    document = {
+        "date": now_ts,
+        "delivery_date": delivery_ts,
+        "address": order_data.get("delivery_address", "Toshkent"),
+        "description": description,
+        "phone": order_data.get("customer_phone", ""),
+        "from_id": 1,
+        "stock_id": stock_id,
+        "price_type_id": 1,
+        "delivery_type_id": 1,
+        "payment_type_id": 1
+    }
+    
+    payload = {
+        "document": document,
+        "operations": operations
+    }
+    
+    regos_headers = {
+        "Authorization": f"Bearer {regos_token}",
+        "Content-Type": "application/json;charset=utf-8"
+    }
+    
+    try:
+        res = requests.post(order_url, headers=regos_headers, json=payload, timeout=15)
+        if res.status_code == 200:
+            res_json = res.json()
+            if res_json.get("ok"):
+                new_id = res_json.get("result", {}).get("new_id")
+                return {
+                    "status": "success",
+                    "message": "Buyurtma muvaffaqiyatli REGOS POS-ga yuborildi!",
+                    "regos_order_id": new_id
+                }
+            else:
+                error_msg = res_json.get("result", "Noma'lum xatolik")
+                raise HTTPException(status_code=400, detail=f"REGOS API xatoligi: {error_msg}")
+        else:
+            raise HTTPException(status_code=500, detail=f"REGOS API javob xatoligi (Status {res.status_code}): {res.text}")
+    except requests.exceptions.RequestException as e:
+        raise HTTPException(status_code=500, detail=f"REGOS API bilan bog'lanishda xatolik: {str(e)}")
+
 @app.post("/api/test/simulate-receipt")
 def simulate_receipt(payload: dict, request: Request):
     company_id = get_company_id(request)
