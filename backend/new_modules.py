@@ -173,6 +173,27 @@ def get_purchase_orders(request: Request):
                 o["supplier_name"] = "Noma'lum"
     return orders
 
+@router.get("/purchase-orders/{id}")
+def get_purchase_order_details(id: str, request: Request):
+    from backend.main import supabase_req, get_company_id
+    company_id = get_company_id(request)
+    orders = supabase_req("GET", f"purchase_orders?id=eq.{id}", company_id=company_id) or []
+    if not orders:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Buyurtma topilmadi")
+    order = orders[0]
+    items = supabase_req("GET", f"purchase_items?purchase_order_id=eq.{id}", company_id=company_id) or []
+    supplier = None
+    if order.get("supplier_id"):
+        suppliers = supabase_req("GET", f"suppliers?id=eq.{order.get('supplier_id')}", company_id=company_id) or []
+        if suppliers:
+            supplier = suppliers[0]
+    return {
+        "order": order,
+        "items": items,
+        "supplier": supplier
+    }
+
 @router.post("/purchase-orders")
 def save_purchase_order(payload: PurchaseOrderModel, request: Request):
     from backend.main import supabase_req, active_company_id

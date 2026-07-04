@@ -3614,25 +3614,48 @@ def create_regos_order(order_data: dict, request: Request):
                 try:
                     # Save order details in local database so it shows up in the list
                     # Order ID MUST be a valid UUID
-                    local_order_id = str(uuid.uuid4())
+                    local_order_id = order_data.get("order_id")
+                    local_supplier_id = None
                     total_amount = sum(float(item.get("quantity", 1)) * float(item.get("price", 0)) for item in items)
-                    
-                    # Create virtual supplier for customer details
-                    local_supplier_id = str(uuid.uuid4())
                     cust_name = f"Mijoz: {order_data.get('customer_name', '')} (REGOS #{new_id})"
                     
-                    local_supplier_data = {
-                        "id": local_supplier_id,
-                        "company_id": company_id,
-                        "name": cust_name,
-                        "phone": order_data.get("customer_phone") or "",
-                        "address": order_data.get("delivery_address") or "",
-                        "rating": 5.0
-                    }
-                    supabase_req("POST", "suppliers", json_data=local_supplier_data, company_id=company_id)
+                    if local_order_id:
+                        # Find existing order to get its supplier_id
+                        existing_po = supabase_req("GET", f"purchase_orders?id=eq.{local_order_id}", company_id=company_id)
+                        if existing_po and len(existing_po) > 0:
+                            local_supplier_id = existing_po[0].get("supplier_id")
+                    
+                    if local_supplier_id:
+                        # Update existing virtual supplier
+                        local_supplier_data = {
+                            "name": cust_name,
+                            "phone": order_data.get("customer_phone") or "",
+                            "address": order_data.get("delivery_address") or "",
+                            "rating": 5.0
+                        }
+                        supabase_req("PATCH", f"suppliers?id=eq.{local_supplier_id}", json_data=local_supplier_data, company_id=company_id)
+                    else:
+                        # Create virtual supplier for customer details
+                        local_supplier_id = str(uuid.uuid4())
+                        local_supplier_data = {
+                            "id": local_supplier_id,
+                            "company_id": company_id,
+                            "name": cust_name,
+                            "phone": order_data.get("customer_phone") or "",
+                            "address": order_data.get("delivery_address") or "",
+                            "rating": 5.0
+                        }
+                        supabase_req("POST", "suppliers", json_data=local_supplier_data, company_id=company_id)
+                    
+                    if not local_order_id:
+                        local_order_id = str(uuid.uuid4())
+                        is_new_order = True
+                    else:
+                        is_new_order = False
+                        # Clean existing items
+                        supabase_req("DELETE", f"purchase_items?purchase_order_id=eq.{local_order_id}", company_id=company_id)
                     
                     local_order_data = {
-                        "id": local_order_id,
                         "company_id": company_id,
                         "supplier_id": local_supplier_id,
                         "expected_delivery_date": order_data.get("delivery_date"),
@@ -3640,8 +3663,11 @@ def create_regos_order(order_data: dict, request: Request):
                         "total_amount": total_amount
                     }
                     
-                    # Insert order
-                    supabase_req("POST", "purchase_orders", json_data=local_order_data, company_id=company_id)
+                    if is_new_order:
+                        local_order_data["id"] = local_order_id
+                        supabase_req("POST", "purchase_orders", json_data=local_order_data, company_id=company_id)
+                    else:
+                        supabase_req("PATCH", f"purchase_orders?id=eq.{local_order_id}", json_data=local_order_data, company_id=company_id)
                     
                     # Insert items
                     for item in items:

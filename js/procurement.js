@@ -44,8 +44,8 @@ window.Procurement = {
                 <td>${new Date(o.created_at).toLocaleDateString()}</td>
                 <td>${statusBadge}</td>
                 <td style="text-align: right;">
-                    ${o.status === "draft" ? `<button class="btn btn-secondary btn-sm" onclick="window.Procurement.approveOrder('${o.id}')"><i class="fas fa-check"></i> Tasdiqlash</button>` : ""}
-                    ${o.status === "approved" ? `<button class="btn btn-primary btn-sm" onclick="window.Procurement.receiveGoods('${o.id}')"><i class="fas fa-warehouse"></i> Tovar olish</button>` : ""}
+                    <button class="btn btn-secondary btn-sm" onclick="window.Procurement.editOrder('${o.id}')" style="margin-right: 5px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); color: #f8fafc;"><i class="fas fa-edit"></i> Tahrirlash</button>
+                    <button class="btn btn-primary btn-sm" onclick="window.Procurement.resendToRegos('${o.id}')" style="background: linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%); border: none;"><i class="fas fa-paper-plane"></i> Qayta jo'natish</button>
                 </td>
             `;
             tbody.appendChild(tr);
@@ -103,6 +103,7 @@ window.Procurement = {
     customers: [],
 
     async openOrderModal() {
+        this.currentEditingOrderId = null;
         // Reset form
         const form = document.getElementById("procurement-order-form");
         if (form) form.reset();
@@ -325,7 +326,7 @@ window.Procurement = {
         window.showModal("procurement-order-modal");
     },
 
-    addOrderItemRow() {
+    addOrderItemRow(selectedProductId = "", qty = 1, price = 0) {
         const tbody = document.getElementById("p-order-items-tbody");
         if (!tbody) return;
 
@@ -336,7 +337,8 @@ window.Procurement = {
         // Generate product options
         let productOptions = '<option value="">-- Mahsulotni tanlang --</option>';
         this.inventory.forEach(item => {
-            productOptions += `<option value="${item.id}" data-price="${item.price || 0}">${item.name} (${item.sku || "RE-" + item.id}) - ${parseFloat(item.price || 0).toLocaleString()} UZS</option>`;
+            const isSelected = String(item.id) === String(selectedProductId) ? "selected" : "";
+            productOptions += `<option value="${item.id}" data-price="${item.price || 0}" ${isSelected}>${item.name} (${item.sku || "RE-" + item.id}) - ${parseFloat(item.price || 0).toLocaleString()} UZS</option>`;
         });
 
         tr.innerHTML = `
@@ -346,10 +348,10 @@ window.Procurement = {
                 </select>
             </td>
             <td style="padding: 6px; text-align: center;">
-                <input type="number" class="form-control item-qty" required min="1" value="1" style="width:100%; text-align:center; font-size:12px; background: rgba(15, 23, 42, 0.4); border: 1px solid rgba(255, 255, 255, 0.1); color: #f8fafc; padding: 4px;">
+                <input type="number" class="form-control item-qty" required min="1" value="${qty}" style="width:100%; text-align:center; font-size:12px; background: rgba(15, 23, 42, 0.4); border: 1px solid rgba(255, 255, 255, 0.1); color: #f8fafc; padding: 4px;">
             </td>
             <td style="padding: 6px; text-align: right;">
-                <input type="number" class="form-control item-price" required min="0" value="0" style="width:100%; text-align:right; font-size:12px; background: rgba(15, 23, 42, 0.4); border: 1px solid rgba(255, 255, 255, 0.1); color: #f8fafc; padding: 4px;">
+                <input type="number" class="form-control item-price" required min="0" value="${price}" style="width:100%; text-align:right; font-size:12px; background: rgba(15, 23, 42, 0.4); border: 1px solid rgba(255, 255, 255, 0.1); color: #f8fafc; padding: 4px;">
             </td>
             <td style="padding: 6px; text-align: right; font-weight: 600; color: #cbd5e1; vertical-align: middle;" class="item-subtotal">0 UZS</td>
             <td style="padding: 6px; text-align: center; vertical-align: middle;">
@@ -440,6 +442,10 @@ window.Procurement = {
             description: document.getElementById("p-order-notes").value.trim(),
             items: items
         };
+
+        if (this.currentEditingOrderId) {
+            payload.order_id = this.currentEditingOrderId;
+        }
 
         const submitBtn = document.querySelector("#procurement-order-form button[type='submit']");
         const originalBtnHtml = submitBtn.innerHTML;
@@ -546,6 +552,119 @@ window.Procurement = {
             priceInput.oninput = () => this.updateOrderTotals();
 
             this.updateOrderTotals();
+        }
+    },
+
+    async editOrder(id) {
+        try {
+            const res = await fetch(`/api/purchase-orders/${id}`, {
+                headers: { "x-company-id": localStorage.getItem("company_id") || "admin" }
+            });
+            if (!res.ok) {
+                alert("Buyurtma tafsilotlarini yuklashda xatolik yuz berdi.");
+                return;
+            }
+            const data = await res.json();
+            const order = data.order;
+            const items = data.items;
+            const supplier = data.supplier;
+
+            await this.openOrderModal();
+
+            // Set editing ID
+            this.currentEditingOrderId = id;
+
+            // Pre-fill fields
+            let custName = supplier ? supplier.name : "";
+            if (custName.startsWith("Mijoz: ")) {
+                custName = custName.replace(/^Mijoz:\s*/, "");
+            }
+            custName = custName.replace(/\s*\(REGOS\s*#\d+\)\s*$/, "");
+
+            document.getElementById("p-order-cust-name").value = custName;
+            document.getElementById("p-order-cust-phone").value = supplier ? supplier.phone : "";
+            document.getElementById("p-order-address").value = supplier ? supplier.address : "";
+            if (order.expected_delivery_date) {
+                document.getElementById("p-order-delivery-date").value = order.expected_delivery_date;
+            }
+
+            // Populate items table
+            const tbody = document.getElementById("p-order-items-tbody");
+            tbody.innerHTML = ""; // Clear default empty row
+
+            if (items && items.length > 0) {
+                items.forEach(item => {
+                    this.addOrderItemRow(item.inventory_id, item.quantity, item.price);
+                });
+            } else {
+                this.addOrderItemRow();
+            }
+
+            this.updateOrderTotals();
+        } catch (e) {
+            console.error("Failed to edit order", e);
+            alert("Buyurtmani tahrirlashda xatolik yuz berdi.");
+        }
+    },
+
+    async resendToRegos(id) {
+        if (!confirm("Ushbu buyurtmani o'zgartirmasdan qayta REGOS POS kassasiga yuborasizmi?")) return;
+        try {
+            const detailRes = await fetch(`/api/purchase-orders/${id}`, {
+                headers: { "x-company-id": localStorage.getItem("company_id") || "admin" }
+            });
+            if (!detailRes.ok) {
+                alert("Buyurtma tafsilotlarini yuklashda xatolik yuz berdi.");
+                return;
+            }
+            const data = await detailRes.json();
+            const order = data.order;
+            const items = data.items;
+            const supplier = data.supplier;
+
+            let custName = supplier ? supplier.name : "";
+            if (custName.startsWith("Mijoz: ")) {
+                custName = custName.replace(/^Mijoz:\s*/, "");
+            }
+            custName = custName.replace(/\s*\(REGOS\s*#\d+\)\s*$/, "");
+
+            const payloadItems = items.map(item => ({
+                product_id: item.inventory_id,
+                quantity: parseFloat(item.quantity || 1),
+                price: parseFloat(item.price || 0)
+            }));
+
+            const payload = {
+                order_id: id,
+                customer_name: custName,
+                customer_phone: supplier ? supplier.phone : "",
+                delivery_address: supplier ? supplier.address : "",
+                delivery_date: order.expected_delivery_date,
+                stock_id: 1, // Default
+                description: "",
+                items: payloadItems
+            };
+
+            const res = await fetch("/api/integration/regos/create-order", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "x-company-id": localStorage.getItem("company_id") || "admin"
+                },
+                body: JSON.stringify(payload)
+            });
+
+            if (res.ok) {
+                const dataRes = await res.json();
+                alert(`Muvaffaqiyatli! Buyurtma REGOS POS-ga qayta yuborildi. REGOS Buyurtma ID: #${dataRes.regos_order_id}`);
+                this.loadPurchaseOrders();
+            } else {
+                const err = await res.json();
+                alert("Xatolik yuz berdi: " + (err.detail || JSON.stringify(err)));
+            }
+        } catch (e) {
+            console.error("Failed to resend order", e);
+            alert("Qayta yuborishda xatolik yuz berdi.");
         }
     }
 };
