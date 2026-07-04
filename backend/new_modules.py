@@ -165,7 +165,7 @@ def get_purchase_orders(request: Request):
         if supplier_id and supplier_id in sup_map:
             o["supplier_name"] = sup_map[supplier_id]
         else:
-            notes = o.get("notes") or ""
+            notes = o.get("notes") or o.get("approved_by") or ""
             if notes.startswith("Mijoz: "):
                 parts = notes.split(" | ")
                 o["supplier_name"] = parts[0]

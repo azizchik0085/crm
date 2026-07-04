@@ -3617,25 +3617,24 @@ def create_regos_order(order_data: dict, request: Request):
                     local_order_id = str(uuid.uuid4())
                     total_amount = sum(float(item.get("quantity", 1)) * float(item.get("price", 0)) for item in items)
                     
-                    # Format notes with customer details and REGOS Order ID
-                    cust_notes = f"Mijoz: {order_data.get('customer_name', '')}"
-                    if order_data.get("customer_phone"):
-                        cust_notes += f" ({order_data.get('customer_phone')})"
-                    cust_notes += f" (REGOS #{new_id})"
+                    # Create virtual supplier for customer details
+                    local_supplier_id = str(uuid.uuid4())
+                    cust_name = f"Mijoz: {order_data.get('customer_name', '')} (REGOS #{new_id})"
                     
-                    details = []
-                    if order_data.get("delivery_address"):
-                        details.append(f"Manzil: {order_data.get('delivery_address')}")
-                    if order_data.get("description"):
-                        details.append(f"Izoh: {order_data.get('description')}")
-                    if details:
-                        cust_notes += " | " + " | ".join(details)
+                    local_supplier_data = {
+                        "id": local_supplier_id,
+                        "company_id": company_id,
+                        "name": cust_name,
+                        "phone": order_data.get("customer_phone") or "",
+                        "address": order_data.get("delivery_address") or "",
+                        "rating": 5.0
+                    }
+                    supabase_req("POST", "suppliers", json_data=local_supplier_data, company_id=company_id)
                     
                     local_order_data = {
                         "id": local_order_id,
                         "company_id": company_id,
-                        "supplier_id": None,
-                        "notes": cust_notes,
+                        "supplier_id": local_supplier_id,
                         "expected_delivery_date": order_data.get("delivery_date"),
                         "status": "approved",
                         "total_amount": total_amount
