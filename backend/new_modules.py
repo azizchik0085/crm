@@ -880,3 +880,164 @@ def get_ceo_dashboard(request: Request):
         "active_tasks_count": active_tasks_count,
         "ai_recommendations": ai_recs
     }
+
+@router.post("/integration/regos/sync-orders")
+def sync_regos_orders(request: Request):
+    from backend.main import get_company_id, get_company_settings, supabase_req
+    from datetime import datetime
+    import requests
+    import uuid
+    import re
+    from fastapi import HTTPException
+    
+    company_id = get_company_id(request)
+    if not company_id:
+        raise HTTPException(status_code=400, detail="Company ID missing")
+        
+    settings = get_company_settings(company_id, bypass_cache=True)
+    regos_endpoint = settings.get("regos_endpoint", "")
+    regos_token = settings.get("regos_token", "")
+    if not regos_endpoint or not regos_token:
+        raise HTTPException(status_code=400, detail="REGOS integration is not configured.")
+        
+    endpoint = regos_endpoint.strip().rstrip("/")
+    if not endpoint.startswith(("http://", "https://")):
+        endpoint = "https://" + endpoint
+        
+    url = f"{endpoint}/v1/docorderdelivery/get" if "/v1" not in endpoint else f"{endpoint}/docorderdelivery/get"
+    headers = {
+        "Authorization": f"Bearer {regos_token}",
+        "Content-Type": "application/json;charset=utf-8"
+    }
+    
+    try:
+        res = requests.post(url, headers=headers, json={"limit": 100}, timeout=10)
+        if res.status_code != 200:
+            raise HTTPException(status_code=400, detail=f"REGOS API returned status code {res.status_code}")
+            
+        orders = res.json().get("result", [])
+        
+        # Get existing local active orders
+        local_orders = supabase_req("GET", "purchase_orders?deleted_at=is.null", company_id=company_id) or []
+        local_regos_ids = set()
+        
+        # Fetch local suppliers to find REGOS IDs in names
+        local_suppliers = supabase_req("GET", "suppliers?deleted_at=is.null", company_id=company_id) or []
+        for s in local_suppliers:
+            name = s.get("name") or ""
+            match = re.search(r"REGOS #(\d+)", name)
+            if match:
+                local_regos_ids.add(int(match.group(1)))
+                
+        synced_count = 0
+        for o in orders:
+            regos_id = o.get("id")
+            if regos_id in local_regos_ids:
+                continue
+                
+            desc = o.get("description") or ""
+            
+            # Determine customer name
+            cust_name = ""
+            cust_phone = ""
+            customer = o.get("customer")
+            if customer:
+                cust_name = customer.get("full_name") or customer.get("first_name") or ""
+                cust_phone = customer.get("main_phone") or ""
+                
+            if not cust_name and desc.startswith("PRO-TECH ERP orqali yaratildi. Mijoz: "):
+                try:
+                    parts = desc.split("Mijoz: ")
+                    cust_name = parts[1].split(" | ")[0]
+                except:
+                    pass
+            if not cust_name:
+                cust_name = "REGOS Mijoz"
+                
+            supplier_name_field = f"Mijoz: {cust_name} (REGOS #{regos_id})"
+            
+            # Insert virtual supplier
+            local_supplier_id = str(uuid.uuid4())
+            local_supplier_data = {
+                "id": local_supplier_id,
+                "company_id": company_id,
+                "name": supplier_name_field,
+                "phone": cust_phone,
+                "address": o.get("address") or "",
+                "rating": 5.0
+            }
+            
+            try:
+                supabase_req("POST", "suppliers", json_data=local_supplier_data, company_id=company_id)
+            except Exception as sup_err:
+                print(f"Failed to save supplier for {regos_id}: {sup_err}")
+                continue
+                
+            regos_status = o.get("status", {}).get("id")
+            status_map = {
+                22: "draft",
+                23: "approved",
+                24: "approved",
+                27: "cancelled"
+            }
+            local_status = status_map.get(regos_status, "approved")
+            
+            total_amount = 0.0
+            det_res = None
+            try:
+                det_res = requests.post(url, headers=headers, json={"id": regos_id}, timeout=5)
+                if det_res.status_code == 200:
+                    det_list = det_res.json().get("result", [])
+                    if det_list:
+                        det_data = det_list[0]
+                        operations = det_data.get("operations") or []
+                        for op in operations:
+                            qty = float(op.get("quantity", 0))
+                            price = float(op.get("price", 0))
+                            total_amount += qty * price
+            except:
+                pass
+                
+            expected_date = None
+            del_date_ts = o.get("delivery_date")
+            if del_date_ts:
+                try:
+                    expected_date = datetime.fromtimestamp(int(del_date_ts)).strftime("%Y-%m-%d")
+                except:
+                    pass
+                    
+            local_order_id = str(uuid.uuid4())
+            local_order_data = {
+                "id": local_order_id,
+                "company_id": company_id,
+                "supplier_id": local_supplier_id,
+                "expected_delivery_date": expected_date,
+                "status": local_status,
+                "total_amount": total_amount
+            }
+            
+            try:
+                supabase_req("POST", "purchase_orders", json_data=local_order_data, company_id=company_id)
+                synced_count += 1
+                
+                # Fetch details again to save items locally
+                if det_res and det_res.status_code == 200:
+                    det_list = det_res.json().get("result", [])
+                    if det_list:
+                        det_data = det_list[0]
+                        operations = det_data.get("operations") or []
+                        for op in operations:
+                            item_data = {
+                                "id": str(uuid.uuid4()),
+                                "purchase_order_id": local_order_id,
+                                "product_id": f"i_regos_{op.get('item_id')}",
+                                "quantity": float(op.get("quantity", 1)),
+                                "unit_cost": float(op.get("price", 0))
+                            }
+                            supabase_req("POST", "purchase_order_items", json_data=item_data, company_id=company_id)
+            except Exception as db_err:
+                print(f"Failed to save order {regos_id} to DB: {db_err}")
+                
+        return {"status": "success", "message": f"REGOS'dan {synced_count} ta buyurtma muvaffaqiyatli sinxronizatsiya qilindi."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

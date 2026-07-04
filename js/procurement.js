@@ -689,6 +689,38 @@ window.Procurement = {
             console.error("Failed to delete order", e);
             alert("Ulanish xatoligi: buyurtmani o'chirish imkoni bo'lmadi.");
         }
+    },
+
+    async syncOrdersFromRegos() {
+        const btn = document.querySelector("button[onclick*='syncOrdersFromRegos']");
+        if (!btn) return;
+        const originalHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sinxronizatsiya...';
+        
+        try {
+            const res = await fetch("/api/integration/regos/sync-orders", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "x-company-id": localStorage.getItem("company_id") || "admin"
+                }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                alert(data.message || "Sinxronizatsiya muvaffaqiyatli yakunlandi.");
+                this.loadPurchaseOrders();
+            } else {
+                const err = await res.json();
+                alert("Sinxronizatsiyada xatolik: " + (err.detail || JSON.stringify(err)));
+            }
+        } catch (e) {
+            console.error("Failed to sync orders", e);
+            alert("Ulanish xatoligi: buyurtmalarni sinxronizatsiya qilib bo'lmadi.");
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+        }
     }
 };
 
