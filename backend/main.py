@@ -3588,9 +3588,32 @@ def create_regos_order(order_data: dict, request: Request):
             res_json = res.json()
             if res_json.get("ok"):
                 new_id = res_json.get("result", {}).get("new_id")
+                
+                # Immediately set status to 'Approved' so it shows up in REGOS POS
+                if "/v1" not in endpoint:
+                    status_url = f"{endpoint}/v1/docorderdelivery/setstatus"
+                else:
+                    status_url = f"{endpoint}/docorderdelivery/setstatus"
+                    
+                status_payload = {
+                    "id": new_id,
+                    "status": "Approved"
+                }
+                
+                try:
+                    status_res = requests.post(status_url, headers=regos_headers, json=status_payload, timeout=10)
+                    if status_res.status_code == 200:
+                        status_json = status_res.json()
+                        if not status_json.get("ok"):
+                            print(f"Failed to auto-approve order {new_id}: {status_json.get('result')}")
+                    else:
+                        print(f"Failed to auto-approve order {new_id} (status code {status_res.status_code}): {status_res.text}")
+                except Exception as status_err:
+                    print(f"Exception during auto-approve order {new_id}: {status_err}")
+                
                 return {
                     "status": "success",
-                    "message": "Buyurtma muvaffaqiyatli REGOS POS-ga yuborildi!",
+                    "message": "Buyurtma muvaffaqiyatli REGOS POS-ga yuborildi va tasdiqlandi!",
                     "regos_order_id": new_id
                 }
             else:
