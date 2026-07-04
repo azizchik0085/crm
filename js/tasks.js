@@ -57,30 +57,39 @@ window.Tasks = {
             if (columns[key]) columns[key].innerHTML = "";
         });
 
-        tasks.forEach(t => {
-            const card = document.createElement("div");
-            card.className = "card";
-            card.style.margin = "0 0 10px 0";
-            card.style.background = "#1e293b";
-            card.style.border = "1px solid #334155";
-            card.style.padding = "12px";
-            card.style.borderRadius = "8px";
-            card.style.textAlign = "left";
+        // Initialize task counts
+        const counts = { todo: 0, in_progress: 0, review: 0, done: 0 };
 
-            let priorityColor = "#64748b";
-            if (t.priority === "high") priorityColor = "#f59e0b";
-            else if (t.priority === "critical") priorityColor = "#ef4444";
+        tasks.forEach(t => {
+            // Count tasks per status
+            if (counts[t.status] !== undefined) {
+                counts[t.status]++;
+            }
+
+            const card = document.createElement("div");
+            card.className = `kanban-card prio-${t.priority || 'low'}`;
+            
+            // Format labels for Uzbek
+            let priorityBadgeClass = t.priority || "low";
+            let priorityLabel = t.priority;
+            if (t.priority === "critical") priorityLabel = "Kritik";
+            else if (t.priority === "high") priorityLabel = "Yuqori";
+            else if (t.priority === "medium") priorityLabel = "O'rta";
+            else if (t.priority === "low") priorityLabel = "Past";
 
             card.innerHTML = `
-                <h5 style="margin: 0 0 6px 0; font-size: 14px; font-weight: 600; color: #f8fafc;">${t.title}</h5>
-                <p style="margin: 0 0 8px 0; font-size: 12px; color: #94a3b8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${t.description || "Tavsif yo'q"}</p>
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                    <span style="font-size: 10px; color: ${priorityColor}; font-weight: bold; text-transform: uppercase;">${t.priority}</span>
-                    <span style="font-size: 11px; color: #a5b4fc;"><i class="fas fa-user"></i> ${t.assigned_to_name || "Biriktirilmagan"}</span>
+                <div class="card-drag-handle"><i class="fas fa-grip-vertical"></i></div>
+                <div class="kanban-card-header">
+                    <h5 class="kanban-card-title">${t.title}</h5>
                 </div>
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px; border-top: 1px solid #334155; padding-top: 8px;">
-                    <span style="font-size: 10px; color: #64748b;"><i class="fas fa-folder"></i> ${t.project_name || "Loyiha tashqarisi"}</span>
-                    <select class="form-control" style="width: auto; padding: 2px 6px; font-size: 11px; background: rgba(0,0,0,0.3); border: 1px solid #475569; color: #f8fafc; border-radius: 4px; cursor: pointer; height: auto;" onchange="window.Tasks.changeStatus('${t.id}', this.value)">
+                <p class="kanban-card-description">${t.description || "Tavsif yo'q"}</p>
+                <div class="kanban-card-meta">
+                    <span class="priority-badge ${priorityBadgeClass}">${priorityLabel}</span>
+                    <span class="assignee-tag" title="Mas'ul xodim"><i class="far fa-user-circle"></i> ${t.assigned_to_name || "Biriktirilmagan"}</span>
+                </div>
+                <div class="kanban-card-footer">
+                    <span class="project-tag" title="${t.project_name || "Loyiha tashqarisi"}"><i class="far fa-folder"></i> ${t.project_name || "Loyiha tashqarisi"}</span>
+                    <select class="kanban-status-select" onchange="window.Tasks.changeStatus('${t.id}', this.value)">
                         <option value="todo" ${t.status === 'todo' ? 'selected' : ''}>Kutilmoqda</option>
                         <option value="in_progress" ${t.status === 'in_progress' ? 'selected' : ''}>Bajarilmoqda</option>
                         <option value="review" ${t.status === 'review' ? 'selected' : ''}>Tekshirilmoqda</option>
@@ -91,6 +100,14 @@ window.Tasks = {
             
             const col = columns[t.status];
             if (col) col.appendChild(card);
+        });
+
+        // Update task count badges in column headers
+        Object.keys(counts).forEach(key => {
+            const countEl = document.getElementById(`${key}-count`);
+            if (countEl) {
+                countEl.textContent = counts[key];
+            }
         });
     },
 

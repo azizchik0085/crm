@@ -1414,22 +1414,34 @@
                 </div>
 
                 <!-- Kanban Doskasi -->
-                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-top: 20px;">
-                    <div class="card" style="min-height: 400px; background: rgba(255,255,255,0.02);">
-                        <h4 style="border-bottom: 2px solid #64748b; padding-bottom: 8px; margin: 0 0 12px 0;"><i class="fas fa-list"></i> Kutilmoqda (Todo)</h4>
-                        <div id="tasks-todo-list" style="display: flex; flex-direction: column; gap: 10px;"></div>
+                <div class="kanban-board">
+                    <div class="kanban-column todo">
+                        <div class="kanban-column-header">
+                            <h4><i class="fas fa-list"></i> Kutilmoqda</h4>
+                            <span class="task-count" id="todo-count">0</span>
+                        </div>
+                        <div id="tasks-todo-list" class="kanban-task-list"></div>
                     </div>
-                    <div class="card" style="min-height: 400px; background: rgba(255,255,255,0.02);">
-                        <h4 style="border-bottom: 2px solid #3b82f6; padding-bottom: 8px; margin: 0 0 12px 0;"><i class="fas fa-spinner"></i> Bajarilmoqda (In Progress)</h4>
-                        <div id="tasks-progress-list" style="display: flex; flex-direction: column; gap: 10px;"></div>
+                    <div class="kanban-column in-progress">
+                        <div class="kanban-column-header">
+                            <h4><i class="fas fa-spinner fa-spin-slow"></i> Bajarilmoqda</h4>
+                            <span class="task-count" id="progress-count">0</span>
+                        </div>
+                        <div id="tasks-progress-list" class="kanban-task-list"></div>
                     </div>
-                    <div class="card" style="min-height: 400px; background: rgba(255,255,255,0.02);">
-                        <h4 style="border-bottom: 2px solid #a855f7; padding-bottom: 8px; margin: 0 0 12px 0;"><i class="fas fa-eye"></i> Tekshirilmoqda (Review)</h4>
-                        <div id="tasks-review-list" style="display: flex; flex-direction: column; gap: 10px;"></div>
+                    <div class="kanban-column review">
+                        <div class="kanban-column-header">
+                            <h4><i class="fas fa-eye"></i> Tekshirilmoqda</h4>
+                            <span class="task-count" id="review-count">0</span>
+                        </div>
+                        <div id="tasks-review-list" class="kanban-task-list"></div>
                     </div>
-                    <div class="card" style="min-height: 400px; background: rgba(255,255,255,0.02);">
-                        <h4 style="border-bottom: 2px solid #10b981; padding-bottom: 8px; margin: 0 0 12px 0;"><i class="fas fa-check-circle"></i> Bajarildi (Done)</h4>
-                        <div id="tasks-done-list" style="display: flex; flex-direction: column; gap: 10px;"></div>
+                    <div class="kanban-column done">
+                        <div class="kanban-column-header">
+                            <h4><i class="fas fa-check-circle"></i> Bajarildi</h4>
+                            <span class="task-count" id="done-count">0</span>
+                        </div>
+                        <div id="tasks-done-list" class="kanban-task-list"></div>
                     </div>
                 </div>
             </section>

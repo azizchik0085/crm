@@ -1734,6 +1734,375 @@ body.light-theme .seniklar-product-item.active {
     text-align: center;
 }
 
+/* ==========================================================================
+   LOYIHALAR VA VAZIFALAR (KANBAN BOARD) PREMIUM STYLES
+   ========================================================================== */
+
+/* Kanban Board Container */
+.kanban-board {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 20px;
+    margin-top: 24px;
+    align-items: start;
+}
+
+/* Kanban Column */
+.kanban-column {
+    background: rgba(15, 23, 42, 0.4);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 18px;
+    padding: 16px;
+    min-height: 500px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.15);
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.kanban-column:hover {
+    border-color: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+}
+
+/* Kanban Column Header */
+.kanban-column-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 12px;
+    margin-bottom: 8px;
+    border-bottom: 2px solid rgba(255, 255, 255, 0.03);
+}
+
+.kanban-column-header h4 {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-main);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+}
+
+.kanban-column-header h4 i {
+    font-size: 14px;
+}
+
+/* Specific column colors & accents */
+.kanban-column.todo {
+    border-top: 3px solid #6366f1; /* Indigo */
+}
+.kanban-column.todo .kanban-column-header h4 i {
+    color: #6366f1;
+}
+
+.kanban-column.in-progress {
+    border-top: 3px solid #f59e0b; /* Orange */
+}
+.kanban-column.in-progress .kanban-column-header h4 i {
+    color: #f59e0b;
+}
+
+.kanban-column.review {
+    border-top: 3px solid #a855f7; /* Purple */
+}
+.kanban-column.review .kanban-column-header h4 i {
+    color: #a855f7;
+}
+
+.kanban-column.done {
+    border-top: 3px solid #10b981; /* Green */
+}
+.kanban-column.done .kanban-column-header h4 i {
+    color: #10b981;
+}
+
+/* Count badge */
+.kanban-column-header .task-count {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-main);
+    padding: 2px 8px;
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: 20px;
+    min-width: 22px;
+    text-align: center;
+    box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.1);
+}
+
+.kanban-column.todo .task-count {
+    background: rgba(99, 102, 241, 0.15);
+    color: #818cf8;
+}
+
+.kanban-column.in-progress .task-count {
+    background: rgba(245, 158, 11, 0.15);
+    color: #fbbf24;
+}
+
+.kanban-column.review .task-count {
+    background: rgba(168, 85, 247, 0.15);
+    color: #c084fc;
+}
+
+.kanban-column.done .task-count {
+    background: rgba(16, 185, 129, 0.15);
+    color: #34d399;
+}
+
+/* Task list container */
+.kanban-task-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-height: 400px;
+    max-height: calc(100vh - 280px);
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.kanban-task-list::-webkit-scrollbar {
+    width: 4px;
+}
+.kanban-task-list::-webkit-scrollbar-track {
+    background: transparent;
+}
+.kanban-task-list::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 10px;
+}
+.kanban-task-list::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+/* Task Card */
+.kanban-card {
+    background: linear-gradient(135deg, rgba(30, 41, 59, 0.85) 0%, rgba(15, 23, 42, 0.9) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 14px;
+    padding: 14px;
+    text-align: left;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+    cursor: grab;
+}
+
+.kanban-card:active {
+    cursor: grabbing;
+}
+
+/* Card hover effect */
+.kanban-card:hover {
+    transform: translateY(-4px);
+    border-color: rgba(99, 102, 241, 0.35);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.35), 0 0 15px rgba(99, 102, 241, 0.1);
+    background: linear-gradient(135deg, rgba(37, 99, 235, 0.08) 0%, rgba(30, 41, 59, 0.92) 100%);
+}
+
+/* Glow bar on the left side of cards */
+.kanban-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 3px;
+    height: 100%;
+    background: transparent;
+    transition: background 0.3s;
+}
+.kanban-card.prio-critical::before {
+    background: #ef4444;
+}
+.kanban-card.prio-high::before {
+    background: #f59e0b;
+}
+.kanban-card.prio-medium::before {
+    background: #3b82f6;
+}
+.kanban-card.prio-low::before {
+    background: #64748b;
+}
+
+/* Card drag handle UI */
+.card-drag-handle {
+    position: absolute;
+    right: 12px;
+    top: 14px;
+    color: rgba(255, 255, 255, 0.15);
+    font-size: 10px;
+    cursor: grab;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+.kanban-card:hover .card-drag-handle {
+    opacity: 1;
+}
+
+/* Card Header */
+.kanban-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 8px;
+    padding-right: 10px;
+}
+
+.kanban-card-title {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #f8fafc;
+    line-height: 1.4;
+    word-break: break-word;
+}
+
+/* Card Description */
+.kanban-card-description {
+    margin: 0 0 12px 0;
+    font-size: 12px;
+    color: #94a3b8;
+    line-height: 1.5;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    word-break: break-word;
+}
+
+/* Priority Badges */
+.priority-badge {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 20px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    letter-spacing: 0.5px;
+}
+
+.priority-badge.critical {
+    background: rgba(239, 68, 68, 0.15);
+    color: #f87171;
+    border: 1px solid rgba(239, 68, 68, 0.2);
+}
+.priority-badge.critical::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background-color: #ef4444;
+    display: inline-block;
+    animation: blinker 1.2s linear infinite;
+}
+
+@keyframes blinker {
+    50% { opacity: 0; }
+}
+
+.priority-badge.high {
+    background: rgba(245, 158, 11, 0.15);
+    color: #fbbf24;
+    border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+.priority-badge.medium {
+    background: rgba(59, 130, 246, 0.15);
+    color: #60a5fa;
+    border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.priority-badge.low {
+    background: rgba(100, 116, 139, 0.15);
+    color: #94a3b8;
+    border: 1px solid rgba(100, 116, 139, 0.2);
+}
+
+/* Card Meta tags */
+.kanban-card-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    color: #a5b4fc;
+    margin-bottom: 10px;
+}
+
+.assignee-tag {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(99, 102, 241, 0.08);
+    padding: 3px 8px;
+    border-radius: 20px;
+    color: #c7d2fe;
+    border: 1px solid rgba(99, 102, 241, 0.1);
+}
+
+.assignee-tag i {
+    font-size: 12px;
+}
+
+/* Project Badge */
+.kanban-card-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 10px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    padding-top: 10px;
+}
+
+.project-tag {
+    font-size: 10px;
+    color: #94a3b8;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    max-width: 130px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.project-tag i {
+    color: #64748b;
+}
+
+/* Selector inside card */
+.kanban-status-select {
+    width: auto;
+    padding: 3px 6px;
+    font-size: 11px;
+    background: rgba(15, 23, 42, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: #f8fafc;
+    border-radius: 6px;
+    cursor: pointer;
+    outline: none;
+    transition: all 0.2s;
+}
+
+.kanban-status-select:hover {
+    border-color: rgba(99, 102, 241, 0.5);
+    background: rgba(15, 23, 42, 0.9);
+}
+
+.kanban-status-select:focus {
+    border-color: #6366f1;
+}
+
+.fa-spin-slow {
+    animation: fa-spin 4s linear infinite;
+}
 
 /* ==========================================================================
    PRINT MEDIA DIRECTIVES
