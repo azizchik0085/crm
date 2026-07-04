@@ -154,10 +154,11 @@ def delete_supplier(id: str, request: Request):
 
 @router.get("/purchase-orders")
 def get_purchase_orders(request: Request):
-    from backend.main import supabase_req
-    orders = supabase_req("GET", "purchase_orders?deleted_at=is.null") or []
+    from backend.main import supabase_req, get_company_id
+    company_id = get_company_id(request)
+    orders = supabase_req("GET", "purchase_orders?deleted_at=is.null", company_id=company_id) or []
     # Join with supplier
-    suppliers = supabase_req("GET", "suppliers?deleted_at=is.null") or []
+    suppliers = supabase_req("GET", "suppliers?deleted_at=is.null", company_id=company_id) or []
     sup_map = {s["id"]: s["name"] for s in suppliers}
     for o in orders:
         supplier_id = o.get("supplier_id")

@@ -3613,13 +3613,15 @@ def create_regos_order(order_data: dict, request: Request):
                 
                 try:
                     # Save order details in local database so it shows up in the list
-                    local_order_id = f"regos_{new_id}"
+                    # Order ID MUST be a valid UUID
+                    local_order_id = str(uuid.uuid4())
                     total_amount = sum(float(item.get("quantity", 1)) * float(item.get("price", 0)) for item in items)
                     
-                    # Format notes with customer details
+                    # Format notes with customer details and REGOS Order ID
                     cust_notes = f"Mijoz: {order_data.get('customer_name', '')}"
                     if order_data.get("customer_phone"):
                         cust_notes += f" ({order_data.get('customer_phone')})"
+                    cust_notes += f" (REGOS #{new_id})"
                     
                     details = []
                     if order_data.get("delivery_address"):
@@ -3640,7 +3642,7 @@ def create_regos_order(order_data: dict, request: Request):
                     }
                     
                     # Insert order
-                    supabase_req("POST", "purchase_orders", json_data=local_order_data)
+                    supabase_req("POST", "purchase_orders", json_data=local_order_data, company_id=company_id)
                     
                     # Insert items
                     for item in items:
@@ -3651,7 +3653,7 @@ def create_regos_order(order_data: dict, request: Request):
                             "quantity": float(item.get("quantity", 1)),
                             "price": float(item.get("price", 0))
                         }
-                        supabase_req("POST", "purchase_items", json_data=local_item_data)
+                        supabase_req("POST", "purchase_items", json_data=local_item_data, company_id=company_id)
                 except Exception as db_err:
                     print(f"Failed to save REGOS order locally in DB: {db_err}")
                 
