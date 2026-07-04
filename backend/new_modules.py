@@ -182,7 +182,14 @@ def get_purchase_order_details(id: str, request: Request):
         from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="Buyurtma topilmadi")
     order = orders[0]
-    items = supabase_req("GET", f"purchase_items?purchase_order_id=eq.{id}", company_id=company_id) or []
+    raw_items = supabase_req("GET", f"purchase_order_items?purchase_order_id=eq.{id}", company_id=company_id) or []
+    items = []
+    for item in raw_items:
+        items.append({
+            "inventory_id": item.get("product_id"),
+            "quantity": item.get("quantity"),
+            "price": item.get("unit_cost")
+        })
     supplier = None
     if order.get("supplier_id"):
         suppliers = supabase_req("GET", f"suppliers?id=eq.{order.get('supplier_id')}", company_id=company_id) or []
@@ -222,16 +229,16 @@ def save_purchase_order(payload: PurchaseOrderModel, request: Request):
         action = "UPDATE"
         
     # Delete old items and save new
-    supabase_req("DELETE", f"purchase_items?purchase_order_id=eq.{order_id}")
+    supabase_req("DELETE", f"purchase_order_items?purchase_order_id=eq.{order_id}")
     for item in payload.items:
         item_data = {
             "id": str(uuid.uuid4()),
             "purchase_order_id": order_id,
-            "inventory_id": item.inventory_id,
+            "product_id": item.inventory_id,
             "quantity": item.quantity,
-            "price": item.price
+            "unit_cost": item.price
         }
-        supabase_req("POST", "purchase_items", json_data=item_data)
+        supabase_req("POST", "purchase_order_items", json_data=item_data)
         
     log_audit(request, action, "purchase_orders", order_id, None, order_data)
     return {"status": "success", "id": order_id}
@@ -258,7 +265,14 @@ def receive_goods(id: str, request: Request):
         return {"status": "already_received"}
         
     # Get items
-    items = supabase_req("GET", f"purchase_items?purchase_order_id=eq.{id}") or []
+    raw_items = supabase_req("GET", f"purchase_order_items?purchase_order_id=eq.{id}") or []
+    items = []
+    for item in raw_items:
+        items.append({
+            "inventory_id": item.get("product_id"),
+            "quantity": item.get("quantity"),
+            "price": item.get("unit_cost")
+        })
     
     # Update inventory stock
     for item in items:

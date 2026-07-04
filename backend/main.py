@@ -3653,7 +3653,7 @@ def create_regos_order(order_data: dict, request: Request):
                     else:
                         is_new_order = False
                         # Clean existing items
-                        supabase_req("DELETE", f"purchase_items?purchase_order_id=eq.{local_order_id}", company_id=company_id)
+                        supabase_req("DELETE", f"purchase_order_items?purchase_order_id=eq.{local_order_id}", company_id=company_id)
                     
                     local_order_data = {
                         "company_id": company_id,
@@ -3674,11 +3674,11 @@ def create_regos_order(order_data: dict, request: Request):
                         local_item_data = {
                             "id": str(uuid.uuid4()),
                             "purchase_order_id": local_order_id,
-                            "inventory_id": item.get("product_id"),
+                            "product_id": item.get("product_id"),
                             "quantity": float(item.get("quantity", 1)),
-                            "price": float(item.get("price", 0))
+                            "unit_cost": float(item.get("price", 0))
                         }
-                        supabase_req("POST", "purchase_items", json_data=local_item_data, company_id=company_id)
+                        supabase_req("POST", "purchase_order_items", json_data=local_item_data, company_id=company_id)
                 except Exception as db_err:
                     print(f"Failed to save REGOS order locally in DB: {db_err}")
                 
