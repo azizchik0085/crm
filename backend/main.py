@@ -4160,9 +4160,25 @@ def run_amocrm_sync_background(subdomain, token, company_id: str = None):
             
     try:
         if synced_customers:
+            # Deduplicate by id before batch upsert to prevent Postgres duplicate key errors in a single transaction
+            unique_customers = {}
+            for cust in synced_customers:
+                c_id = cust["id"]
+                if c_id not in unique_customers:
+                    unique_customers[c_id] = cust
+                else:
+                    existing = unique_customers[c_id]
+                    # Keep the one with active status
+                    if existing["status"] in ["lost", "won"] and cust["status"] not in ["lost", "won"]:
+                        unique_customers[c_id] = cust
+                    elif cust["value"] > existing["value"]:
+                        existing["value"] = cust["value"]
+            synced_customers = list(unique_customers.values())
+
             chunk_size = 100
             for i in range(0, len(synced_customers), chunk_size):
                 chunk = synced_customers[i:i + chunk_size]
+                supabase_req("POST", "customers?on_conflict=id", json_data=chunk)
                 supabase_req("POST", "customers?on_conflict=id", json_data=chunk)
             print(f"amoCRM Background Sync: successfully synced {len(synced_customers)} active customers to database.")
         else:
