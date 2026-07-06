@@ -2,7 +2,7 @@ import os
 import time
 import json
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from contextvars import ContextVar
 import requests
 from fastapi import FastAPI, HTTPException, Request
@@ -426,7 +426,6 @@ sales_report_cache = load_sales_report_cache()
 def get_regos_sales_report(request: Request, start_date: int = None, end_date: int = None):
     import base64
     import gzip
-    from datetime import timezone, timedelta
     
     company_id = get_company_id(request)
     settings = get_company_settings(company_id, bypass_cache=True) if company_id else settings_state
@@ -3075,7 +3074,6 @@ def run_sync_in_background(days: int = None, sync_date: str = None, company_id: 
         cheques_list = []
         
         if sync_date:
-            from datetime import timezone, timedelta
             local_tz = timezone(timedelta(hours=5))
             dt = datetime.strptime(sync_date, "%Y-%m-%d")
             start_of_day = datetime(dt.year, dt.month, dt.day, 0, 0, 0, tzinfo=local_tz)
