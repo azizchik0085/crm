@@ -4296,7 +4296,140 @@ def create_amocrm_deals_for_receipts(receipts, company_id, force=False):
             try:
                 lead_res = requests.post(lead_url, headers=headers, json=lead_payload, timeout=10)
                 if lead_res.status_code in [200, 201]:
-                    print(f"amoCRM Lead Creation: Successfully created lead for receipt {code} (amount: {total_amount})")
+                    lead_data = lead_res.json()
+                    created_leads = lead_data.get("_embedded", {}).get("leads", [])
+                    if created_leads:
+                        lead_id = created_leads[0].get("id")
+                        print(f"amoCRM Lead Creation: Successfully created lead {lead_id} for receipt {code} (amount: {total_amount})")
+                        
+                        # Dynamic Invoices creation and linking
+                        try:
+                            # 1. Discover invoices catalog ID
+                            catalogs_res = requests.get(f"https://{subdomain}.amocrm.ru/api/v4/catalogs", headers=headers, timeout=10)
+                            invoices_catalog_id = None
+                            if catalogs_res.status_code == 200:
+                                catalogs = catalogs_res.json().get("_embedded", {}).get("catalogs", [])
+                                for c in catalogs:
+                                    if c.get("type") == "invoices":
+                                        invoices_catalog_id = c.get("id")
+                                        break
+                                        
+                            if invoices_catalog_id:
+                                # 2. Discover paid status enum ID
+                                cf_res = requests.get(f"https://{subdomain}.amocrm.ru/api/v4/catalogs/{invoices_catalog_id}/custom_fields", headers=headers, timeout=10)
+                                paid_enum_id = None
+                                if cf_res.status_code == 200:
+                                    fields = cf_res.json().get("_embedded", {}).get("custom_fields", [])
+                                    for f in fields:
+                                        if f.get("code") == "BILL_STATUS":
+                                            enums = f.get("enums") or []
+                                            for e in enums:
+                                                if e.get("code") == "paid" or e.get("value") in ["TO'LANDI", "Оплачено"]:
+                                                    paid_enum_id = e.get("id")
+                                                    break
+                                            break
+                                            
+                                # 3. Construct products (ITEMS) list from receipt products
+                                receipt_products = items.get("products") or []
+                                invoice_items = []
+                                for p in receipt_products:
+                                    invoice_items.append({
+                                        "value": {
+                                            "sku": str(p.get("sku") or ""),
+                                            "description": p.get("name") or "Mahsulot",
+                                            "unit_price": float(p.get("price") or 0),
+                                            "quantity": float(p.get("quantity") or 1)
+                                        }
+                                    })
+                                    
+                                if not invoice_items:
+                                    invoice_items.append({
+                                        "value": {
+                                            "sku": "",
+                                            "description": f"Buyurtma (REGOS: {code})",
+                                            "unit_price": float(total_amount),
+                                            "quantity": 1.0
+                                        }
+                                    })
+                                    
+                                # 4. Create Invoice Element
+                                element_payload = [
+                                    {
+                                        "name": f"REGOS: {code}",
+                                        "custom_fields_values": [
+                                            {
+                                                "field_code": "BILL_PRICE",
+                                                "values": [
+                                                    {
+                                                        "value": str(int(total_amount))
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "field_code": "PAYER",
+                                                "values": [
+                                                    {
+                                                        "value": {
+                                                            "name": cust_name or "Mijoz",
+                                                            "entity_type": "contacts",
+                                                            "entity_id": contact_id,
+                                                            "phone": clean_phone
+                                                        }
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "field_code": "BILL_COMMENT",
+                                                "values": [
+                                                    {
+                                                        "value": "REGOS orqali avtomatik yuborildi"
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "field_code": "ITEMS",
+                                                "values": invoice_items
+                                            }
+                                        ]
+                                    }
+                                ]
+                                
+                                if paid_enum_id:
+                                    element_payload[0]["custom_fields_values"].append({
+                                        "field_code": "BILL_STATUS",
+                                        "values": [
+                                            {
+                                                "enum_id": paid_enum_id
+                                            }
+                                        ]
+                                    })
+                                    
+                                element_res = requests.post(f"https://{subdomain}.amocrm.ru/api/v4/catalogs/{invoices_catalog_id}/elements", headers=headers, json=element_payload, timeout=10)
+                                if element_res.status_code in [200, 201]:
+                                    created_elements = element_res.json().get("_embedded", {}).get("elements", [])
+                                    if created_elements:
+                                        element_id = created_elements[0].get("id")
+                                        print(f"amoCRM Invoice Creation: Successfully created invoice element {element_id} for lead {lead_id}")
+                                        
+                                        # 5. Link Invoice to Lead
+                                        link_payload = [
+                                            {
+                                                "to_entity_id": element_id,
+                                                "to_entity_type": "catalog_elements",
+                                                "metadata": {
+                                                    "catalog_id": invoices_catalog_id
+                                                }
+                                            }
+                                        ]
+                                        link_res = requests.post(f"https://{subdomain}.amocrm.ru/api/v4/leads/{lead_id}/link", headers=headers, json=link_payload, timeout=10)
+                                        if link_res.status_code in [200, 201]:
+                                            print(f"amoCRM Invoice Linking: Successfully linked invoice {element_id} to lead {lead_id}")
+                                        else:
+                                            print(f"amoCRM Invoice Linking failed: {link_res.text}")
+                                else:
+                                    print(f"amoCRM Invoice Creation failed: {element_res.text}")
+                        except Exception as e_invoice:
+                            print(f"amoCRM Invoice processing exception: {e_invoice}")
                 else:
                     print(f"amoCRM Lead Creation: Failed to create lead (status: {lead_res.status_code}), response: {lead_res.text}")
             except Exception as e_lead:
