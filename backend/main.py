@@ -4050,6 +4050,7 @@ def get_amocrm_contacts_map(subdomain, token):
                 for c in contacts:
                     c_id = c.get("id")
                     c_name = c.get("name", "")
+                    c_resp_id = c.get("responsible_user_id")
                     phone = ""
                     cf_values = c.get("custom_fields_values") or []
                     for cf in cf_values:
@@ -4060,7 +4061,8 @@ def get_amocrm_contacts_map(subdomain, token):
                                 break
                     contact_map[c_id] = {
                         "name": c_name,
-                        "phone": phone
+                        "phone": phone,
+                        "responsible_user_id": c_resp_id
                     }
                 
                 links = data.get("_links", {})
@@ -4113,18 +4115,25 @@ def run_amocrm_sync_background(subdomain, token, company_id: str = None):
                     #     continue
                         
                     contacts_list = l.get("_embedded", {}).get("contacts", [])
+                    if not contacts_list:
+                        continue
+                        
+                    c_id = contacts_list[0].get("id")
                     cust_name = lead_name
                     phone = ""
-                    
-                    if contacts_list:
-                        c_id = contacts_list[0].get("id")
-                        if c_id in contact_map:
-                            phone = contact_map[c_id]["phone"]
-                            cust_name = contact_map[c_id]["name"]
+                    if c_id in contact_map:
+                        phone = contact_map[c_id]["phone"]
+                        cust_name = contact_map[c_id]["name"]
+                        c_resp_id = contact_map[c_id].get("responsible_user_id")
+                        if c_resp_id:
+                            operator_name = user_map.get(c_resp_id, operator_name)
                     
                     clean_phone = "".join(c for c in phone if c.isdigit() or c == "+") if phone else ""
+                    if not clean_phone:
+                        continue
+                        
                     customer = {
-                        "id": f"amocrm_{lead_id}",
+                        "id": f"amocrm_{c_id}",
                         "name": cust_name,
                         "phone": clean_phone,
                         "operator": operator_name,
@@ -4555,6 +4564,7 @@ async def amocrm_webhook(request: Request):
                     contacts_list = lead.get("_embedded", {}).get("contacts", [])
                     cust_name = lead.get("name")
                     phone = ""
+                    c_id = None
                     
                     if contacts_list:
                         c_id = contacts_list[0].get("id")
@@ -4562,11 +4572,14 @@ async def amocrm_webhook(request: Request):
                         if contact:
                             cust_name = contact.get("name")
                             phone = extract_phone_from_contact(contact)
+                            c_resp_id = contact.get("responsible_user_id")
+                            if c_resp_id:
+                                operator_name = user_map.get(c_resp_id, operator_name)
                             
-                    if phone:
+                    if phone and c_id:
                         clean_phone = "".join(c for c in phone if c.isdigit() or c == "+")
                         customer = {
-                            "id": f"amocrm_{lead_id}",
+                            "id": f"amocrm_{c_id}",
                             "name": cust_name,
                             "phone": clean_phone,
                             "operator": operator_name,
