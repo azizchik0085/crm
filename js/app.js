@@ -636,7 +636,7 @@ window.App = {
             let allowedViews = ['dashboard'];
             
             if (activeUserId === 'admin') {
-                allowedViews = ['dashboard', 'crm', 'telephony', 'erp', 'finance', 'chats', 'hr', 'settings', 'receipts', 'seniklar', 'kassa', 'procurement', 'tasks', 'marketing', 'service', 'documents', 'audit'];
+                allowedViews = ['dashboard', 'crm', 'telephony', 'erp', 'finance', 'chats', 'hr', 'settings', 'receipts', 'seniklar', 'kassa', 'procurement', 'tasks', 'marketing', 'service', 'documents', 'audit', 'reports'];
             } else if (foundRole && foundRole.permissions) {
                 allowedViews = ['dashboard', ...foundRole.permissions];
             } else {
@@ -648,13 +648,13 @@ window.App = {
                 const isHR = activeRoleName.includes('hr') || activeRoleName.includes('kadr') || activeRoleName.includes('recruiter');
                 
                 if (isSupervisor) {
-                    allowedViews = ['dashboard', 'crm', 'telephony', 'erp', 'finance', 'chats', 'hr', 'settings', 'receipts', 'seniklar', 'kassa', 'procurement', 'tasks', 'marketing', 'service', 'documents', 'audit'];
+                    allowedViews = ['dashboard', 'crm', 'telephony', 'erp', 'finance', 'chats', 'hr', 'settings', 'receipts', 'seniklar', 'kassa', 'procurement', 'tasks', 'marketing', 'service', 'documents', 'audit', 'reports'];
                 } else if (isSales) {
-                    allowedViews = ['dashboard', 'crm', 'telephony', 'chats', 'erp', 'receipts', 'seniklar', 'kassa'];
+                    allowedViews = ['dashboard', 'crm', 'telephony', 'chats', 'erp', 'receipts', 'seniklar', 'kassa', 'reports'];
                 } else if (isWarehouse) {
                     allowedViews = ['dashboard', 'erp', 'receipts', 'seniklar', 'kassa'];
                 } else if (isAccountant) {
-                    allowedViews = ['dashboard', 'finance', 'erp', 'receipts', 'seniklar', 'kassa'];
+                    allowedViews = ['dashboard', 'finance', 'erp', 'receipts', 'seniklar', 'kassa', 'reports'];
                 } else if (isHR) {
                     allowedViews = ['dashboard', 'hr'];
                 } else {
@@ -1041,6 +1041,8 @@ window.App = {
             if (window.HR) window.HR.init();
         } else if (viewName === 'finance') {
             window.Finance.init();
+        } else if (viewName === 'reports') {
+            if (window.Reports) window.Reports.init();
         } else if (viewName === 'receipts') {
             if (window.Receipts) window.Receipts.init();
         } else if (viewName === 'seniklar') {

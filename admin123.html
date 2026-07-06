@@ -95,6 +95,9 @@
                     <li class="nav-item" data-view="finance">
                         <a href="#" data-view="finance"><i class="fas fa-wallet"></i> Moliya</a>
                     </li>
+                    <li class="nav-item" data-view="reports">
+                        <a href="#" data-view="reports"><i class="fas fa-chart-line"></i> Hisobotlar</a>
+                    </li>
                     <li class="nav-item" data-view="receipts">
                         <a href="#" data-view="receipts"><i class="fas fa-receipt"></i> Cheklar</a>
                     </li>
@@ -544,6 +547,49 @@
 
                 <div id="receipts-content">
                     <!-- Dinamik cheklar ro'yxati -->
+                </div>
+            </section>
+
+            <!-- 7.6. HISOBOTLAR BO'LIMI -->
+            <section id="view-reports" class="view-section">
+                <div class="header" style="justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+                    <div class="header-title">
+                        <h1>Sotuvlar va Analitika Hisoboti</h1>
+                        <p>Kompaniyaning moliyaviy, sotuv va operatorlar bo'yicha hisobotlari</p>
+                    </div>
+                    
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        <button class="btn btn-secondary btn-sm" id="rep-preset-today">Bugun</button>
+                        <button class="btn btn-secondary btn-sm" id="rep-preset-week">Oxirgi 7 kun</button>
+                        <button class="btn btn-secondary btn-sm" id="rep-preset-month">Shu oy</button>
+                        <button class="btn btn-secondary btn-sm" id="rep-preset-prev-month">O'tgan oy</button>
+                    </div>
+                </div>
+
+                <div class="card" style="margin-top: 16px; padding: 16px; display: flex; gap: 16px; align-items: center; flex-wrap: wrap; justify-content: space-between;">
+                    <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                        <div style="display: flex; flex-direction: column; gap: 4px;">
+                            <label style="font-size: 11px; color: var(--text-muted); font-weight: 500;">Boshlanish sanasi:</label>
+                            <input type="date" id="reports-date-start" class="form-control" style="height: 38px; width: 150px; font-family: 'JetBrains Mono';">
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 4px;">
+                            <label style="font-size: 11px; color: var(--text-muted); font-weight: 500;">Tugash sanasi:</label>
+                            <input type="date" id="reports-date-end" class="form-control" style="height: 38px; width: 150px; font-family: 'JetBrains Mono';">
+                        </div>
+                        <button class="btn btn-primary" id="reports-filter-submit" style="height: 38px; margin-top: 19px; display: flex; align-items: center; gap: 8px;">
+                            <i class="fas fa-filter"></i> Saralash
+                        </button>
+                    </div>
+
+                    <div style="display: flex; gap: 8px; margin-top: 10px;">
+                        <button class="btn btn-primary" id="rep-tab-sales" style="height: 38px;"><i class="fas fa-chart-line"></i> Grafik</button>
+                        <button class="btn btn-secondary" id="rep-tab-employees" style="height: 38px;"><i class="fas fa-user-friends"></i> Xodimlar (REGOS)</button>
+                        <button class="btn btn-secondary" id="rep-tab-operators" style="height: 38px;"><i class="fas fa-headset"></i> Operatorlar (CRM)</button>
+                    </div>
+                </div>
+
+                <div id="reports-content-container">
+                    <!-- Dinamik hisobotlar mazmuni -->
                 </div>
             </section>
 
@@ -1824,6 +1870,7 @@ CREATE TABLE IF NOT EXISTS public.messages (
     <!-- JsBarcode Library -->
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
     <script src="js/seniklar.js?v=6"></script>
+    <script src="js/reports.js?v=1"></script>
     <script>
         window.IS_SUPERADMIN_PORTAL = true;
         
