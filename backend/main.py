@@ -4315,9 +4315,11 @@ def create_amocrm_deals_for_receipts(receipts, company_id, force=False):
                                         break
                                         
                             if invoices_catalog_id:
-                                # 2. Discover paid status enum ID
+                                # 2. Discover paid status enum ID and operator field mapping
                                 cf_res = requests.get(f"https://{subdomain}.amocrm.ru/api/v4/catalogs/{invoices_catalog_id}/custom_fields", headers=headers, timeout=10)
                                 paid_enum_id = None
+                                operator_field_id = None
+                                operator_enum_id = None
                                 if cf_res.status_code == 200:
                                     fields = cf_res.json().get("_embedded", {}).get("custom_fields", [])
                                     for f in fields:
@@ -4327,7 +4329,18 @@ def create_amocrm_deals_for_receipts(receipts, company_id, force=False):
                                                 if e.get("code") == "paid" or e.get("value") in ["TO'LANDI", "Оплачено"]:
                                                     paid_enum_id = e.get("id")
                                                     break
-                                            break
+                                        
+                                        # Match "sotuv operatori" custom field dynamically by name
+                                        if f.get("name") and f.get("name").strip().lower() == "sotuv operatori":
+                                            operator_field_id = f.get("id")
+                                            if operator_name:
+                                                enums = f.get("enums") or []
+                                                for e in enums:
+                                                    e_val = e.get("value", "").strip().lower()
+                                                    op_val = operator_name.strip().lower()
+                                                    if e_val == op_val or e_val in op_val or op_val in e_val:
+                                                        operator_enum_id = e.get("id")
+                                                        break
                                             
                                 # 3. Construct products (ITEMS) list from receipt products
                                 receipt_products = items.get("products") or []
@@ -4400,6 +4413,16 @@ def create_amocrm_deals_for_receipts(receipts, company_id, force=False):
                                         "values": [
                                             {
                                                 "enum_id": paid_enum_id
+                                            }
+                                        ]
+                                    })
+                                    
+                                if operator_field_id and operator_enum_id:
+                                    element_payload[0]["custom_fields_values"].append({
+                                        "field_id": operator_field_id,
+                                        "values": [
+                                            {
+                                                "enum_id": operator_enum_id
                                             }
                                         ]
                                     })
