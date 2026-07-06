@@ -4204,6 +4204,38 @@ def create_amocrm_deals_for_receipts(receipts, company_id, force=False):
                 clean_ph = "".join(char for char in ph if char.isdigit() or char == "+")
                 phone_to_operator[clean_ph] = op
                 
+        # Discover invoices catalog ID, paid status enum ID, and operator field mapping once
+        invoices_catalog_id = None
+        paid_enum_id = None
+        operator_field_id = None
+        operator_enums = []
+        try:
+            catalogs_res = requests.get(f"https://{subdomain}.amocrm.ru/api/v4/catalogs", headers=headers, timeout=10)
+            if catalogs_res.status_code == 200:
+                catalogs = catalogs_res.json().get("_embedded", {}).get("catalogs", [])
+                for c in catalogs:
+                    if c.get("type") == "invoices":
+                        invoices_catalog_id = c.get("id")
+                        break
+                        
+            if invoices_catalog_id:
+                cf_res = requests.get(f"https://{subdomain}.amocrm.ru/api/v4/catalogs/{invoices_catalog_id}/custom_fields", headers=headers, timeout=10)
+                if cf_res.status_code == 200:
+                    fields = cf_res.json().get("_embedded", {}).get("custom_fields", [])
+                    for f in fields:
+                        if f.get("code") == "BILL_STATUS":
+                            enums = f.get("enums") or []
+                            for e in enums:
+                                if e.get("code") == "paid" or e.get("value") in ["TO'LANDI", "Оплачено"]:
+                                    paid_enum_id = e.get("id")
+                                    break
+                                    
+                        if f.get("name") and f.get("name").strip().lower() == "sotuv operatori":
+                            operator_field_id = f.get("id")
+                            operator_enums = f.get("enums") or []
+        except Exception as e_discovery:
+            print(f"amoCRM Lead Creation: Error during catalog discovery: {e_discovery}")
+
         for r in receipts:
             items = r.get("items") or {}
             if isinstance(items, str):
@@ -4325,43 +4357,16 @@ def create_amocrm_deals_for_receipts(receipts, company_id, force=False):
                         
                         # Dynamic Invoices creation and linking
                         try:
-                            # 1. Discover invoices catalog ID
-                            catalogs_res = requests.get(f"https://{subdomain}.amocrm.ru/api/v4/catalogs", headers=headers, timeout=10)
-                            invoices_catalog_id = None
-                            if catalogs_res.status_code == 200:
-                                catalogs = catalogs_res.json().get("_embedded", {}).get("catalogs", [])
-                                for c in catalogs:
-                                    if c.get("type") == "invoices":
-                                        invoices_catalog_id = c.get("id")
-                                        break
-                                        
                             if invoices_catalog_id:
-                                # 2. Discover paid status enum ID and operator field mapping
-                                cf_res = requests.get(f"https://{subdomain}.amocrm.ru/api/v4/catalogs/{invoices_catalog_id}/custom_fields", headers=headers, timeout=10)
-                                paid_enum_id = None
-                                operator_field_id = None
+                                # Find matching operator enum ID from pre-fetched list
                                 operator_enum_id = None
-                                if cf_res.status_code == 200:
-                                    fields = cf_res.json().get("_embedded", {}).get("custom_fields", [])
-                                    for f in fields:
-                                        if f.get("code") == "BILL_STATUS":
-                                            enums = f.get("enums") or []
-                                            for e in enums:
-                                                if e.get("code") == "paid" or e.get("value") in ["TO'LANDI", "Оплачено"]:
-                                                    paid_enum_id = e.get("id")
-                                                    break
-                                        
-                                        # Match "sotuv operatori" custom field dynamically by name
-                                        if f.get("name") and f.get("name").strip().lower() == "sotuv operatori":
-                                            operator_field_id = f.get("id")
-                                            if operator_name:
-                                                enums = f.get("enums") or []
-                                                for e in enums:
-                                                    e_val = e.get("value", "").strip().lower()
-                                                    op_val = operator_name.strip().lower()
-                                                    if e_val == op_val or e_val in op_val or op_val in e_val:
-                                                        operator_enum_id = e.get("id")
-                                                        break
+                                if operator_field_id and operator_name:
+                                    for e in operator_enums:
+                                        e_val = e.get("value", "").strip().lower()
+                                        op_val = operator_name.strip().lower()
+                                        if e_val == op_val or e_val in op_val or op_val in e_val:
+                                            operator_enum_id = e.get("id")
+                                            break
                                             
                                 # 3. Construct products (ITEMS) list from receipt products
                                 receipt_products = items.get("products") or []
@@ -4571,7 +4576,7 @@ def read_admin():
     raise HTTPException(status_code=404, detail="Admin index file not found")
 
 @app.post("/api/integration/amocrm/push-receipts")
-def push_receipts_to_amocrm_endpoint(payload: dict, request: Request):
+def push_receipts_to_amocrm_endpoint(payload: dict, background_tasks: BackgroundTasks, request: Request):
     company_id = get_company_id(request)
     receipt_ids = payload.get("receipt_ids") or []
     if not receipt_ids:
@@ -4593,8 +4598,8 @@ def push_receipts_to_amocrm_endpoint(payload: dict, request: Request):
         if not receipts:
             return {"status": "success", "message": "Yuborish uchun ma'lumotlar topilmadi."}
             
-        create_amocrm_deals_for_receipts(receipts, company_id, force=True)
-        return {"status": "success", "message": f"Muvaffaqiyatli yakunlandi: {len(receipts)} ta chek amoCRM-ga buyurtma sifatida yuborildi."}
+        background_tasks.add_task(create_amocrm_deals_for_receipts, receipts, company_id, True)
+        return {"status": "success", "message": f"{len(receipts)} ta chekni yuborish orqa fonda boshlandi."}
     except Exception as e:
         print(f"Manual Push Receipts: Error: {e}")
         raise HTTPException(status_code=500, detail=f"Tizim xatoligi yuz berdi: {str(e)}")
