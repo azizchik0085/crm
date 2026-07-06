@@ -10,7 +10,7 @@ window.Receipts = {
     },
 
     setupEventListeners: function() {
-        const inputs = ['receipts-search', 'receipts-search-seller', 'receipts-search-phone'];
+        const inputs = ['receipts-search', 'receipts-search-seller', 'receipts-search-phone', 'receipts-search-operator'];
         let debounceTimer;
         inputs.forEach(id => {
             const input = document.getElementById(id);
@@ -29,6 +29,7 @@ window.Receipts = {
         const searchVal = document.getElementById('receipts-search')?.value.toLowerCase() || '';
         const sellerVal = document.getElementById('receipts-search-seller')?.value.toLowerCase() || '';
         const phoneVal = document.getElementById('receipts-search-phone')?.value.replace(/\D/g, '') || '';
+        const operatorVal = document.getElementById('receipts-search-operator')?.value.toLowerCase() || '';
         const container = document.getElementById('receipts-content');
         if (!container) return;
 
@@ -108,10 +109,12 @@ window.Receipts = {
                 let customerPhone = '';
                 let sellerNorm = '';
                 let productsNorm = '';
+                let operatorNorm = '';
 
                 if (itemsObj && !Array.isArray(itemsObj) && typeof itemsObj === 'object') {
-                    if (itemsObj.customer_name) {
-                        customerNameNorm = window.normalizeUzbek ? window.normalizeUzbek(itemsObj.customer_name) : itemsObj.customer_name.toLowerCase();
+                    const cName = itemsObj.customer_name || '';
+                    if (cName) {
+                        customerNameNorm = window.normalizeUzbek ? window.normalizeUzbek(cName) : cName.toLowerCase();
                     }
                     if (itemsObj.customer_phone) {
                         customerPhone = itemsObj.customer_phone;
@@ -122,6 +125,39 @@ window.Receipts = {
                     if (Array.isArray(itemsObj.products)) {
                         const names = itemsObj.products.map(p => p.name || '').join(' ').toLowerCase();
                         productsNorm = window.normalizeUzbek ? window.normalizeUzbek(names) : names;
+                    }
+
+                    // Resolve matched customer operator
+                    let matchedCustomer = null;
+                    if (customerPhone) {
+                        const cleanRecPhone = customerPhone.replace(/\D/g, '').slice(-9);
+                        if (cleanRecPhone.length >= 7) {
+                            matchedCustomer = customers.find(c => {
+                                const phoneClean = c.phone ? c.phone.replace(/\D/g, '').slice(-9) : '';
+                                const phone2Clean = c.phone2 ? c.phone2.replace(/\D/g, '').slice(-9) : '';
+                                return (phoneClean && phoneClean === cleanRecPhone) || (phone2Clean && phone2Clean === cleanRecPhone);
+                            });
+                        }
+                    }
+                    
+                    if (!matchedCustomer && cName) {
+                        const cleanRecName = cName.trim().toLowerCase();
+                        if (cleanRecName && cleanRecName !== 'mijoz' && cleanRecName !== 'noma\'lum') {
+                            matchedCustomer = customers.find(c => {
+                                const cNameClean = c.name ? c.name.trim().toLowerCase() : '';
+                                return cNameClean && cNameClean === cleanRecName;
+                            });
+                            if (!matchedCustomer) {
+                                matchedCustomer = customers.find(c => {
+                                    const cNameClean = c.name ? c.name.trim().toLowerCase() : '';
+                                    return cNameClean && (cNameClean.includes(cleanRecName) || cleanRecName.includes(cNameClean));
+                                });
+                            }
+                        }
+                    }
+
+                    if (matchedCustomer && matchedCustomer.operator) {
+                        operatorNorm = window.normalizeUzbek ? window.normalizeUzbek(matchedCustomer.operator) : matchedCustomer.operator.toLowerCase();
                     }
                 }
 
@@ -143,6 +179,7 @@ window.Receipts = {
                        customerNameNorm.includes(searchValNorm) ||
                        sellerNorm.includes(searchValNorm) ||
                        productsNorm.includes(searchValNorm) ||
+                       operatorNorm.includes(searchValNorm) ||
                        phoneMatches;
             });
         }
@@ -183,6 +220,58 @@ window.Receipts = {
                 }
                 const cleanCustPhone = customerPhone.replace(/\D/g, '');
                 return cleanCustPhone.includes(phoneVal);
+            });
+        }
+
+        if (operatorVal) {
+            const opValNorm = window.normalizeUzbek ? window.normalizeUzbek(operatorVal) : operatorVal.toLowerCase();
+            filtered = filtered.filter(r => {
+                let itemsObj = r.items;
+                if (typeof itemsObj === 'string') {
+                    try {
+                        itemsObj = JSON.parse(itemsObj);
+                    } catch (e) {
+                        itemsObj = null;
+                    }
+                }
+                let cName = '';
+                let cPhone = '';
+                if (itemsObj && !Array.isArray(itemsObj) && typeof itemsObj === 'object') {
+                    cName = itemsObj.customer_name || '';
+                    cPhone = itemsObj.customer_phone || '';
+                }
+                
+                let matchedCustomer = null;
+                if (cPhone) {
+                    const cleanRecPhone = cPhone.replace(/\D/g, '').slice(-9);
+                    if (cleanRecPhone.length >= 7) {
+                        matchedCustomer = customers.find(c => {
+                            const phoneClean = c.phone ? c.phone.replace(/\D/g, '').slice(-9) : '';
+                            const phone2Clean = c.phone2 ? c.phone2.replace(/\D/g, '').slice(-9) : '';
+                            return (phoneClean && phoneClean === cleanRecPhone) || (phone2Clean && phone2Clean === cleanRecPhone);
+                        });
+                    }
+                }
+                
+                if (!matchedCustomer && cName) {
+                    const cleanRecName = cName.trim().toLowerCase();
+                    if (cleanRecName && cleanRecName !== 'mijoz' && cleanRecName !== 'noma\'lum') {
+                        matchedCustomer = customers.find(c => {
+                            const cNameClean = c.name ? c.name.trim().toLowerCase() : '';
+                            return cNameClean && cNameClean === cleanRecName;
+                        });
+                        if (!matchedCustomer) {
+                            matchedCustomer = customers.find(c => {
+                                const cNameClean = c.name ? c.name.trim().toLowerCase() : '';
+                                return cNameClean && (cNameClean.includes(cleanRecName) || cleanRecName.includes(cNameClean));
+                            });
+                        }
+                    }
+                }
+                
+                const operatorName = matchedCustomer ? (matchedCustomer.operator || '') : '';
+                const operatorNorm = window.normalizeUzbek ? window.normalizeUzbek(operatorName) : operatorName.toLowerCase();
+                return operatorNorm.includes(opValNorm);
             });
         }
 
