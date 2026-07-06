@@ -1715,12 +1715,24 @@ CREATE TABLE IF NOT EXISTS public.messages (
                                 <span style="font-size: 11px; color: var(--text-muted);">O'zingiz istagan kunlar sonini kiritish</span>
                             </div>
                         </label>
+                        <label class="sync-option-label" style="display: flex; align-items: center; gap: 12px; padding: 12px; border: 1px solid var(--border-color); border-radius: 8px; cursor: pointer; transition: all 0.2s;">
+                            <input type="radio" name="sync-days-option" value="date" onchange="Receipts.toggleCustomDaysInput()" style="cursor: pointer; width: 18px; height: 18px; accent-color: var(--accent);">
+                            <div style="display: flex; flex-direction: column; width: 100%;">
+                                <span style="font-size: 13px; font-weight: 600; color: var(--text-main);">Kalendardan kun belgilash</span>
+                                <span style="font-size: 11px; color: var(--text-muted);">Tanlangan aniq bir kun cheklarini sinxronizatsiya qilish</span>
+                            </div>
+                        </label>
                     </div>
                 </div>
                 
                 <div id="sync-custom-days-container" style="display: none; flex-direction: column; gap: 6px;">
                     <label for="sync-custom-days-input" style="font-size: 12px; font-weight: 500; color: var(--text-main);">Kunlar sonini kiriting:</label>
                     <input type="number" id="sync-custom-days-input" class="form-control" min="1" max="365" value="7" style="height: 38px; font-family: 'JetBrains Mono';">
+                </div>
+                
+                <div id="sync-custom-date-container" style="display: none; flex-direction: column; gap: 6px;">
+                    <label for="sync-custom-date-input" style="font-size: 12px; font-weight: 500; color: var(--text-main);">Sana tanlang:</label>
+                    <input type="date" id="sync-custom-date-input" class="form-control" style="height: 38px; font-family: 'JetBrains Mono';">
                 </div>
             </div>
             <div class="modal-footer" style="border-top: 1px solid var(--border-color); padding-top: 14px; display: flex; gap: 12px; justify-content: flex-end;">

@@ -3033,7 +3033,7 @@ def save_parsed_receipt(cheque: dict, company_id: str = None):
 # Global state for tracking REGOS synchronization progress
 sync_progress = {"running": False, "processed": 0, "total": 0, "message": ""}
 
-def run_sync_in_background(days: int, company_id: str = None):
+def run_sync_in_background(days: int = None, sync_date: str = None, company_id: str = None):
     global sync_progress
     if sync_progress["running"]:
         print("Sync is already running. Skipping.")
@@ -3070,18 +3070,17 @@ def run_sync_in_background(days: int, company_id: str = None):
             "Content-Type": "application/json"
         }
         
-        # 1. Fetch closed receipts from the cloud in sequential chunks
         now_ts = int(time.time())
-        chunk_days = 30
-        chunks_count = (days + chunk_days - 1) // chunk_days
         cheques_list = []
         
-        days_remaining = days
-        i = 0
-        while days_remaining > 0:
-            current_chunk_days = min(chunk_days, days_remaining)
-            start_ts = now_ts - ((i * chunk_days + current_chunk_days) * 24 * 3600)
-            end_ts = now_ts - (i * chunk_days * 24 * 3600)
+        if sync_date:
+            from datetime import timezone, timedelta
+            local_tz = timezone(timedelta(hours=5))
+            dt = datetime.strptime(sync_date, "%Y-%m-%d")
+            start_of_day = datetime(dt.year, dt.month, dt.day, 0, 0, 0, tzinfo=local_tz)
+            end_of_day = datetime(dt.year, dt.month, dt.day, 23, 59, 59, tzinfo=local_tz)
+            start_ts = int(start_of_day.timestamp())
+            end_ts = int(end_of_day.timestamp())
             
             payload = {
                 "start_date": start_ts,
@@ -3089,45 +3088,90 @@ def run_sync_in_background(days: int, company_id: str = None):
                 "statuses": ["Closed"]
             }
             
-            start_date_str = datetime.fromtimestamp(start_ts).strftime('%Y-%m-%d')
-            end_date_str = datetime.fromtimestamp(end_ts).strftime('%Y-%m-%d')
-            sync_progress["message"] = f"Cheklar ro'yxati olinmoqda: {start_date_str} dan {end_date_str} gacha ({i+1}/{chunks_count} qism)..."
-            print(f"Background Sync: fetching chunk {i+1}/{chunks_count} ({start_date_str} to {end_date_str})")
-            
+            sync_progress["message"] = f"Cheklar ro'yxati olinmoqda: {sync_date} kuni uchun..."
+            print(f"Background Sync: fetching specific date {sync_date}")
             try:
                 response = requests.post(cloud_url, headers=regos_headers, json=payload, timeout=30)
                 if response.status_code == 200:
                     resp_data = response.json()
                     if isinstance(resp_data, dict) and not resp_data.get("ok"):
-                        print(f"REGOS Cloud API returned error for chunk {i+1}: {resp_data.get('result')}")
-                        days_remaining -= current_chunk_days
-                        i += 1
-                        continue
-                        
-                    chunk_cheques = []
-                    if isinstance(resp_data, list):
-                        chunk_cheques = resp_data
-                    elif isinstance(resp_data, dict):
-                        for key in ["result", "cheques", "data", "list"]:
-                            if key in resp_data and isinstance(resp_data[key], list):
-                                chunk_cheques = resp_data[key]
-                                break
-                        else:
-                            for val in resp_data.values():
-                                if isinstance(val, list):
-                                    chunk_cheques = val
+                        print(f"REGOS Cloud API returned error: {resp_data.get('result')}")
+                    else:
+                        chunk_cheques = []
+                        if isinstance(resp_data, list):
+                            chunk_cheques = resp_data
+                        elif isinstance(resp_data, dict):
+                            for key in ["result", "cheques", "data", "list"]:
+                                if key in resp_data and isinstance(resp_data[key], list):
+                                    chunk_cheques = resp_data[key]
                                     break
-                    
-                    cheques_list.extend(chunk_cheques)
-                    print(f"Background Sync: chunk {i+1} returned {len(chunk_cheques)} cheques. Total list size: {len(cheques_list)}")
+                            else:
+                                for val in resp_data.values():
+                                    if isinstance(val, list):
+                                        chunk_cheques = val
+                                        break
+                        cheques_list.extend(chunk_cheques)
                 else:
-                    print(f"Failed to fetch chunk {i+1} from cloud API (status: {response.status_code})")
-            except Exception as e_chunk:
-                print(f"Exception during fetching chunk {i+1}: {e_chunk}")
+                    print(f"Failed to fetch {sync_date} from cloud API (status: {response.status_code})")
+            except Exception as e_specific:
+                print(f"Exception during fetching specific date: {e_specific}")
+        else:
+            # 1. Fetch closed receipts from the cloud in sequential chunks
+            chunk_days = 30
+            chunks_count = (days + chunk_days - 1) // chunk_days
+            
+            days_remaining = days
+            i = 0
+            while days_remaining > 0:
+                current_chunk_days = min(chunk_days, days_remaining)
+                start_ts = now_ts - ((i * chunk_days + current_chunk_days) * 24 * 3600)
+                end_ts = now_ts - (i * chunk_days * 24 * 3600)
                 
-            days_remaining -= current_chunk_days
-            i += 1
+                payload = {
+                    "start_date": start_ts,
+                    "end_date": end_ts,
+                    "statuses": ["Closed"]
+                }
                 
+                start_date_str = datetime.fromtimestamp(start_ts).strftime('%Y-%m-%d')
+                end_date_str = datetime.fromtimestamp(end_ts).strftime('%Y-%m-%d')
+                sync_progress["message"] = f"Cheklar ro'yxati olinmoqda: {start_date_str} dan {end_date_str} gacha ({i+1}/{chunks_count} qism)..."
+                print(f"Background Sync: fetching chunk {i+1}/{chunks_count} ({start_date_str} to {end_date_str})")
+                
+                try:
+                    response = requests.post(cloud_url, headers=regos_headers, json=payload, timeout=30)
+                    if response.status_code == 200:
+                        resp_data = response.json()
+                        if isinstance(resp_data, dict) and not resp_data.get("ok"):
+                            print(f"REGOS Cloud API returned error for chunk {i+1}: {resp_data.get('result')}")
+                            days_remaining -= current_chunk_days
+                            i += 1
+                            continue
+                            
+                        chunk_cheques = []
+                        if isinstance(resp_data, list):
+                            chunk_cheques = resp_data
+                        elif isinstance(resp_data, dict):
+                            for key in ["result", "cheques", "data", "list"]:
+                                if key in resp_data and isinstance(resp_data[key], list):
+                                    chunk_cheques = resp_data[key]
+                                    break
+                            else:
+                                for val in resp_data.values():
+                                    if isinstance(val, list):
+                                        chunk_cheques = val
+                                        break
+                        
+                        cheques_list.extend(chunk_cheques)
+                        print(f"Background Sync: chunk {i+1} returned {len(chunk_cheques)} cheques. Total list size: {len(cheques_list)}")
+                    else:
+                        print(f"Failed to fetch chunk {i+1} from cloud API (status: {response.status_code})")
+                except Exception as e_chunk:
+                    print(f"Exception during fetching chunk {i+1}: {e_chunk}")
+                    
+                days_remaining -= current_chunk_days
+                i += 1
+                    
         if not cheques_list:
             sync_progress["running"] = False
             sync_progress["message"] = "Yangi cheklar topilmadi."
@@ -3138,9 +3182,15 @@ def run_sync_in_background(days: int, company_id: str = None):
         
         # 2. Query Supabase for existing IDs in the entire time range to avoid duplicates
         print("Background Sync: Fetching existing receipt IDs in synced range...")
-        start_range_ts = now_ts - (days * 24 * 3600)
+        if sync_date:
+            start_range_ts = start_ts
+            end_range_ts = end_ts
+        else:
+            start_range_ts = now_ts - (days * 24 * 3600)
+            end_range_ts = now_ts
+            
         start_iso = datetime.fromtimestamp(start_range_ts, tz=timezone.utc).isoformat().replace("+", "%2B")
-        end_iso = datetime.fromtimestamp(now_ts, tz=timezone.utc).isoformat().replace("+", "%2B")
+        end_iso = datetime.fromtimestamp(end_range_ts, tz=timezone.utc).isoformat().replace("+", "%2B")
         
         existing_receipts = {}  # id -> is_new_format (bool)
         try:
@@ -3466,16 +3516,26 @@ def delete_receipt(id: str, request: Request):
 from fastapi import BackgroundTasks
 
 @app.post("/api/integration/regos/sync-receipts")
-def sync_regos_receipts(background_tasks: BackgroundTasks, request: Request, days: int = 360):
+def sync_regos_receipts(background_tasks: BackgroundTasks, request: Request, days: int = None, sync_date: str = None):
     global sync_progress
     if sync_progress["running"]:
         raise HTTPException(status_code=400, detail="Sinxronizatsiya jarayoni allaqachon bajarilmoqda.")
         
     company_id = get_company_id(request)
-    background_tasks.add_task(run_sync_in_background, days, company_id)
+    
+    if not days and not sync_date:
+        days = 360
+        
+    background_tasks.add_task(run_sync_in_background, days, sync_date, company_id)
+    
+    if sync_date:
+        msg = f"Sinxronizatsiya orqa fonda boshlandi ({sync_date} kuni uchun). Cheklar asta-sekin paydo bo'ladi."
+    else:
+        msg = f"Sinxronizatsiya orqa fonda boshlandi ({days} kunlik). Cheklar asta-sekin paydo bo'ladi."
+        
     return {
         "status": "processing",
-        "message": f"Sinxronizatsiya orqa fonda boshlandi ({days} kunlik). Cheklar asta-sekin paydo bo'ladi."
+        "message": msg
     }
 
 @app.get("/api/integration/regos/sync-status")

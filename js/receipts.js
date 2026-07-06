@@ -513,6 +513,7 @@ window.Receipts = {
         } else {
             console.error("showModal funksiyasi topilmadi!");
         }
+        this.toggleCustomDaysInput();
     },
 
     toggleCustomDaysInput: function() {
@@ -521,18 +522,43 @@ window.Receipts = {
         if (container && customOption) {
             container.style.display = customOption.checked ? 'flex' : 'none';
         }
+
+        const dateOption = document.querySelector('input[name="sync-days-option"][value="date"]');
+        const dateContainer = document.getElementById('sync-custom-date-container');
+        if (dateContainer && dateOption) {
+            dateContainer.style.display = dateOption.checked ? 'flex' : 'none';
+            if (dateOption.checked) {
+                const dateInput = document.getElementById('sync-custom-date-input');
+                if (dateInput && !dateInput.value) {
+                    const todayStr = new Date().toLocaleDateString('en-CA'); // format: YYYY-MM-DD
+                    dateInput.value = todayStr;
+                }
+            }
+        }
     },
 
     startSyncFromModal: async function() {
         const selectedOption = document.querySelector('input[name="sync-days-option"]:checked');
         if (!selectedOption) return;
 
-        let days = 1;
-        if (selectedOption.value === 'custom') {
-            const input = document.getElementById('sync-custom-days-input');
-            days = parseInt(input ? input.value : 7) || 7;
+        let url = '/api/integration/regos/sync-receipts';
+        if (selectedOption.value === 'date') {
+            const input = document.getElementById('sync-custom-date-input');
+            const syncDate = input ? input.value : '';
+            if (!syncDate) {
+                alert("Iltimos, sanani tanlang!");
+                return;
+            }
+            url += `?sync_date=${encodeURIComponent(syncDate)}`;
         } else {
-            days = parseInt(selectedOption.value) || 1;
+            let days = 1;
+            if (selectedOption.value === 'custom') {
+                const input = document.getElementById('sync-custom-days-input');
+                days = parseInt(input ? input.value : 7) || 7;
+            } else {
+                days = parseInt(selectedOption.value) || 1;
+            }
+            url += `?days=${days}`;
         }
 
         // Close the modal
@@ -550,7 +576,7 @@ window.Receipts = {
         btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Sinxronizatsiya boshlanmoqda...`;
 
         try {
-            const response = await fetch(`/api/integration/regos/sync-receipts?days=${days}`, {
+            const response = await fetch(url, {
                 method: 'POST'
             });
             
