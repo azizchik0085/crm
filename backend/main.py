@@ -3009,7 +3009,8 @@ def save_parsed_receipt(cheque: dict, company_id: str = None):
             "customer_name": cust_name,
             "customer_phone": cust_phone,
             "seller_name": seller_name,
-            "products": items_list
+            "products": items_list,
+            "status": cheque.get("status") or "Closed"
         }
 
         receipt_payload = {
@@ -3379,7 +3380,8 @@ def run_sync_in_background(days: int = None, sync_date: str = None, company_id: 
                     "customer_name": cust_name,
                     "customer_phone": cust_phone,
                     "seller_name": seller_name,
-                    "products": items_list
+                    "products": items_list,
+                    "status": target_cheque.get("status") or "Closed"
                 }
                 
                 receipt_payload = {
@@ -3501,10 +3503,10 @@ def get_receipts(request: Request, search: str = None):
             search_cyr = to_cyrillic(search)
             term_lat = f"%{search_lat}%"
             term_cyr = f"%{search_cyr}%"
-            path = f"receipts?select=*&company_id=eq.{company_id}&id=not.like.settings_*&or=(code.ilike.{term_lat},cashier_name.ilike.{term_lat},code.ilike.{term_cyr},cashier_name.ilike.{term_cyr})&order=created_at.desc&limit=1000"
+            path = f"receipts?select=*&company_id=eq.{company_id}&id=not.like.settings_*&total_amount=gt.0&or=(code.ilike.{term_lat},cashier_name.ilike.{term_lat},code.ilike.{term_cyr},cashier_name.ilike.{term_cyr})&order=created_at.desc&limit=1000"
             return supabase_req("GET", path)
         else:
-            return supabase_req("GET", f"receipts?select=*&company_id=eq.{company_id}&id=not.like.settings_*&order=created_at.desc&limit=1000")
+            return supabase_req("GET", f"receipts?select=*&company_id=eq.{company_id}&id=not.like.settings_*&total_amount=gt.0&order=created_at.desc&limit=1000")
     except Exception as e:
         print(f"Failed to fetch receipts: {e}")
         return []
