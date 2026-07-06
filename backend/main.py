@@ -1645,6 +1645,7 @@ def update_settings(settings: dict, request: Request):
     company_settings["regos_token"] = settings.get("regos_token", "")
     company_settings["amocrm_subdomain"] = settings.get("amocrm_subdomain", "")
     company_settings["amocrm_token"] = settings.get("amocrm_token", "")
+    company_settings["amocrm_lead_creation"] = settings.get("amocrm_lead_creation", False)
     company_settings["supabase_url"] = settings.get("supabase_url", "")
     company_settings["supabase_key"] = settings.get("supabase_key", "")
     if "roles" in settings:
@@ -3414,6 +3415,7 @@ def run_sync_in_background(days: int = None, sync_date: str = None, company_id: 
 
         saved_count = 0
         processed_receipts = []
+        newly_saved_receipts = []
         
         if new_cheques:
             from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -3443,12 +3445,14 @@ def run_sync_in_background(days: int = None, sync_date: str = None, company_id: 
                         try:
                             supabase_req("POST", "receipts?on_conflict=id", json_data=processed_receipts)
                             saved_count += len(processed_receipts)
+                            newly_saved_receipts.extend(processed_receipts)
                         except Exception as ex:
                             print(f"Background Sync: batch upsert failed, doing single inserts... Error: {ex}")
                             for payload in processed_receipts:
                                 try:
                                     supabase_req("POST", "receipts?on_conflict=id", json_data=payload)
                                     saved_count += 1
+                                    newly_saved_receipts.append(payload)
                                 except Exception as single_ex:
                                     print(f"Background Sync: Fallback insert failed for {payload['id']}: {single_ex}")
                         processed_receipts = []
@@ -3459,15 +3463,24 @@ def run_sync_in_background(days: int = None, sync_date: str = None, company_id: 
             try:
                 supabase_req("POST", "receipts?on_conflict=id", json_data=processed_receipts)
                 saved_count += len(processed_receipts)
+                newly_saved_receipts.extend(processed_receipts)
             except Exception as ex:
                 print(f"Background Sync: final batch upsert failed, doing single inserts... Error: {ex}")
                 for payload in processed_receipts:
                     try:
                         supabase_req("POST", "receipts?on_conflict=id", json_data=payload)
                         saved_count += 1
+                        newly_saved_receipts.append(payload)
                     except Exception as single_ex:
                         print(f"Background Sync: Fallback insert failed for {payload['id']}: {single_ex}")
             processed_receipts = []
+            
+        # Trigger amoCRM deal creation for newly saved receipts if enabled
+        if newly_saved_receipts:
+            try:
+                create_amocrm_deals_for_receipts(newly_saved_receipts, company_id)
+            except Exception as e_deals:
+                print(f"Background Sync: error triggering amocrm deal creation: {e_deals}")
             
         sync_progress["running"] = False
         # Force restart trigger comment
@@ -4149,6 +4162,150 @@ def run_amocrm_sync_background(subdomain, token, company_id: str = None):
             print("amoCRM Background Sync: no active customers found.")
     except Exception as e:
         print(f"amoCRM Background Sync failed saving to Supabase: {e}")
+
+def create_amocrm_deals_for_receipts(receipts, company_id):
+    if not receipts:
+        return
+        
+    try:
+        settings = get_company_settings(company_id, bypass_cache=True) if company_id else settings_state
+        if not settings.get("amocrm_lead_creation"):
+            print("amoCRM Lead Creation: Disabled in settings. Skipping.")
+            return
+            
+        subdomain = settings.get("amocrm_subdomain", "")
+        token = settings.get("amocrm_token", "")
+        if not subdomain or not token:
+            print("amoCRM Lead Creation: Credentials missing. Skipping.")
+            return
+            
+        print(f"amoCRM Lead Creation: processing {len(receipts)} receipts...")
+        headers = get_amocrm_headers(token)
+        
+        # Load amoCRM users to map operator names
+        user_map = get_amocrm_users(subdomain, token)
+        user_name_to_id = {}
+        for uid, name in user_map.items():
+            user_name_to_id[name.strip().lower()] = uid
+            
+        # Get local customers to cross-reference phone numbers to operator names
+        customers = []
+        try:
+            path = "customers?select=phone,operator"
+            if company_id:
+                path += f"&company_id=eq.{company_id}"
+            customers = supabase_get_all(path, company_id=company_id)
+        except Exception as e_cust:
+            print(f"amoCRM Lead Creation: failed to load local customers: {e_cust}")
+            
+        phone_to_operator = {}
+        for c in customers:
+            ph = c.get("phone") or ""
+            op = c.get("operator") or ""
+            if ph and op:
+                clean_ph = "".join(char for char in ph if char.isdigit() or char == "+")
+                phone_to_operator[clean_ph] = op
+                
+        for r in receipts:
+            items = r.get("items") or {}
+            if isinstance(items, str):
+                try:
+                    import json
+                    items = json.loads(items)
+                except Exception:
+                    items = {}
+            
+            cust_name = items.get("customer_name") or ""
+            cust_phone = items.get("customer_phone") or ""
+            if not cust_phone:
+                continue
+                
+            clean_phone = "".join(char for char in cust_phone if char.isdigit() or char == "+")
+            if not clean_phone:
+                continue
+                
+            # Search contact in amoCRM by phone number
+            contact_id = None
+            search_url = f"https://{subdomain}.amocrm.ru/api/v4/contacts?query={clean_phone}"
+            try:
+                search_res = requests.get(search_url, headers=headers, timeout=10)
+                if search_res.status_code == 200:
+                    search_data = search_res.json()
+                    contacts_found = search_data.get("_embedded", {}).get("contacts", [])
+                    if contacts_found:
+                        contact_id = contacts_found[0].get("id")
+                        print(f"amoCRM Lead Creation: Found existing contact ID {contact_id} for {clean_phone}")
+                
+                # If contact not found, create new contact in amoCRM
+                if not contact_id:
+                    create_url = f"https://{subdomain}.amocrm.ru/api/v4/contacts"
+                    contact_payload = [
+                        {
+                            "name": cust_name or "Yangi Mijoz",
+                            "custom_fields_values": [
+                                {
+                                    "field_code": "PHONE",
+                                    "values": [
+                                        {
+                                            "value": clean_phone
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                    create_res = requests.post(create_url, headers=headers, json=contact_payload, timeout=10)
+                    if create_res.status_code in [200, 201]:
+                        create_data = create_res.json()
+                        created_contacts = create_data.get("_embedded", {}).get("contacts", [])
+                        if created_contacts:
+                            contact_id = created_contacts[0].get("id")
+                            print(f"amoCRM Lead Creation: Created new contact ID {contact_id} for {clean_phone}")
+            except Exception as e_contact:
+                print(f"amoCRM Lead Creation: Failed contact lookup/creation for {clean_phone}: {e_contact}")
+                
+            if not contact_id:
+                print(f"amoCRM Lead Creation: Could not resolve contact ID for {clean_phone}. Skipping lead creation.")
+                continue
+                
+            # Map operator to responsible_user_id
+            responsible_user_id = None
+            operator_name = phone_to_operator.get(clean_phone)
+            if operator_name:
+                responsible_user_id = user_name_to_id.get(operator_name.strip().lower())
+                
+            # Create Lead in amoCRM
+            lead_url = f"https://{subdomain}.amocrm.ru/api/v4/leads"
+            total_amount = r.get("total_amount") or 0
+            code = r.get("code") or r.get("id")
+            
+            lead_payload = [
+                {
+                    "name": f"Buyurtma (REGOS: {code})",
+                    "price": int(total_amount),
+                    "_embedded": {
+                        "contacts": [
+                            {
+                                "id": contact_id
+                            }
+                        ]
+                    }
+                }
+            ]
+            if responsible_user_id:
+                lead_payload[0]["responsible_user_id"] = int(responsible_user_id)
+                
+            try:
+                lead_res = requests.post(lead_url, headers=headers, json=lead_payload, timeout=10)
+                if lead_res.status_code in [200, 201]:
+                    print(f"amoCRM Lead Creation: Successfully created lead for receipt {code} (amount: {total_amount})")
+                else:
+                    print(f"amoCRM Lead Creation: Failed to create lead (status: {lead_res.status_code}), response: {lead_res.text}")
+            except Exception as e_lead:
+                print(f"amoCRM Lead Creation: Exception creating lead: {e_lead}")
+                
+    except Exception as e_outer:
+        print(f"amoCRM Lead Creation: Outer exception: {e_outer}")
 
 @app.post("/api/integration/amocrm/sync")
 def sync_amocrm_leads(background_tasks: BackgroundTasks, request: Request):

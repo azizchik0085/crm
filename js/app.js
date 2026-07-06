@@ -87,6 +87,7 @@ window.App = {
                     if (backendSettings.regos_token !== undefined) data.settings.regosToken = backendSettings.regos_token;
                     if (backendSettings.amocrm_subdomain !== undefined) data.settings.amocrmSubdomain = backendSettings.amocrm_subdomain;
                     if (backendSettings.amocrm_token !== undefined) data.settings.amocrmToken = backendSettings.amocrm_token;
+                    if (backendSettings.amocrm_lead_creation !== undefined) data.settings.amocrmLeadCreation = !!backendSettings.amocrm_lead_creation;
                     
                     if (backendSettings.taplink_desc !== undefined) data.settings.taplinkDesc = backendSettings.taplink_desc;
                     if (backendSettings.taplink_web !== undefined) data.settings.taplinkWeb = backendSettings.taplink_web;
@@ -243,6 +244,9 @@ window.App = {
 
         const amocrmTokenInput = document.getElementById('settings-amocrm-token');
         if (amocrmTokenInput) amocrmTokenInput.value = data.settings.amocrmToken || '';
+
+        const amocrmLeadCreationInput = document.getElementById('settings-amocrm-lead-creation');
+        if (amocrmLeadCreationInput) amocrmLeadCreationInput.checked = !!data.settings.amocrmLeadCreation;
 
         // Webhook manzillarini joriy domen bo'yicha dinamik to'ldirish
         const companyId = localStorage.getItem('activeCompanyId') || '';
@@ -800,6 +804,7 @@ window.App = {
                  const regosToken = document.getElementById('settings-regos-token')?.value.trim() || '';
                  const amocrmSubdomain = document.getElementById('settings-amocrm-subdomain')?.value.trim() || '';
                  const amocrmToken = document.getElementById('settings-amocrm-token')?.value.trim() || '';
+                 const amocrmLeadCreation = !!document.getElementById('settings-amocrm-lead-creation')?.checked;
                   
                  const taplinkDesc = document.getElementById('settings-taplink-desc')?.value.trim() || '';
                  const taplinkWeb = document.getElementById('settings-taplink-web')?.value.trim() || '';
@@ -874,6 +879,7 @@ window.App = {
                 data.settings.regosToken = regosToken;
                 data.settings.amocrmSubdomain = amocrmSubdomain;
                 data.settings.amocrmToken = amocrmToken;
+                data.settings.amocrmLeadCreation = amocrmLeadCreation;
                 data.settings.amocrmOperatorsMap = amocrmOperatorsMap;
                  
                  data.settings.taplinkDesc = taplinkDesc;
@@ -912,6 +918,7 @@ window.App = {
                             regos_token: regosToken,
                             amocrm_subdomain: amocrmSubdomain,
                             amocrm_token: amocrmToken,
+                            amocrm_lead_creation: amocrmLeadCreation,
                             supabase_url: sbUrl,
                             supabase_key: sbKey,
                             roles: data.settings.roles || [],
