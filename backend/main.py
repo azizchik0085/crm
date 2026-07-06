@@ -4161,13 +4161,13 @@ def run_amocrm_sync_background(subdomain, token, company_id: str = None):
     except Exception as e:
         print(f"amoCRM Background Sync failed saving to Supabase: {e}")
 
-def create_amocrm_deals_for_receipts(receipts, company_id):
+def create_amocrm_deals_for_receipts(receipts, company_id, force=False):
     if not receipts:
         return
         
     try:
         settings = get_company_settings(company_id, bypass_cache=True) if company_id else settings_state
-        if not settings.get("amocrm_lead_creation"):
+        if not force and not settings.get("amocrm_lead_creation"):
             print("amoCRM Lead Creation: Disabled in settings. Skipping.")
             return
             
@@ -4392,6 +4392,35 @@ def read_admin():
             headers={"Cache-Control": "no-cache, no-store, must-revalidate, public, max-age=0"}
         )
     raise HTTPException(status_code=404, detail="Admin index file not found")
+
+@app.post("/api/integration/amocrm/push-receipts")
+def push_receipts_to_amocrm_endpoint(payload: dict, request: Request):
+    company_id = get_company_id(request)
+    receipt_ids = payload.get("receipt_ids") or []
+    if not receipt_ids:
+        raise HTTPException(status_code=400, detail="Chek ID-lari ko'rsatilmagan")
+        
+    try:
+        receipts = []
+        chunk_size = 50
+        for i in range(0, len(receipt_ids), chunk_size):
+            chunk = receipt_ids[i:i + chunk_size]
+            ids_str = ",".join(chunk)
+            path = f"receipts?id=in.({ids_str})"
+            if company_id:
+                path += f"&company_id=eq.{company_id}"
+            chunk_receipts = supabase_req("GET", path, company_id=company_id)
+            if chunk_receipts and isinstance(chunk_receipts, list):
+                receipts.extend(chunk_receipts)
+                
+        if not receipts:
+            return {"status": "success", "message": "Yuborish uchun ma'lumotlar topilmadi."}
+            
+        create_amocrm_deals_for_receipts(receipts, company_id, force=True)
+        return {"status": "success", "message": f"Muvaffaqiyatli yakunlandi: {len(receipts)} ta chek amoCRM-ga buyurtma sifatida yuborildi."}
+    except Exception as e:
+        print(f"Manual Push Receipts: Error: {e}")
+        raise HTTPException(status_code=500, detail=f"Tizim xatoligi yuz berdi: {str(e)}")
 
 @app.get("/")
 def read_index():

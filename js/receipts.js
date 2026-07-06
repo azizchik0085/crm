@@ -704,5 +704,92 @@ window.Receipts = {
                 console.error("Error polling sync status:", e);
             }
         }, 1500);
+    },
+
+    pushReceiptsToAmoCRM: async function(btn) {
+        const searchVal = document.getElementById('receipts-search')?.value.toLowerCase() || '';
+        const sellerVal = document.getElementById('receipts-search-seller')?.value.toLowerCase() || '';
+        const phoneVal = document.getElementById('receipts-search-phone')?.value.replace(/\D/g, '') || '';
+        const operatorVal = document.getElementById('receipts-search-operator')?.value.toLowerCase() || '';
+        
+        let filtered = this.receiptsList || [];
+        if (searchVal || sellerVal || phoneVal || operatorVal) {
+            filtered = filtered.filter(r => {
+                const codeNorm = r.code ? r.code.toLowerCase() : '';
+                const cashierNorm = r.cashier_name ? r.cashier_name.toLowerCase() : '';
+                const idNorm = r.id ? r.id.toLowerCase() : '';
+                
+                let itemsObj = r.items;
+                if (typeof itemsObj === 'string') {
+                    try { itemsObj = JSON.parse(itemsObj); } catch (e) { itemsObj = {}; }
+                }
+                const sellerNorm = (itemsObj.seller_name || '').toLowerCase();
+                const custNameNorm = (itemsObj.customer_name || '').toLowerCase();
+                const custPhoneDigits = (itemsObj.customer_phone || '').replace(/\D/g, '');
+                
+                let operatorName = '';
+                if (custPhoneDigits && window.customersList) {
+                    const matchedCustomer = window.customersList.find(c => c.phone && c.phone.replace(/\D/g, '') === custPhoneDigits);
+                    if (matchedCustomer) operatorName = (matchedCustomer.operator || '').toLowerCase();
+                }
+
+                let matches = true;
+                if (searchVal) {
+                    matches = matches && (codeNorm.includes(searchVal) || cashierNorm.includes(searchVal) || idNorm.includes(searchVal) || custNameNorm.includes(searchVal));
+                }
+                if (sellerVal) {
+                    matches = matches && (sellerNorm.includes(sellerVal) || cashierNorm.includes(sellerVal));
+                }
+                if (phoneVal) {
+                    matches = matches && custPhoneDigits.includes(phoneVal);
+                }
+                if (operatorVal) {
+                    matches = matches && operatorName.includes(operatorVal);
+                }
+                return matches;
+            });
+        }
+        
+        const receiptsToPush = filtered.filter(r => {
+            let itemsObj = r.items;
+            if (typeof itemsObj === 'string') {
+                try { itemsObj = JSON.parse(itemsObj); } catch (e) { itemsObj = {}; }
+            }
+            return itemsObj && !!itemsObj.customer_phone;
+        });
+
+        if (receiptsToPush.length === 0) {
+            alert("Ushbu filtr bo'yicha yuborish uchun telefon raqamiga ega cheklar topilmadi!");
+            return;
+        }
+
+        const confirmPush = confirm(`Tanlangan filtr bo'yicha ${receiptsToPush.length} ta chekni amoCRM-ga buyurtma (sdelka) sifatida qo'lda yubormoqchimisiz?`);
+        if (!confirmPush) return;
+
+        const originalText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Yuborilmoqda...`;
+
+        try {
+            const receiptIds = receiptsToPush.map(r => r.id);
+            const response = await fetch('/api/integration/amocrm/push-receipts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ receipt_ids: receiptIds })
+            });
+
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.detail || "amoCRM-ga yuborishda xatolik yuz berdi.");
+            }
+
+            alert(data.message || `Muvaffaqiyatli yakunlandi: ${receiptsToPush.length} ta chek yuborildi.`);
+        } catch (e) {
+            console.error("amoCRM manual push failed:", e);
+            alert("Xatolik: " + e.message);
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
     }
 };
