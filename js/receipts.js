@@ -10,20 +10,25 @@ window.Receipts = {
     },
 
     setupEventListeners: function() {
-        const searchInput = document.getElementById('receipts-search');
-        if (searchInput) {
-            let debounceTimer;
-            searchInput.oninput = () => {
-                clearTimeout(debounceTimer);
-                debounceTimer = setTimeout(() => {
-                    this.render();
-                }, 300);
-            };
-        }
+        const inputs = ['receipts-search', 'receipts-search-seller', 'receipts-search-phone'];
+        let debounceTimer;
+        inputs.forEach(id => {
+            const input = document.getElementById(id);
+            if (input) {
+                input.oninput = () => {
+                    clearTimeout(debounceTimer);
+                    debounceTimer = setTimeout(() => {
+                        this.render();
+                    }, 300);
+                };
+            }
+        });
     },
 
     render: async function() {
         const searchVal = document.getElementById('receipts-search')?.value.toLowerCase() || '';
+        const sellerVal = document.getElementById('receipts-search-seller')?.value.toLowerCase() || '';
+        const phoneVal = document.getElementById('receipts-search-phone')?.value.replace(/\D/g, '') || '';
         const container = document.getElementById('receipts-content');
         if (!container) return;
 
@@ -139,6 +144,45 @@ window.Receipts = {
                        sellerNorm.includes(searchValNorm) ||
                        productsNorm.includes(searchValNorm) ||
                        phoneMatches;
+            });
+        }
+
+        if (sellerVal) {
+            const sellerValNorm = window.normalizeUzbek ? window.normalizeUzbek(sellerVal) : sellerVal.toLowerCase();
+            filtered = filtered.filter(r => {
+                let itemsObj = r.items;
+                if (typeof itemsObj === 'string') {
+                    try {
+                        itemsObj = JSON.parse(itemsObj);
+                    } catch (e) {
+                        itemsObj = null;
+                    }
+                }
+                let sellerName = '';
+                if (itemsObj && !Array.isArray(itemsObj) && typeof itemsObj === 'object') {
+                    sellerName = itemsObj.seller_name || '';
+                }
+                const sellerNorm = window.normalizeUzbek ? window.normalizeUzbek(sellerName) : sellerName.toLowerCase();
+                return sellerNorm.includes(sellerValNorm);
+            });
+        }
+
+        if (phoneVal) {
+            filtered = filtered.filter(r => {
+                let itemsObj = r.items;
+                if (typeof itemsObj === 'string') {
+                    try {
+                        itemsObj = JSON.parse(itemsObj);
+                    } catch (e) {
+                        itemsObj = null;
+                    }
+                }
+                let customerPhone = '';
+                if (itemsObj && !Array.isArray(itemsObj) && typeof itemsObj === 'object') {
+                    customerPhone = itemsObj.customer_phone || '';
+                }
+                const cleanCustPhone = customerPhone.replace(/\D/g, '');
+                return cleanCustPhone.includes(phoneVal);
             });
         }
 
