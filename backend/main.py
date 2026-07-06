@@ -4222,6 +4222,27 @@ def create_amocrm_deals_for_receipts(receipts, company_id, force=False):
             if not clean_phone:
                 continue
                 
+            code = r.get("code") or r.get("id")
+            
+            # Check if lead already exists in amoCRM to prevent duplicates
+            already_exists = False
+            try:
+                check_url = f"https://{subdomain}.amocrm.ru/api/v4/leads?query={code}"
+                check_res = requests.get(check_url, headers=headers, timeout=10)
+                if check_res.status_code == 200:
+                    check_data = check_res.json()
+                    existing_leads = check_data.get("_embedded", {}).get("leads", [])
+                    for el in existing_leads:
+                        if el.get("name") == f"Buyurtma (REGOS: {code})":
+                            already_exists = True
+                            print(f"amoCRM Lead Creation: Lead for receipt {code} already exists (ID: {el.get('id')}). Skipping.")
+                            break
+            except Exception as e_check:
+                print(f"amoCRM Lead Creation: Error checking existing lead: {e_check}")
+                
+            if already_exists:
+                continue
+                
             # Search contact in amoCRM by phone number
             contact_id = None
             search_url = f"https://{subdomain}.amocrm.ru/api/v4/contacts?query={clean_phone}"
