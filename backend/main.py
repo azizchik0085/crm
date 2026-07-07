@@ -4310,37 +4310,36 @@ def create_amocrm_deals_for_receipts(receipts, company_id, force=False):
                 if search_res.status_code == 200:
                     search_data = search_res.json()
                     contacts_found = search_data.get("_embedded", {}).get("contacts", [])
-                    if contacts_found:
-                        contact_id = contacts_found[0].get("id")
-                        print(f"amoCRM Lead Creation: Found existing contact ID {contact_id} for {clean_phone}")
-                
-                # If contact not found, create new contact in amoCRM
-                if not contact_id:
-                    create_url = f"https://{subdomain}.amocrm.ru/api/v4/contacts"
-                    contact_payload = [
-                        {
-                            "name": cust_name or "Yangi Mijoz",
-                            "custom_fields_values": [
-                                {
-                                    "field_code": "PHONE",
-                                    "values": [
-                                        {
-                                            "value": clean_phone
-                                        }
-                                    ]
-                                }
-                            ]
-                        }
-                    ]
-                    create_res = requests.post(create_url, headers=headers, json=contact_payload, timeout=10)
-                    if create_res.status_code in [200, 201]:
-                        create_data = create_res.json()
-                        created_contacts = create_data.get("_embedded", {}).get("contacts", [])
-                        if created_contacts:
-                            contact_id = created_contacts[0].get("id")
-                            print(f"amoCRM Lead Creation: Created new contact ID {contact_id} for {clean_phone}")
+                    for c in contacts_found:
+                        c_details = fetch_amocrm_contact_details(subdomain, token, c.get("id"))
+                        if c_details:
+                            cf_values = c_details.get("custom_fields_values") or []
+                            matched = False
+                            for cf in cf_values:
+                                if cf.get("field_code") == "PHONE":
+                                    vals = cf.get("values") or []
+                                    for v in vals:
+                                        val_phone = v.get("value") or ""
+                                        # Compare last 9 digits of both numbers to ignore formatting/country codes
+                                        p1 = "".join(char for char in val_phone if char.isdigit())
+                                        p2 = "".join(char for char in clean_phone if char.isdigit())
+                                        if p1 and p2:
+                                            is_match = False
+                                            if len(p1) >= 9 and len(p2) >= 9:
+                                                is_match = p1[-9:] == p2[-9:]
+                                            else:
+                                                is_match = p1 == p2
+                                            if is_match:
+                                                contact_id = c.get("id")
+                                                matched = True
+                                                print(f"amoCRM Lead Creation: Found existing matching contact ID {contact_id} with phone {val_phone} for {clean_phone}")
+                                                break
+                                if matched:
+                                    break
+                        if contact_id:
+                            break
             except Exception as e_contact:
-                print(f"amoCRM Lead Creation: Failed contact lookup/creation for {clean_phone}: {e_contact}")
+                print(f"amoCRM Lead Creation: Failed contact lookup/verification for {clean_phone}: {e_contact}")
                 
             if not contact_id:
                 print(f"amoCRM Lead Creation: Could not resolve contact ID for {clean_phone}. Skipping lead creation.")
