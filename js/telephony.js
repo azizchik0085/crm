@@ -9,10 +9,23 @@ window.Telephony = {
 
     activeCallId: null,
     currentPage: 1,
+    autoResponderEnabled: localStorage.getItem('telephony_auto_responder') === 'true',
+    autoResponderText: localStorage.getItem('telephony_auto_responder_text') || "Assalomu alaykum! Sarkor Telecom kompaniyasiga xush kelibsiz. Hozirda barcha operatorlarimiz band. Iltimos, xabaringizni qoldiring, tez orada siz bilan bog'lanamiz.",
 
     init: function() {
         this.setupJsSIP();
         this.renderCallLogsTab();
+        
+        // Initialize Auto-Responder checkbox state
+        const toggle = document.getElementById('auto-responder-toggle');
+        if (toggle) {
+            toggle.checked = this.autoResponderEnabled;
+        }
+        const statusLabel = document.getElementById('auto-responder-status');
+        if (statusLabel) {
+            statusLabel.textContent = this.autoResponderEnabled ? "Faol" : "Faolsiz";
+            statusLabel.style.color = this.autoResponderEnabled ? "var(--success)" : "var(--text-muted)";
+        }
         
         // Supabase-dan faol qo'ng'iroqlarni har 2 soniyada tekshirib turish
         setInterval(() => this.pollActiveCalls(), 2000);
@@ -174,6 +187,21 @@ window.Telephony = {
 
         // Bildirishnoma oynasini ko'rsatish
         this.showIncomingPopup(phone, clientName, clientInfo, client ? client.id : null);
+
+        // Auto-responder check
+        if (this.autoResponderEnabled) {
+            console.log("Auto-responder active. Preparing to auto-answer call...");
+            setTimeout(() => {
+                const popup = document.getElementById('incoming-call-popup');
+                if (popup) {
+                    this.answerIncoming(phone, client ? client.id : null);
+                    setTimeout(() => {
+                        this.updateCallStatusUI("🤖 Robot javob bermoqda...");
+                        this.speakRobot(this.autoResponderText);
+                    }, 1000);
+                }
+            }, 2000);
+        }
     },
 
     showIncomingPopup: function(phone, name, infoText, customerId) {
@@ -340,6 +368,9 @@ window.Telephony = {
     },
 
     endCallTimer: function() {
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
+        }
         if (this.callTimerInterval) {
             clearInterval(this.callTimerInterval);
             this.callTimerInterval = null;
@@ -634,9 +665,7 @@ window.Telephony = {
                     
                     if (call.status === 'ringing' && call.direction === 'incoming') {
                         // Kiruvchi qo'ng'iroq bildirishnomasini ko'rsatish
-                        const customers = await DB.getCustomers();
-                        const client = customers.find(c => c.phone.replace(/\s+/g, '') === call.phone.replace(/\s+/g, ''));
-                        this.showIncomingPopup(call.phone, client ? client.name : "Noma'lum Raqam", client ? (client.company || '-') : 'Tizimda yo\'q', client ? client.id : null);
+                        this.handleIncomingCall(call.phone);
                     }
                 }
 
@@ -691,6 +720,60 @@ window.Telephony = {
                     }
                 }, 1500);
             }
+        }
+    },
+
+    speakRobot: function(text) {
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
+            
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'uz-UZ';
+            utterance.rate = 0.9;
+            
+            const voices = window.speechSynthesis.getVoices();
+            const uzVoice = voices.find(v => v.lang.includes('uz') || v.lang.includes('UZ'));
+            if (uzVoice) {
+                utterance.voice = uzVoice;
+            } else {
+                const trVoice = voices.find(v => v.lang.includes('tr') || v.lang.includes('TR'));
+                if (trVoice) {
+                    utterance.voice = trVoice;
+                }
+            }
+            
+            utterance.onend = () => {
+                console.log("Robot finished speaking.");
+                this.updateCallStatusUI("Xabar qoldirildi.");
+                setTimeout(() => {
+                    this.hangup();
+                }, 2000);
+            };
+            
+            window.speechSynthesis.speak(utterance);
+            console.log("Robot speaking: ", text);
+        } else {
+            console.warn("Speech synthesis not supported in this browser.");
+        }
+    },
+
+    toggleAutoResponder: function(enabled) {
+        this.autoResponderEnabled = enabled;
+        localStorage.setItem('telephony_auto_responder', enabled);
+        const statusLabel = document.getElementById('auto-responder-status');
+        if (statusLabel) {
+            statusLabel.textContent = enabled ? "Faol" : "Faolsiz";
+            statusLabel.style.color = enabled ? "var(--success)" : "var(--text-muted)";
+        }
+    },
+
+    editAutoResponderText: function() {
+        const currentText = this.autoResponderText;
+        const newText = prompt("Avtojavob matnini kiriting:", currentText);
+        if (newText !== null && newText.trim() !== "") {
+            this.autoResponderText = newText.trim();
+            localStorage.setItem('telephony_auto_responder_text', this.autoResponderText);
+            alert("Avtojavob matni muvaffaqiyatli saqlandi!");
         }
     }
 };
