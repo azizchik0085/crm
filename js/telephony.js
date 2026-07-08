@@ -342,14 +342,16 @@ window.Telephony = {
         if (this.session) {
             this.session.terminate();
         } else if (this.callStartTime) {
-            // Simulyatorda yakunlash
+            // Simulyatorda yoki polled qo'ng'iroqlarda yakunlash
             const duration = this.endCallTimer();
             this.updateCallStatusUI("Suhbat yakunlandi.");
             
             const info = this.sessionSimulatorType;
-            if (info) {
-                this.saveCallHistory(info.phone, info.direction, duration, 'answered');
-            }
+            const phone = info ? info.phone : document.getElementById('call-phone').textContent;
+            const direction = info ? info.direction : (document.getElementById('call-direction-text').textContent.includes('Kiruvchi') ? 'incoming' : 'outgoing');
+            
+            this.saveCallHistory(phone, direction, duration, 'answered');
+            this.sessionSimulatorType = null;
             setTimeout(() => closeModal('call-modal'), 1000);
         }
     },
@@ -389,8 +391,11 @@ window.Telephony = {
         const customers = await DB.getCustomers();
         const client = customers.find(c => c.phone.replace(/\s+/g, '') === phone.replace(/\s+/g, ''));
         
+        // Use activeCallId if it exists to overwrite the active call row in Supabase
+        const callId = this.activeCallId || ('call_' + Date.now());
+        
         const callLog = {
-            id: 'call_' + Date.now(),
+            id: callId,
             customer_id: client ? client.id : null,
             phone,
             direction,
@@ -399,6 +404,9 @@ window.Telephony = {
         };
 
         await DB.saveCallLog(callLog);
+        
+        // Clear activeCallId once it is saved to prevent it from matching on next poll
+        this.activeCallId = null;
         
         // Ro'yxatni yangilaymiz
         this.renderCallLogsTab();
