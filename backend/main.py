@@ -4037,13 +4037,20 @@ def get_amocrm_status_map(subdomain, token):
         print(f"Failed to fetch amoCRM pipelines: {e}")
     return status_map
 
+# Global progress tracker for amoCRM sync
+amocrm_sync_progress = {"running": False, "processed": 0, "total": 0, "message": ""}
+
 def get_amocrm_contacts_map(subdomain, token):
+    import time
     headers = get_amocrm_headers(token)
     contact_map = {}
     url = f"https://{subdomain}.amocrm.ru/api/v4/contacts"
     params = {"limit": 250}
     
-    for _ in range(12): # Fetch up to 3000 contacts (12 pages)
+    for page_idx in range(12): # Fetch up to 3000 contacts (12 pages)
+        time.sleep(0.15) # Rate limit protection (7 RPS)
+        global amocrm_sync_progress
+        amocrm_sync_progress["message"] = f"amoCRM kontaktlari yuklanmoqda ({page_idx + 1}-sahifa)..."
         try:
             res = requests.request("GET", url, headers=headers, params=params, timeout=10)
             if res.status_code == 200:
@@ -4086,85 +4093,95 @@ def get_amocrm_contacts_map(subdomain, token):
 
 # Background task for full sync
 def run_amocrm_sync_background(subdomain, token, company_id: str = None):
+    import time
+    global amocrm_sync_progress
+    if amocrm_sync_progress["running"]:
+        print("amoCRM Sync already running. Skipping.")
+        return
+        
     print("amoCRM Background Sync: started.")
-    user_map = get_amocrm_users(subdomain, token)
-    status_map = get_amocrm_status_map(subdomain, token)
-    contact_map = get_amocrm_contacts_map(subdomain, token)
+    amocrm_sync_progress = {"running": True, "processed": 0, "total": 0, "message": "amoCRM operatorlari ro'yxati yuklanmoqda..."}
     
-    headers = get_amocrm_headers(token)
-    url = f"https://{subdomain}.amocrm.ru/api/v4/leads"
-    params = {"limit": 250, "with": "contacts"}
-    synced_customers = []
-    
-    for _ in range(12): # Fetch up to 3000 leads (12 pages)
-        try:
-            res = requests.request("GET", url, headers=headers, params=params, timeout=15)
-            if res.status_code == 200:
-                data = res.json()
-                leads = data.get("_embedded", {}).get("leads", [])
-                if not leads:
-                    break
-                for l in leads:
-                    lead_id = l.get("id")
-                    lead_name = l.get("name")
-                    price = float(l.get("price") or 0)
-                    status_id = l.get("status_id")
-                    resp_user_id = l.get("responsible_user_id")
-                    
-                    operator_name = user_map.get(resp_user_id, "")
-                    status = status_map.get(status_id, "lead")
-                    
-                    # Don't skip lost leads so we can match their operators and show stats
-                    # if status == "lost":
-                    #     continue
+    try:
+        user_map = get_amocrm_users(subdomain, token)
+        
+        amocrm_sync_progress["message"] = "Kelishuv bosqichlari (status map) yuklanmoqda..."
+        status_map = get_amocrm_status_map(subdomain, token)
+        
+        amocrm_sync_progress["message"] = "amoCRM kontaktlari qidirilmoqda..."
+        contact_map = get_amocrm_contacts_map(subdomain, token)
+        
+        headers = get_amocrm_headers(token)
+        url = f"https://{subdomain}.amocrm.ru/api/v4/leads"
+        params = {"limit": 250, "with": "contacts"}
+        synced_customers = []
+        
+        for page_idx in range(12): # Fetch up to 3000 leads (12 pages)
+            time.sleep(0.15) # Rate limit protection
+            amocrm_sync_progress["message"] = f"amoCRM kelishuvlari yuklanmoqda ({page_idx + 1}-sahifa)..."
+            try:
+                res = requests.request("GET", url, headers=headers, params=params, timeout=15)
+                if res.status_code == 200:
+                    data = res.json()
+                    leads = data.get("_embedded", {}).get("leads", [])
+                    if not leads:
+                        break
+                    for l in leads:
+                        lead_id = l.get("id")
+                        lead_name = l.get("name")
+                        price = float(l.get("price") or 0)
+                        status_id = l.get("status_id")
+                        resp_user_id = l.get("responsible_user_id")
                         
-                    contacts_list = l.get("_embedded", {}).get("contacts", [])
-                    if not contacts_list:
-                        continue
+                        operator_name = user_map.get(resp_user_id, "")
+                        status = status_map.get(status_id, "lead")
                         
-                    c_id = contacts_list[0].get("id")
-                    cust_name = lead_name
-                    phone = ""
-                    if c_id in contact_map:
-                        phone = contact_map[c_id]["phone"]
-                        cust_name = contact_map[c_id]["name"]
-                        c_resp_id = contact_map[c_id].get("responsible_user_id")
-                        if c_resp_id:
-                            operator_name = user_map.get(c_resp_id, operator_name)
+                        contacts_list = l.get("_embedded", {}).get("contacts", [])
+                        if not contacts_list:
+                            continue
+                            
+                        c_id = contacts_list[0].get("id")
+                        cust_name = lead_name
+                        phone = ""
+                        if c_id in contact_map:
+                            phone = contact_map[c_id]["phone"]
+                            cust_name = contact_map[c_id]["name"]
+                            c_resp_id = contact_map[c_id].get("responsible_user_id")
+                            if c_resp_id:
+                                operator_name = user_map.get(c_resp_id, operator_name)
+                        
+                        clean_phone = "".join(c for c in phone if c.isdigit() or c == "+") if phone else ""
+                        if not clean_phone:
+                            continue
+                            
+                        customer = {
+                            "id": f"amocrm_{c_id}",
+                            "name": cust_name,
+                            "phone": clean_phone,
+                            "operator": operator_name,
+                            "status": status,
+                            "value": price,
+                            "source": "amocrm"
+                        }
+                        if company_id:
+                            customer["company_id"] = company_id
+                        synced_customers.append(customer)
                     
-                    clean_phone = "".join(c for c in phone if c.isdigit() or c == "+") if phone else ""
-                    if not clean_phone:
-                        continue
-                        
-                    customer = {
-                        "id": f"amocrm_{c_id}",
-                        "name": cust_name,
-                        "phone": clean_phone,
-                        "operator": operator_name,
-                        "status": status,
-                        "value": price,
-                        "source": "amocrm"
-                    }
-                    if company_id:
-                        customer["company_id"] = company_id
-                    synced_customers.append(customer)
-                
-                links = data.get("_links", {})
-                next_url = links.get("next", {}).get("href")
-                if next_url:
-                    url = next_url
-                    params = None
+                    links = data.get("_links", {})
+                    next_url = links.get("next", {}).get("href")
+                    if next_url:
+                        url = next_url
+                        params = None
+                    else:
+                        break
                 else:
                     break
-            else:
+            except Exception as e:
+                print(f"Failed to fetch amoCRM leads page: {e}")
                 break
-        except Exception as e:
-            print(f"Failed to fetch amoCRM leads page: {e}")
-            break
-            
-    try:
+                
         if synced_customers:
-            # Deduplicate by id before batch upsert to prevent Postgres duplicate key errors in a single transaction
+            amocrm_sync_progress["message"] = f"Yuklangan {len(synced_customers)} ta mijoz saralanmoqda..."
             unique_customers = {}
             for cust in synced_customers:
                 c_id = cust["id"]
@@ -4172,23 +4189,30 @@ def run_amocrm_sync_background(subdomain, token, company_id: str = None):
                     unique_customers[c_id] = cust
                 else:
                     existing = unique_customers[c_id]
-                    # Keep the one with active status
                     if existing["status"] in ["lost", "won"] and cust["status"] not in ["lost", "won"]:
                         unique_customers[c_id] = cust
                     elif cust["value"] > existing["value"]:
                         existing["value"] = cust["value"]
             synced_customers = list(unique_customers.values())
-
+    
+            amocrm_sync_progress["message"] = f"Bazada yangilanmoqda: {len(synced_customers)} ta mijoz..."
             chunk_size = 100
             for i in range(0, len(synced_customers), chunk_size):
                 chunk = synced_customers[i:i + chunk_size]
                 supabase_req("POST", "customers?on_conflict=id", json_data=chunk)
-                supabase_req("POST", "customers?on_conflict=id", json_data=chunk)
+            
+            amocrm_sync_progress["running"] = False
+            amocrm_sync_progress["message"] = f"Muvaffaqiyatli yakunlandi. {len(synced_customers)} ta mijoz sinxronlandi."
             print(f"amoCRM Background Sync: successfully synced {len(synced_customers)} active customers to database.")
         else:
+            amocrm_sync_progress["running"] = False
+            amocrm_sync_progress["message"] = "Sinxronizatsiya yakunlandi: faol mijoz topilmadi."
             print("amoCRM Background Sync: no active customers found.")
-    except Exception as e:
-        print(f"amoCRM Background Sync failed saving to Supabase: {e}")
+            
+    except Exception as e_outer:
+        amocrm_sync_progress["running"] = False
+        amocrm_sync_progress["message"] = f"Xatolik yuz berdi: {str(e_outer)}"
+        print(f"amoCRM Background Sync failed: {e_outer}")
 
 def create_amocrm_deals_for_receipts(receipts, company_id, force=False):
     if not receipts:
@@ -4535,6 +4559,10 @@ def sync_amocrm_leads(background_tasks: BackgroundTasks, request: Request):
         
     background_tasks.add_task(run_amocrm_sync_background, subdomain, token, company_id)
     return {"status": "success", "message": "Sinxronizatsiya orqa fonda boshlandi."}
+
+@app.get("/api/integration/amocrm/sync-status")
+def get_amocrm_sync_status():
+    return amocrm_sync_progress
 
 @app.post("/api/integration/amocrm/webhook")
 async def amocrm_webhook(request: Request):

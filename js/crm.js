@@ -804,39 +804,46 @@ window.CRM = {
         if (btn) {
             originalHTML = btn.innerHTML;
             btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sinxronizatsiya...';
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Boshlanmoqda...';
         }
         
         try {
             const response = await fetch('/api/integration/amocrm/sync', {
                 method: 'POST'
             });
-            const result = await response.json();
-            if (response.ok) {
-                alert(result.message || 'Sinxronizatsiya orqa fonda boshlandi!');
-                // Re-enable and refresh after a short delay
-                setTimeout(async () => {
-                    try {
-                        await this.render();
-                    } catch (renderErr) {
-                        console.error("CRM render error during sync:", renderErr);
-                    } finally {
+            if (!response.ok) {
+                const result = await response.json();
+                throw new Error(result.detail || 'Sinxronizatsiya boshlashda xatolik yuz berdi.');
+            }
+            
+            // Sinxronizatsiya statusini kuzatib boramiz (polling)
+            const interval = setInterval(async () => {
+                try {
+                    const statusRes = await fetch('/api/integration/amocrm/sync-status');
+                    if (statusRes.ok) {
+                        const statusData = await statusRes.json();
                         if (btn) {
-                            btn.disabled = false;
-                            btn.innerHTML = originalHTML;
+                            btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${statusData.message || 'Sinxronizatsiya...'}`;
+                        }
+                        
+                        if (!statusData.running) {
+                            clearInterval(interval);
+                            if (btn) {
+                                btn.disabled = false;
+                                btn.innerHTML = originalHTML;
+                            }
+                            alert(statusData.message || 'Sinxronizatsiya yakunlandi!');
+                            await this.render();
                         }
                     }
-                }, 3000);
-            } else {
-                alert(result.detail || 'Sinxronizatsiya boshlashda xatolik yuz berdi.');
-                if (btn) {
-                    btn.disabled = false;
-                    btn.innerHTML = originalHTML;
+                } catch (pollErr) {
+                    console.error("Error polling sync status:", pollErr);
                 }
-            }
+            }, 2000);
+            
         } catch (e) {
             console.error("amoCRM sync error:", e);
-            alert("Serverga ulanishda xatolik yuz berdi.");
+            alert("Xatolik: " + e.message);
             if (btn) {
                 btn.disabled = false;
                 btn.innerHTML = originalHTML;
