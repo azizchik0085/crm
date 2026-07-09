@@ -1538,9 +1538,17 @@
                         <h1>Marketing Kampaniyalari</h1>
                         <p>Reklama kanallari xarajatlari, leads va ROI tahlili</p>
                     </div>
-                    <button class="btn btn-primary" onclick="window.Marketing.openCampaignModal()">
-                        <i class="fas fa-plus"></i> Yangi Kampaniya
-                    </button>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="btn btn-secondary" onclick="window.Marketing.openMetaSettings()" style="display: flex; align-items: center; gap: 8px;">
+                            <i class="fas fa-cog"></i> Meta API Sozlamalari
+                        </button>
+                        <button class="btn btn-primary" id="btn-marketing-sync" onclick="window.Marketing.syncCampaigns()" style="display: flex; align-items: center; gap: 8px; background: var(--success); border-color: var(--success);">
+                            <i class="fas fa-sync"></i> Sinxronizatsiya
+                        </button>
+                        <button class="btn btn-primary" onclick="window.Marketing.openCampaignModal()" style="display: flex; align-items: center; gap: 8px;">
+                            <i class="fas fa-plus"></i> Yangi Kampaniya
+                        </button>
+                    </div>
                 </div>
 
                 <div class="table-responsive" style="margin-top: 20px;">
@@ -2876,6 +2884,101 @@
                 <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid rgba(255,255,255,0.08); padding: 15px 20px;">
                     <button type="button" class="btn btn-secondary" onclick="closeModal('procurement-order-modal')" style="padding: 8px 20px;">Bekor qilish</button>
                     <button type="submit" class="btn btn-primary" style="padding: 8px 20px;"><i class="fas fa-paper-plane"></i> REGOS POS-ga yuborish</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Meta Ads Manager Sozlamalari Modali -->
+    <div class="modal" id="meta-marketing-settings-modal">
+        <div class="modal-content" style="max-width: 500px; width: 95vw; background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 18px; box-shadow: 0 20px 50px rgba(0,0,0,0.5);">
+            <div class="modal-header" style="border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 15px;">
+                <h3 style="font-weight: 700; color: #f8fafc; font-size: 18px; margin: 0;"><i class="fab fa-facebook-square" style="color:#1877f2; margin-right: 8px;"></i> Meta API Sozlamalari</h3>
+                <button class="close-modal-btn" onclick="closeModal('meta-marketing-settings-modal')" style="color: #94a3b8; background: transparent; border: none; font-size: 24px; cursor: pointer;">&times;</button>
+            </div>
+            <form id="meta-marketing-settings-form" onsubmit="window.Marketing.saveMetaSettings(event)">
+                <div class="modal-body" style="text-align: left; padding: 20px; color: #f1f5f9; display: flex; flex-direction: column; gap: 15px;">
+                    <p style="font-size: 12px; color: #94a3b8; margin: 0 0 10px 0;">Meta Graph API orqali Facebook va Instagram reklama kampaniyalaringiz xarajatlarini va lidlarini sinxronizatsiya qilish uchun ma'lumotlarni kiriting.</p>
+                    
+                    <div class="form-group">
+                        <label style="display:block; margin-bottom: 6px; font-weight:600; font-size: 13px; color: #cbd5e1;">Meta API Access Token (Kirish kaliti):</label>
+                        <input type="password" id="meta-api-access-token" class="form-control" placeholder="E.g. EAAGz..." style="background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255, 255, 255, 0.1); color: #f8fafc; width: 100%; box-sizing: border-box; padding: 8px 12px; border-radius: 6px;">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label style="display:block; margin-bottom: 6px; font-weight:600; font-size: 13px; color: #cbd5e1;">Meta Ad Account ID (Reklama Kabineti ID):</label>
+                        <input type="text" id="meta-ad-account-id" class="form-control" placeholder="E.g. act_123456789" style="background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255, 255, 255, 0.1); color: #f8fafc; width: 100%; box-sizing: border-box; padding: 8px 12px; border-radius: 6px;">
+                    </div>
+                    
+                    <div style="background: rgba(99, 102, 241, 0.1); border: 1px solid rgba(99, 102, 241, 0.2); border-radius: 8px; padding: 12px; font-size: 12px; color: #818cf8; display: flex; gap: 8px; align-items: flex-start;">
+                        <i class="fas fa-info-circle" style="margin-top: 2px;"></i>
+                        <div>Sozlamalar bo'sh qoldirilsa yoki kalit xato bo'lsa, tizim sinov rejimi sifatida simulyatsiyalangan (mock) reklama kampaniyalarini yuklaydi.</div>
+                    </div>
+                </div>
+                <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid rgba(255,255,255,0.08); padding: 15px 20px;">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('meta-marketing-settings-modal')" style="padding: 8px 20px;">Bekor qilish</button>
+                    <button type="submit" class="btn btn-primary" style="padding: 8px 20px; background: #1877f2; border-color: #1877f2;"><i class="fas fa-save"></i> Saqlash</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Yangi Reklama Kampaniyasi Modal Oynasi -->
+    <div class="modal" id="marketing-campaign-modal">
+        <div class="modal-content" style="max-width: 500px; width: 95vw; background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 18px; box-shadow: 0 20px 50px rgba(0,0,0,0.5);">
+            <div class="modal-header" style="border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 15px;">
+                <h3 style="font-weight: 700; color: #f8fafc; font-size: 18px; margin: 0;"><i class="fas fa-bullhorn" style="color:#6366f1; margin-right: 8px;"></i> Yangi Reklama Kampaniyasi</h3>
+                <button class="close-modal-btn" onclick="closeModal('marketing-campaign-modal')" style="color: #94a3b8; background: transparent; border: none; font-size: 24px; cursor: pointer;">&times;</button>
+            </div>
+            <form id="marketing-campaign-form" onsubmit="window.Marketing.saveCampaign(event)">
+                <div class="modal-body" style="text-align: left; padding: 20px; color: #f1f5f9; display: flex; flex-direction: column; gap: 15px;">
+                    
+                    <div class="form-group">
+                        <label style="display:block; margin-bottom: 6px; font-weight:600; font-size: 13px; color: #cbd5e1;">Kampaniya Nomi <span style="color:var(--danger)">*</span></label>
+                        <input type="text" id="m-camp-name" class="form-control" required placeholder="E.g. Sement Sotuv Instagram" style="background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255, 255, 255, 0.1); color: #f8fafc; width: 100%; box-sizing: border-box; padding: 8px 12px; border-radius: 6px;">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label style="display:block; margin-bottom: 6px; font-weight:600; font-size: 13px; color: #cbd5e1;">Platforma <span style="color:var(--danger)">*</span></label>
+                        <select id="m-camp-platform" class="form-control" required style="background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255, 255, 255, 0.1); color: #f8fafc; width: 100%; box-sizing: border-box; padding: 8px 12px; border-radius: 6px;">
+                            <option value="facebook">Facebook</option>
+                            <option value="instagram">Instagram</option>
+                            <option value="telegram">Telegram</option>
+                            <option value="google">Google</option>
+                        </select>
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                        <div class="form-group">
+                            <label style="display:block; margin-bottom: 6px; font-weight:600; font-size: 13px; color: #cbd5e1;">Budjet (UZS):</label>
+                            <input type="number" id="m-camp-budget" class="form-control" value="0" style="background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255, 255, 255, 0.1); color: #f8fafc; width: 100%; box-sizing: border-box; padding: 8px 12px; border-radius: 6px;">
+                        </div>
+                        <div class="form-group">
+                            <label style="display:block; margin-bottom: 6px; font-weight:600; font-size: 13px; color: #cbd5e1;">Xarajat (Sarflangan, UZS):</label>
+                            <input type="number" id="m-camp-spent" class="form-control" value="0" style="background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255, 255, 255, 0.1); color: #f8fafc; width: 100%; box-sizing: border-box; padding: 8px 12px; border-radius: 6px;">
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label style="display:block; margin-bottom: 6px; font-weight:600; font-size: 13px; color: #cbd5e1;">Lidlar Soni (Conversions):</label>
+                        <input type="number" id="m-camp-leads" class="form-control" value="0" style="background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255, 255, 255, 0.1); color: #f8fafc; width: 100%; box-sizing: border-box; padding: 8px 12px; border-radius: 6px;">
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                        <div class="form-group">
+                            <label style="display:block; margin-bottom: 6px; font-weight:600; font-size: 13px; color: #cbd5e1;">Boshlanish Sanasi:</label>
+                            <input type="date" id="m-camp-start" class="form-control" style="background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255, 255, 255, 0.1); color: #f8fafc; width: 100%; box-sizing: border-box; padding: 8px 12px; border-radius: 6px;">
+                        </div>
+                        <div class="form-group">
+                            <label style="display:block; margin-bottom: 6px; font-weight:600; font-size: 13px; color: #cbd5e1;">Tugash Sanasi:</label>
+                            <input type="date" id="m-camp-end" class="form-control" style="background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255, 255, 255, 0.1); color: #f8fafc; width: 100%; box-sizing: border-box; padding: 8px 12px; border-radius: 6px;">
+                        </div>
+                    </div>
+                    
+                </div>
+                <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid rgba(255,255,255,0.08); padding: 15px 20px;">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('marketing-campaign-modal')" style="padding: 8px 20px;">Bekor qilish</button>
+                    <button type="submit" class="btn btn-primary" style="padding: 8px 20px;"><i class="fas fa-save"></i> Kampaniyani saqlash</button>
                 </div>
             </form>
         </div>

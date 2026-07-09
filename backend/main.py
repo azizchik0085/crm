@@ -1647,6 +1647,8 @@ def update_settings(settings: dict, request: Request):
     company_settings["amocrm_lead_creation"] = settings.get("amocrm_lead_creation", False)
     company_settings["supabase_url"] = settings.get("supabase_url", "")
     company_settings["supabase_key"] = settings.get("supabase_key", "")
+    company_settings["meta_access_token"] = settings.get("meta_access_token", "")
+    company_settings["meta_ad_account_id"] = settings.get("meta_ad_account_id", "")
     if "roles" in settings:
         company_settings["roles"] = settings.get("roles")
     if "amocrm_operators_map" in settings:
