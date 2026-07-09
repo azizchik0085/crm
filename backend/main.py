@@ -4262,6 +4262,14 @@ def create_amocrm_deals_for_receipts(receipts, company_id, force=False):
         paid_enum_id = None
         operator_field_id = None
         operator_enums = []
+        
+        # Resolve field IDs dynamically from custom fields list
+        bill_price_field_id = None
+        payer_field_id = None
+        bill_comment_field_id = None
+        items_field_id = None
+        bill_status_field_id = None
+        
         try:
             catalogs_res = requests.get(f"https://{subdomain}.amocrm.ru/api/v4/catalogs", headers=headers, timeout=10)
             if catalogs_res.status_code == 200:
@@ -4276,15 +4284,26 @@ def create_amocrm_deals_for_receipts(receipts, company_id, force=False):
                 if cf_res.status_code == 200:
                     fields = cf_res.json().get("_embedded", {}).get("custom_fields", [])
                     for f in fields:
-                        if f.get("code") == "BILL_STATUS":
+                        code = f.get("code")
+                        fid = f.get("id")
+                        if code == "BILL_STATUS":
+                            bill_status_field_id = fid
                             enums = f.get("enums") or []
                             for e in enums:
                                 if e.get("code") == "paid" or e.get("value") in ["TO'LANDI", "Оплачено"]:
                                     paid_enum_id = e.get("id")
                                     break
+                        elif code == "PAYER":
+                            payer_field_id = fid
+                        elif code == "ITEMS":
+                            items_field_id = fid
+                        elif code == "BILL_COMMENT":
+                            bill_comment_field_id = fid
+                        elif code == "BILL_PRICE":
+                            bill_price_field_id = fid
                                     
                         if f.get("name") and f.get("name").strip().lower() == "sotuv operatori":
-                            operator_field_id = f.get("id")
+                            operator_field_id = fid
                             operator_enums = f.get("enums") or []
         except Exception as e_discovery:
             print(f"amoCRM Lead Creation: Error during catalog discovery: {e_discovery}")
@@ -4412,7 +4431,7 @@ def create_amocrm_deals_for_receipts(receipts, company_id, force=False):
                             break
             except Exception as e_active_search:
                 print(f"amoCRM Lead Creation: Failed to search active lead: {e_active_search}")
-
+ 
             if not lead_id:
                 print(f"amoCRM Lead Creation: No active lead/deal found for contact {contact_id} and phone {clean_phone}. Skipping invoice creation.")
                 continue
@@ -4423,6 +4442,8 @@ def create_amocrm_deals_for_receipts(receipts, company_id, force=False):
                 # Dynamic Invoices creation and linking
                 try:
                     if invoices_catalog_id:
+                        total_amount = float(r.get("total_amount") or 0.0)
+                        
                         # Find matching operator enum ID from pre-fetched list
                         operator_enum_id = None
                         if operator_field_id and operator_name:
@@ -4440,9 +4461,20 @@ def create_amocrm_deals_for_receipts(receipts, company_id, force=False):
                             invoice_items.append({
                                 "value": {
                                     "sku": str(p.get("sku") or ""),
+                                    "product_id": None,
                                     "description": p.get("name") or "Mahsulot",
                                     "unit_price": float(p.get("price") or 0),
-                                    "quantity": float(p.get("quantity") or 1)
+                                    "unit_type": p.get("unit") or "ta",
+                                    "quantity": float(p.get("quantity") or 1),
+                                    "discount": {
+                                        "type": "amount",
+                                        "value": 0.0
+                                    },
+                                    "vat_rate_id": 0,
+                                    "vat_rate_value": 0,
+                                    "bonus_points_per_purchase": 0.0,
+                                    "external_uid": "",
+                                    "metadata": []
                                 }
                             })
                             
@@ -4450,73 +4482,68 @@ def create_amocrm_deals_for_receipts(receipts, company_id, force=False):
                             invoice_items.append({
                                 "value": {
                                     "sku": "",
+                                    "product_id": None,
                                     "description": f"Buyurtma (REGOS: {code})",
                                     "unit_price": float(total_amount),
-                                    "quantity": 1.0
+                                    "unit_type": "ta",
+                                    "quantity": 1.0,
+                                    "discount": {
+                                        "type": "amount",
+                                        "value": 0.0
+                                    },
+                                    "vat_rate_id": 0,
+                                    "vat_rate_value": 0,
+                                    "bonus_points_per_purchase": 0.0,
+                                    "external_uid": "",
+                                    "metadata": []
                                 }
                             })
                             
-                        # 4. Create Invoice Element
+                        # 4. Create Invoice Element using dynamic Field IDs (crucial for API validation)
+                        element_fields = []
+                        if bill_price_field_id:
+                            element_fields.append({
+                                "field_id": bill_price_field_id,
+                                "values": [{"value": int(total_amount)}]
+                            })
+                        if payer_field_id:
+                            element_fields.append({
+                                "field_id": payer_field_id,
+                                "values": [{
+                                    "value": {
+                                        "entity_type": "contacts",
+                                        "entity_id": int(contact_id),
+                                        "phone": clean_phone
+                                    }
+                                }]
+                            })
+                        if bill_comment_field_id:
+                            element_fields.append({
+                                "field_id": bill_comment_field_id,
+                                "values": [{"value": "REGOS orqali avtomatik yuborildi"}]
+                            })
+                        if items_field_id:
+                            element_fields.append({
+                                "field_id": items_field_id,
+                                "values": invoice_items
+                            })
+                        if bill_status_field_id and paid_enum_id:
+                            element_fields.append({
+                                "field_id": bill_status_field_id,
+                                "values": [{"enum_id": paid_enum_id}]
+                            })
+                        if operator_field_id and operator_enum_id:
+                            element_fields.append({
+                                "field_id": operator_field_id,
+                                "values": [{"enum_id": operator_enum_id}]
+                            })
+
                         element_payload = [
                             {
                                 "name": f"REGOS: {code}",
-                                "custom_fields_values": [
-                                    {
-                                        "field_code": "BILL_PRICE",
-                                        "values": [
-                                            {
-                                                "value": str(int(total_amount))
-                                            }
-                                        ]
-                                    },
-                                    {
-                                        "field_code": "PAYER",
-                                        "values": [
-                                            {
-                                                "value": {
-                                                    "name": cust_name or "Mijoz",
-                                                    "entity_type": "contacts",
-                                                    "entity_id": contact_id,
-                                                    "phone": clean_phone
-                                                }
-                                            }
-                                        ]
-                                    },
-                                    {
-                                        "field_code": "BILL_COMMENT",
-                                        "values": [
-                                            {
-                                                "value": "REGOS orqali avtomatik yuborildi"
-                                            }
-                                        ]
-                                    },
-                                    {
-                                        "field_code": "ITEMS",
-                                        "values": invoice_items
-                                    }
-                                ]
+                                "custom_fields_values": element_fields
                             }
                         ]
-                        
-                        if paid_enum_id:
-                            element_payload[0]["custom_fields_values"].append({
-                                        "field_code": "BILL_STATUS",
-                                        "values": [
-                                            {
-                                                "enum_id": paid_enum_id
-                                            }
-                                        ]
-                                    })
-                                    
-                        if operator_field_id and operator_enum_id:
-                            element_payload[0]["custom_fields_values"].append({
-                                        "field_id": operator_field_id,
-                                        "values": [
-                                            {
-                                                "enum_id": operator_enum_id
-                                            }
-                                        ]
-                                    })
                                     
                         element_res = requests.post(f"https://{subdomain}.amocrm.ru/api/v4/catalogs/{invoices_catalog_id}/elements", headers=headers, json=element_payload, timeout=10)
                         if element_res.status_code in [200, 201]:
