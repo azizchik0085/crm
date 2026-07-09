@@ -4367,45 +4367,11 @@ def create_amocrm_deals_for_receipts(receipts, company_id, force=False):
             except Exception as e_active_search:
                 print(f"amoCRM Lead Creation: Failed to search active lead: {e_active_search}")
 
-            # Create Lead in amoCRM if no active lead is found
-            lead_url = f"https://{subdomain}.amocrm.ru/api/v4/leads"
-            total_amount = r.get("total_amount") or 0
-            code = r.get("code") or r.get("id")
-            
-            lead_payload = [
-                {
-                    "name": f"Buyurtma (REGOS: {code})",
-                    "price": int(total_amount),
-                    "_embedded": {
-                        "contacts": [
-                            {
-                                "id": contact_id
-                            }
-                        ]
-                    }
-                }
-            ]
-            if responsible_user_id:
-                lead_payload[0]["responsible_user_id"] = int(responsible_user_id)
+            if not lead_id:
+                print(f"amoCRM Lead Creation: No active lead/deal found for contact {contact_id} and phone {clean_phone}. Skipping invoice creation.")
+                continue
                 
-            lead_created_or_found = False
-            if lead_id:
-                lead_created_or_found = True
-                
-            if not lead_created_or_found:
-                try:
-                    lead_res = requests.post(lead_url, headers=headers, json=lead_payload, timeout=10)
-                    if lead_res.status_code in [200, 201]:
-                        lead_data = lead_res.json()
-                        created_leads = lead_data.get("_embedded", {}).get("leads", [])
-                        if created_leads:
-                            lead_id = created_leads[0].get("id")
-                            print(f"amoCRM Lead Creation: Successfully created lead {lead_id} for receipt {code} (amount: {total_amount})")
-                            lead_created_or_found = True
-                    else:
-                        print(f"amoCRM Lead Creation: Failed to create lead (status: {lead_res.status_code}), response: {lead_res.text}")
-                except Exception as e_lead:
-                    print(f"amoCRM Lead Creation: Exception creating lead: {e_lead}")
+            lead_created_or_found = True
                     
             if lead_created_or_found and lead_id:
                 # Dynamic Invoices creation and linking
