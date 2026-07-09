@@ -4213,10 +4213,10 @@ def create_amocrm_deals_for_receipts(receipts, company_id, force=False):
         for uid, name in user_map.items():
             user_name_to_id[name.strip().lower()] = uid
             
-        # Get local customers to cross-reference phone numbers to operator names
+        # Get local customers to cross-reference phone numbers, contact IDs and operator names
         customers = []
         try:
-            path = "customers?select=phone,operator"
+            path = "customers?select=id,phone,operator,source"
             if company_id:
                 path += f"&company_id=eq.{company_id}"
             customers = supabase_get_all(path, company_id=company_id)
@@ -4302,47 +4302,67 @@ def create_amocrm_deals_for_receipts(receipts, company_id, force=False):
             if already_exists:
                 continue
                 
-            # Search contact in amoCRM by phone number
+            # Search contact in local DB first, then live API fallback
             contact_id = None
-            search_url = f"https://{subdomain}.amocrm.ru/api/v4/contacts?query={clean_phone}"
-            try:
-                search_res = requests.get(search_url, headers=headers, timeout=10)
-                if search_res.status_code == 200:
-                    search_data = search_res.json()
-                    contacts_found = search_data.get("_embedded", {}).get("contacts", [])
-                    for c in contacts_found:
-                        c_details = fetch_amocrm_contact_details(subdomain, token, c.get("id"))
-                        if c_details:
-                            cf_values = c_details.get("custom_fields_values") or []
-                            matched = False
-                            for cf in cf_values:
-                                if cf.get("field_code") == "PHONE":
-                                    vals = cf.get("values") or []
-                                    for v in vals:
-                                        val_phone = v.get("value") or ""
-                                        # Compare last 9 digits of both numbers to ignore formatting/country codes
-                                        p1 = "".join(char for char in val_phone if char.isdigit())
-                                        p2 = "".join(char for char in clean_phone if char.isdigit())
-                                        if p1 and p2:
-                                            is_match = False
-                                            if len(p1) >= 9 and len(p2) >= 9:
-                                                is_match = p1[-9:] == p2[-9:]
-                                            else:
-                                                is_match = p1 == p2
-                                            if is_match:
-                                                contact_id = c.get("id")
-                                                matched = True
-                                                print(f"amoCRM Lead Creation: Found existing matching contact ID {contact_id} with phone {val_phone} for {clean_phone}")
-                                                break
-                                if matched:
-                                    break
-                        if contact_id:
-                            break
-            except Exception as e_contact:
-                print(f"amoCRM Lead Creation: Failed contact lookup/verification for {clean_phone}: {e_contact}")
+            
+            # 1. Search in pre-fetched local customers database (fast and formatting-insensitive)
+            p2 = "".join(char for char in clean_phone if char.isdigit())
+            for c in customers:
+                ph = c.get("phone") or ""
+                p1 = "".join(char for char in ph if char.isdigit())
+                if p1 and p2:
+                    is_match = False
+                    if len(p1) >= 9 and len(p2) >= 9:
+                        is_match = p1[-9:] == p2[-9:]
+                    else:
+                        is_match = p1 == p2
+                    if is_match and c.get("source") == "amocrm" and c.get("id", "").startswith("amocrm_"):
+                        contact_id = c.get("id").split("_")[1]
+                        print(f"amoCRM Lead Creation: Resolved contact ID {contact_id} from local DB for phone {clean_phone}")
+                        break
+            
+            # 2. Live amoCRM API query fallback
+            if not contact_id:
+                # Try query with the last 9 digits to minimize formatting mismatches
+                last_9 = clean_phone[-9:] if len(clean_phone) >= 9 else clean_phone
+                search_url = f"https://{subdomain}.amocrm.ru/api/v4/contacts?query={last_9}"
+                try:
+                    search_res = requests.get(search_url, headers=headers, timeout=10)
+                    if search_res.status_code == 200:
+                        search_data = search_res.json()
+                        contacts_found = search_data.get("_embedded", {}).get("contacts", [])
+                        for c in contacts_found:
+                            c_details = fetch_amocrm_contact_details(subdomain, token, c.get("id"))
+                            if c_details:
+                                cf_values = c_details.get("custom_fields_values") or []
+                                matched = False
+                                for cf in cf_values:
+                                    if cf.get("field_code") == "PHONE":
+                                        vals = cf.get("values") or []
+                                        for v in vals:
+                                            val_phone = v.get("value") or ""
+                                            p1 = "".join(char for char in val_phone if char.isdigit())
+                                            p2 = "".join(char for char in clean_phone if char.isdigit())
+                                            if p1 and p2:
+                                                is_match = False
+                                                if len(p1) >= 9 and len(p2) >= 9:
+                                                    is_match = p1[-9:] == p2[-9:]
+                                                else:
+                                                    is_match = p1 == p2
+                                                if is_match:
+                                                    contact_id = c.get("id")
+                                                    matched = True
+                                                    print(f"amoCRM Lead Creation: Found existing matching contact ID {contact_id} with phone {val_phone} via API fallback")
+                                                    break
+                                        if matched:
+                                            break
+                            if contact_id:
+                                break
+                except Exception as e_contact:
+                    print(f"amoCRM Lead Creation: Failed contact lookup fallback for {clean_phone}: {e_contact}")
                 
             if not contact_id:
-                print(f"amoCRM Lead Creation: Could not resolve contact ID for {clean_phone}. Skipping lead creation.")
+                print(f"amoCRM Lead Creation: Could not resolve contact ID for {clean_phone}. Skipping invoice creation.")
                 continue
                 
             # Map operator to responsible_user_id
