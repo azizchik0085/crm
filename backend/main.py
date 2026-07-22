@@ -4442,7 +4442,10 @@ def create_amocrm_deals_for_receipts(receipts, company_id, force=False):
                 # Dynamic Invoices creation and linking
                 try:
                     if invoices_catalog_id:
-                        total_amount = float(r.get("total_amount") or 0.0)
+                        try:
+                            total_amount = float(r.get("total_amount") or 0.0)
+                        except (ValueError, TypeError):
+                            total_amount = 0.0
                         
                         # Find matching operator enum ID from pre-fetched list
                         operator_enum_id = None
@@ -4458,14 +4461,23 @@ def create_amocrm_deals_for_receipts(receipts, company_id, force=False):
                         receipt_products = items.get("products") or []
                         invoice_items = []
                         for p in receipt_products:
+                            try:
+                                u_price = float(p.get("price") or 0)
+                            except (ValueError, TypeError):
+                                u_price = 0.0
+                            try:
+                                u_qty = float(p.get("quantity") or 1)
+                            except (ValueError, TypeError):
+                                u_qty = 1.0
+                                
                             invoice_items.append({
                                 "value": {
                                     "sku": str(p.get("sku") or ""),
                                     "product_id": None,
                                     "description": p.get("name") or "Mahsulot",
-                                    "unit_price": float(p.get("price") or 0),
+                                    "unit_price": u_price,
                                     "unit_type": p.get("unit") or "ta",
-                                    "quantity": float(p.get("quantity") or 1),
+                                    "quantity": u_qty,
                                     "discount": {
                                         "type": "amount",
                                         "value": 0.0
@@ -4484,7 +4496,7 @@ def create_amocrm_deals_for_receipts(receipts, company_id, force=False):
                                     "sku": "",
                                     "product_id": None,
                                     "description": f"Buyurtma (REGOS: {code})",
-                                    "unit_price": float(total_amount),
+                                    "unit_price": total_amount,
                                     "unit_type": "ta",
                                     "quantity": 1.0,
                                     "discount": {
@@ -4615,7 +4627,10 @@ async def amocrm_webhook(request: Request):
                     user_map = get_amocrm_users(subdomain, token)
                     status_map = get_amocrm_status_map(subdomain, token)
                     
-                    price = float(lead.get("price") or 0)
+                    try:
+                        price = float(lead.get("price") or 0)
+                    except (ValueError, TypeError):
+                        price = 0.0
                     status_id = lead.get("status_id")
                     resp_user_id = lead.get("responsible_user_id")
                     operator_name = user_map.get(resp_user_id, "")
