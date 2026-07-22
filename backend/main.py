@@ -4760,11 +4760,38 @@ async def amocrm_webhook(request: Request):
                             
                     if phone and c_id:
                         clean_phone = "".join(c for c in phone if c.isdigit() or c == "+")
+                        
+                        # Load employees list to resolve mapped names
+                        employees_list = []
+                        try:
+                            path = "employees?select=id,name"
+                            if data_company_id:
+                                path += f"&company_id=eq.{data_company_id}"
+                            employees_list = supabase_get_all(path, company_id=data_company_id)
+                        except Exception as e_emp:
+                            print(f"amoCRM Webhook: failed to load employees: {e_emp}")
+                        emp_id_to_name = {e.get("id"): e.get("name") for e in employees_list if e.get("id")}
+                        
+                        # Map operator name if configured in settings
+                        operators_map = settings.get("amocrm_operators_map") or {}
+                        mapped_operator_name = None
+                        if operator_name:
+                            mapped_emp_id = operators_map.get(operator_name)
+                            # Fallback to case-insensitive match
+                            if not mapped_emp_id:
+                                op_upper = operator_name.upper()
+                                for k, v in operators_map.items():
+                                    if k.upper() == op_upper:
+                                        mapped_emp_id = v
+                                        break
+                            if mapped_emp_id and mapped_emp_id in emp_id_to_name:
+                                mapped_operator_name = emp_id_to_name[mapped_emp_id]
+
                         customer = {
                             "id": f"amocrm_{c_id}",
                             "name": cust_name,
                             "phone": clean_phone,
-                            "operator": operator_name,
+                            "operator": mapped_operator_name or operator_name,
                             "status": status,
                             "value": price,
                             "source": "amocrm"
