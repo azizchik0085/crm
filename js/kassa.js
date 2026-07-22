@@ -774,6 +774,24 @@ window.Kassa = {
 
         try {
             await DB.saveReceipt(updatedReceipt);
+
+            // Moliya (Kassa) bo'limiga kirim tranzaksiyasini yozish (agar yetkazilgan bo'lsa)
+            if (success) {
+                try {
+                    const transaction = {
+                        id: 't_' + Date.now(),
+                        type: 'income',
+                        category: 'Sotuvlar',
+                        amount: receipt.total_amount || 0,
+                        date: new Date().toISOString().split('T')[0],
+                        description: `Dastavka cheki: ${receipt.code} (${statusText})`
+                    };
+                    await DB.saveTransaction(transaction);
+                } catch (e_tx) {
+                    console.error("Failed to write financial transaction on delivery completion:", e_tx);
+                }
+            }
+
             await this.render();
 
             // Also, update stats
@@ -805,8 +823,29 @@ window.Kassa = {
 
         itemsObj.delivery.status = "delivered";
 
+        const updatedReceipt = {
+            ...receipt,
+            items: itemsObj
+        };
+
         try {
             await DB.saveReceipt(updatedReceipt);
+            
+            // Moliya (Kassa) bo'limiga kirim tranzaksiyasini yozish
+            try {
+                const transaction = {
+                    id: 't_' + Date.now(),
+                    type: 'income',
+                    category: 'Sotuvlar',
+                    amount: receipt.total_amount || 0,
+                    date: new Date().toISOString().split('T')[0],
+                    description: `Dastavka cheki: ${receipt.code} (Kassa naqd pul qabul qildi)`
+                };
+                await DB.saveTransaction(transaction);
+            } catch (e_tx) {
+                console.error("Failed to write financial transaction on cash confirmation:", e_tx);
+            }
+
             await this.render();
             if (window.App && typeof window.App.updateDashboardStats === 'function') {
                 window.App.updateDashboardStats();
