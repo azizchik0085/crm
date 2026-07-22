@@ -4411,10 +4411,23 @@ def create_amocrm_deals_for_receipts(receipts, company_id, force=False):
                 continue
                 
             # Map operator to responsible_user_id
+            operators_map = settings.get("amocrm_operators_map") or {}
+            operator_name = r.get("cashier_name")
+            if operator_name and operator_name in operators_map:
+                operator_name = operators_map[operator_name]
+            if not operator_name:
+                operator_name = phone_to_operator.get(clean_phone)
+                
             responsible_user_id = None
-            operator_name = phone_to_operator.get(clean_phone)
             if operator_name:
                 responsible_user_id = user_name_to_id.get(operator_name.strip().lower())
+                # Try partial matches on user names if direct lookup fails
+                if not responsible_user_id:
+                    op_clean = operator_name.strip().lower()
+                    for name, uid in user_name_to_id.items():
+                        if name in op_clean or op_clean in name:
+                            responsible_user_id = uid
+                            break
                 
             # Search for an active lead for this contact in amoCRM
             lead_id = None
@@ -4464,6 +4477,7 @@ def create_amocrm_deals_for_receipts(receipts, company_id, force=False):
                                 op_val = operator_name.strip().lower()
                                 if e_val == op_val or e_val in op_val or op_val in e_val:
                                     operator_enum_id = e.get("id")
+                                    print(f"amoCRM Invoice Creation: Found matching operator custom field enum {e.get('value')} (ID: {operator_enum_id}) for operator {operator_name}")
                                     break
                                     
                         # 3. Construct products (ITEMS) list from receipt products
@@ -4565,6 +4579,8 @@ def create_amocrm_deals_for_receipts(receipts, company_id, force=False):
                                 "custom_fields_values": element_fields
                             }
                         ]
+                        if responsible_user_id:
+                            element_payload[0]["responsible_user_id"] = int(responsible_user_id)
                                     
                         element_res = requests.post(f"https://{subdomain}.amocrm.ru/api/v4/catalogs/{invoices_catalog_id}/elements", headers=headers, json=element_payload, timeout=10)
                         if element_res.status_code in [200, 201]:
