@@ -4891,6 +4891,21 @@ def push_receipts_to_amocrm_endpoint(payload: dict, background_tasks: Background
         print(f"Manual Push Receipts: Error: {e}")
         raise HTTPException(status_code=500, detail=f"Tizim xatoligi yuz berdi: {str(e)}")
 
+@app.get("/tv")
+def tv_redirect(company: str = "giperbrendstroy"):
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url=f"/tv.html?company={company}")
+
+@app.get("/tv/{alias}")
+def tv_alias_redirect(alias: str):
+    from fastapi.responses import RedirectResponse
+    company_map = {
+        "giper": "giperbrendstroy",
+        "protech": "protechctiy"
+    }
+    company_id = company_map.get(alias.lower(), alias)
+    return RedirectResponse(url=f"/tv.html?company={company_id}")
+
 @app.get("/")
 def read_index():
     index_path = os.path.join(STATIC_DIR, "index.html")
