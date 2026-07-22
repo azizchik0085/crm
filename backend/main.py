@@ -4113,6 +4113,18 @@ def run_amocrm_sync_background(subdomain, token, company_id: str = None):
         contact_map = get_amocrm_contacts_map(subdomain, token)
         
         headers = get_amocrm_headers(token)
+        
+        # Fetch employees to resolve mapped names
+        employees_list = []
+        try:
+            path = "employees?select=id,name"
+            if company_id:
+                path += f"&company_id=eq.{company_id}"
+            employees_list = supabase_get_all(path, company_id=company_id)
+        except Exception as e_emp:
+            print(f"amoCRM Sync: failed to load employees: {e_emp}")
+        emp_id_to_name = {e.get("id"): e.get("name") for e in employees_list if e.get("id")}
+
         url = f"https://{subdomain}.amocrm.ru/api/v4/leads"
         params = {"limit": 250, "with": "contacts"}
         synced_customers = []
@@ -4155,11 +4167,26 @@ def run_amocrm_sync_background(subdomain, token, company_id: str = None):
                         if not clean_phone:
                             continue
                             
+                        # Map operator name if configured in settings
+                        operators_map = settings.get("amocrm_operators_map") or {}
+                        mapped_operator_name = None
+                        if operator_name:
+                            mapped_emp_id = operators_map.get(operator_name)
+                            # Fallback to case-insensitive match
+                            if not mapped_emp_id:
+                                op_upper = operator_name.upper()
+                                for k, v in operators_map.items():
+                                    if k.upper() == op_upper:
+                                        mapped_emp_id = v
+                                        break
+                            if mapped_emp_id and mapped_emp_id in emp_id_to_name:
+                                mapped_operator_name = emp_id_to_name[mapped_emp_id]
+                                
                         customer = {
                             "id": f"amocrm_{c_id}",
                             "name": cust_name,
                             "phone": clean_phone,
-                            "operator": operator_name,
+                            "operator": mapped_operator_name or operator_name,
                             "status": status,
                             "value": price,
                             "source": "amocrm"
@@ -4240,6 +4267,17 @@ def create_amocrm_deals_for_receipts(receipts, company_id, force=False):
         for uid, name in user_map.items():
             user_name_to_id[name.strip().lower()] = uid
             
+        # Get employees to map cashier name -> employee ID
+        employees_list = []
+        try:
+            path = "employees?select=id,name"
+            if company_id:
+                path += f"&company_id=eq.{company_id}"
+            employees_list = supabase_get_all(path, company_id=company_id)
+        except Exception as e_emp:
+            print(f"amoCRM Lead Creation: failed to load employees: {e_emp}")
+        emp_name_to_id = {e.get("name").strip().lower(): e.get("id") for e in employees_list if e.get("name")}
+
         # Get local customers to cross-reference phone numbers, contact IDs and operator names
         customers = []
         try:
@@ -4413,18 +4451,31 @@ def create_amocrm_deals_for_receipts(receipts, company_id, force=False):
                 
             # Map operator to responsible_user_id
             operators_map = settings.get("amocrm_operators_map") or {}
-            operator_name = r.get("cashier_name")
-            if operator_name and operator_name in operators_map:
-                operator_name = operators_map[operator_name]
-            if not operator_name:
-                operator_name = phone_to_operator.get(clean_phone)
+            cashier_name = r.get("cashier_name")
+            amocrm_user_name = None
+            
+            if cashier_name:
+                # Find employee ID for this cashier
+                emp_id = emp_name_to_id.get(cashier_name.strip().lower())
+                if emp_id:
+                    # Find which amoCRM operator name maps to this employee ID
+                    for amocrm_op, mapped_id in operators_map.items():
+                        if mapped_id == emp_id:
+                            amocrm_user_name = amocrm_op
+                            break
+            
+            if not amocrm_user_name:
+                amocrm_user_name = cashier_name
+                
+            if not amocrm_user_name:
+                amocrm_user_name = phone_to_operator.get(clean_phone)
                 
             responsible_user_id = None
-            if operator_name:
-                responsible_user_id = user_name_to_id.get(operator_name.strip().lower())
+            if amocrm_user_name:
+                responsible_user_id = user_name_to_id.get(amocrm_user_name.strip().lower())
                 # Try partial matches on user names if direct lookup fails
                 if not responsible_user_id:
-                    op_clean = operator_name.strip().lower()
+                    op_clean = amocrm_user_name.strip().lower()
                     for name, uid in user_name_to_id.items():
                         if name in op_clean or op_clean in name:
                             responsible_user_id = uid
