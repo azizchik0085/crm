@@ -617,33 +617,34 @@
                         const cost = formatMoney(d.total_amount);
                         
                         return `
-                            <div class="delivery-card status-shipped">
-                                <div class="card-header-row">
-                                    <span class="code-box">${d.code}</span>
-                                    <span class="time-badge"><i class="far fa-clock"></i> ${transitTime}</span>
+                            <div class="delivery-card status-shipped" style="padding: 24px 28px;">
+                                <div class="card-header-row" style="margin-bottom: 12px;">
+                                    <span class="code-box" style="font-size: 20px; padding: 6px 12px;">${d.code}</span>
+                                    <span class="time-badge" style="font-size: 16px;"><i class="far fa-clock"></i> ${transitTime}</span>
                                 </div>
-                                <div class="address-box">${dev.address || 'Manzil kiritilmagan'}</div>
-                                <div style="font-size: 15px; margin-bottom: 12px; color: var(--text-main); display: flex; align-items: center; gap: 8px;">
+                                <div class="address-box" style="font-size: 26px; font-weight: 800; margin-bottom: 14px;">${dev.address || 'Manzil kiritilmagan'}</div>
+                                <div style="font-size: 22px; margin-bottom: 8px; color: var(--text-main); display: flex; align-items: center; gap: 10px;">
                                     <i class="fas fa-user" style="color: var(--accent);"></i> 
                                     <strong>${d.customerName}</strong>
-                                    ${d.customerPhone ? `<span style="color: var(--text-muted); font-family: 'JetBrains Mono', monospace;">(${d.customerPhone})</span>` : ''}
                                 </div>
-                                <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px; border-top: 1px dashed rgba(255,255,255,0.06); padding-top: 8px;">
-                                    <strong style="color: var(--accent);"><i class="fas fa-shopping-basket"></i> Mahsulotlar:</strong> ${formatProductsList(d.products)}
+                                ${d.customerPhone ? `<div style="font-size: 20px; font-weight: 700; color: #10B981; font-family: 'JetBrains Mono', monospace; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;"><i class="fas fa-phone-alt"></i> ${d.customerPhone}</div>` : ''}
+                                <div style="font-size: 18px; color: #f8fafc; margin-bottom: 20px; border-top: 1px dashed rgba(255,255,255,0.15); padding-top: 10px;">
+                                    <strong style="color: #f59e0b;"><i class="fas fa-shopping-basket"></i> Mahsulotlar:</strong> 
+                                    <span style="font-weight: 600;">${formatProductsList(d.products)}</span>
                                 </div>
-                                <div class="meta-grid">
+                                <div class="meta-grid" style="padding-top: 16px;">
                                     <div class="meta-item">
-                                        <div class="meta-icon"><i class="fas fa-user-ninja"></i></div>
+                                        <div class="meta-icon" style="width: 44px; height: 44px; font-size: 18px;"><i class="fas fa-user-ninja"></i></div>
                                         <div class="meta-content">
-                                            <span class="meta-label">Kuryer</span>
-                                            <span class="meta-value">${dev.courier_name || 'Noma\'lum'}</span>
+                                            <span class="meta-label" style="font-size: 12px;">Kuryer</span>
+                                            <span class="meta-value" style="font-size: 18px;">${dev.courier_name || 'Noma\'lum'}</span>
                                         </div>
                                     </div>
                                     <div class="meta-item">
-                                        <div class="meta-icon"><i class="fas fa-coins"></i></div>
+                                        <div class="meta-icon" style="width: 44px; height: 44px; font-size: 18px;"><i class="fas fa-coins"></i></div>
                                         <div class="meta-content">
-                                            <span class="meta-label">Jami Summa</span>
-                                            <span class="meta-value" style="color: var(--success); font-family: 'JetBrains Mono', monospace; font-size:16px;">${cost}</span>
+                                            <span class="meta-label" style="font-size: 12px;">Jami Summa</span>
+                                            <span class="meta-value" style="color: var(--success); font-family: 'JetBrains Mono', monospace; font-size: 20px; font-weight: 800;">${cost}</span>
                                         </div>
                                     </div>
                                 </div>
@@ -670,16 +671,17 @@
                         const statusText = isPrep ? '<i class="fas fa-spinner fa-spin"></i> Yig\'ilmoqda' : '<i class="far fa-clock"></i> Kutilyapti';
                         
                         return `
-                            <div class="mini-card">
+                            <div class="mini-card" style="padding: 20px 24px; border-left: 5px solid var(--accent);">
                                 <div class="mini-info" style="flex: 1; padding-right: 12px;">
-                                    <h3 style="font-size: 16px; margin-bottom: 4px;">${d.code} &bull; <span style="color: var(--accent);">${d.customerName}</span></h3>
-                                    <p style="margin-bottom: 4px;"><i class="fas fa-map-marker-alt"></i> ${dev.address || 'Manzil kiritilmagan'} &bull; ${elapsed}</p>
-                                    ${d.customerPhone ? `<p style="margin-bottom: 4px; font-family: 'JetBrains Mono', monospace;"><i class="fas fa-phone-alt"></i> ${d.customerPhone}</p>` : ''}
-                                    <p style="font-size: 12px; color: var(--text-muted); border-top: 1px dashed rgba(255,255,255,0.06); padding-top: 4px; margin-top: 4px;">
-                                        <strong>Mahsulotlar:</strong> ${formatProductsList(d.products)}
-                                    </p>
+                                    <h3 style="font-size: 24px; margin-bottom: 8px; font-weight: 800;">${d.code} &bull; <span style="color: #a5b4fc;">${d.customerName}</span></h3>
+                                    <p style="margin-bottom: 6px; font-size: 16px;"><i class="fas fa-map-marker-alt"></i> ${dev.address || 'Manzil kiritilmagan'} &bull; ${elapsed}</p>
+                                    ${d.customerPhone ? `<p style="margin-bottom: 10px; font-family: 'JetBrains Mono', monospace; font-size: 20px; font-weight: 700; color: #10B981;"><i class="fas fa-phone-alt"></i> ${d.customerPhone}</p>` : ''}
+                                    <div style="font-size: 18px; color: #f8fafc; border-top: 1px dashed rgba(255,255,255,0.15); padding-top: 8px; margin-top: 8px;">
+                                        <strong style="color: #f59e0b;"><i class="fas fa-shopping-basket"></i> Mahsulotlar:</strong>
+                                        <span style="font-weight: 600; color: #f8fafc;">${formatProductsList(d.products)}</span>
+                                    </div>
                                 </div>
-                                <span class="status-pill ${statusClass}">${statusText}</span>
+                                <span class="status-pill ${statusClass}" style="font-size: 14px; padding: 8px 16px;">${statusText}</span>
                             </div>
                         `;
                     }).join('');
@@ -706,16 +708,18 @@
                             : '<i class="fas fa-check-circle"></i> Yetkazildi';
                         
                         return `
-                            <div class="mini-card" style="border-color: rgba(16, 185, 129, 0.15);">
+                            <div class="mini-card" style="padding: 20px 24px; border-left: 5px solid var(--success); border-color: rgba(16, 185, 129, 0.3);">
                                 <div class="mini-info" style="flex: 1; padding-right: 12px;">
-                                    <h3 style="font-size: 16px; margin-bottom: 4px;">${d.code} &bull; <span style="color: var(--success);">${d.customerName}</span></h3>
-                                    <p style="margin-bottom: 4px;"><i class="fas fa-map-marker-alt"></i> ${dev.address || 'Manzil kiritilmagan'} &bull; ${elapsed}</p>
-                                    <p style="margin-bottom: 4px;"><i class="fas fa-user-ninja"></i> Kuryer: ${dev.courier_name || 'Noma\'lum'} ${d.customerPhone ? `&bull; <span style="font-family: 'JetBrains Mono', monospace;"><i class="fas fa-phone-alt"></i> ${d.customerPhone}</span>` : ''}</p>
-                                    <p style="font-size: 12px; color: var(--text-muted); border-top: 1px dashed rgba(255,255,255,0.06); padding-top: 4px; margin-top: 4px;">
-                                        <strong>Mahsulotlar:</strong> ${formatProductsList(d.products)}
-                                    </p>
+                                    <h3 style="font-size: 24px; margin-bottom: 8px; font-weight: 800;">${d.code} &bull; <span style="color: var(--success);">${d.customerName}</span></h3>
+                                    <p style="margin-bottom: 6px; font-size: 16px;"><i class="fas fa-map-marker-alt"></i> ${dev.address || 'Manzil kiritilmagan'} &bull; ${elapsed}</p>
+                                    <p style="margin-bottom: 6px; font-size: 16px;"><i class="fas fa-user-ninja"></i> Kuryer: <strong style="color: var(--text-main);">${dev.courier_name || 'Noma\'lum'}</strong></p>
+                                    ${d.customerPhone ? `<p style="margin-bottom: 10px; font-family: 'JetBrains Mono', monospace; font-size: 20px; font-weight: 700; color: #10B981;"><i class="fas fa-phone-alt"></i> ${d.customerPhone}</p>` : ''}
+                                    <div style="font-size: 18px; color: #f8fafc; border-top: 1px dashed rgba(255,255,255,0.15); padding-top: 8px; margin-top: 8px;">
+                                        <strong style="color: #f59e0b;"><i class="fas fa-shopping-basket"></i> Mahsulotlar:</strong>
+                                        <span style="font-weight: 600; color: #f8fafc;">${formatProductsList(d.products)}</span>
+                                    </div>
                                 </div>
-                                <span class="status-pill ${statusClass}">${statusText}</span>
+                                <span class="status-pill ${statusClass}" style="font-size: 14px; padding: 8px 16px;">${statusText}</span>
                             </div>
                         `;
                     }).join('');
