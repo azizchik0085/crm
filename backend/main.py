@@ -3620,6 +3620,7 @@ def create_regos_order(order_data: dict, request: Request):
                 continue
                 
         operations.append({
+            "document_id": 0,
             "item_id": item_id,
             "quantity": float(item.get("quantity", 1)),
             "price": float(item.get("price", 0))
