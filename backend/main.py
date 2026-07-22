@@ -4419,16 +4419,25 @@ def create_amocrm_deals_for_receipts(receipts, company_id, force=False):
             # Search for an active lead for this contact in amoCRM
             lead_id = None
             try:
-                leads_filter_url = f"https://{subdomain}.amocrm.ru/api/v4/leads?filter[contacts][id]={contact_id}"
-                leads_res = requests.get(leads_filter_url, headers=headers, timeout=10)
-                if leads_res.status_code == 200:
-                    leads_list = leads_res.json().get("_embedded", {}).get("leads", [])
-                    # Find the first active lead (status_id not in [142, 143])
-                    for l in leads_list:
-                        if l.get("status_id") not in [142, 143]:
-                            lead_id = l.get("id")
-                            print(f"amoCRM Lead Creation: Found existing active lead ID {lead_id} for contact {contact_id}. Reusing.")
-                            break
+                links_url = f"https://{subdomain}.amocrm.ru/api/v4/contacts/{contact_id}/links"
+                links_res = requests.get(links_url, headers=headers, timeout=10)
+                if links_res.status_code == 200:
+                    links_data = links_res.json()
+                    links_list = links_data.get("_embedded", {}).get("links", [])
+                    linked_lead_ids = [str(lnk.get("to_entity_id")) for lnk in links_list if lnk.get("to_entity_type") == "leads"]
+                    
+                    if linked_lead_ids:
+                        ids_str = ",".join(linked_lead_ids)
+                        leads_url = f"https://{subdomain}.amocrm.ru/api/v4/leads?filter[id]={ids_str}"
+                        leads_res = requests.get(leads_url, headers=headers, timeout=10)
+                        if leads_res.status_code == 200:
+                            leads_list = leads_res.json().get("_embedded", {}).get("leads", [])
+                            # Find the first active lead (status_id not in [142, 143])
+                            for l in leads_list:
+                                if l.get("status_id") not in [142, 143]:
+                                    lead_id = l.get("id")
+                                    print(f"amoCRM Lead Creation: Found existing active lead ID {lead_id} for contact {contact_id}. Reusing.")
+                                    break
             except Exception as e_active_search:
                 print(f"amoCRM Lead Creation: Failed to search active lead: {e_active_search}")
  
