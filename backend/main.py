@@ -4459,6 +4459,36 @@ def create_amocrm_deals_for_receipts(receipts, company_id, force=False):
                 continue
                 
             lead_created_or_found = True
+            
+            # Update Contact and Lead (Deal) responsible user in amoCRM to match the sales operator
+            if responsible_user_id:
+                # 1. Update Contact
+                try:
+                    update_contact_url = f"https://{subdomain}.amocrm.ru/api/v4/contacts/{contact_id}"
+                    contact_update_payload = {
+                        "responsible_user_id": int(responsible_user_id)
+                    }
+                    contact_update_res = requests.patch(update_contact_url, headers=headers, json=contact_update_payload, timeout=10)
+                    if contact_update_res.status_code == 200:
+                        print(f"amoCRM Contact Update: Successfully updated responsible user for contact {contact_id} to {responsible_user_id}")
+                    else:
+                        print(f"amoCRM Contact Update failed: {contact_update_res.text}")
+                except Exception as e_contact_update:
+                    print(f"amoCRM Contact Update exception: {e_contact_update}")
+                    
+                # 2. Update Lead (Deal)
+                try:
+                    update_lead_url = f"https://{subdomain}.amocrm.ru/api/v4/leads/{lead_id}"
+                    lead_update_payload = {
+                        "responsible_user_id": int(responsible_user_id)
+                    }
+                    lead_update_res = requests.patch(update_lead_url, headers=headers, json=lead_update_payload, timeout=10)
+                    if lead_update_res.status_code == 200:
+                        print(f"amoCRM Lead Update: Successfully updated responsible user for lead {lead_id} to {responsible_user_id}")
+                    else:
+                        print(f"amoCRM Lead Update failed: {lead_update_res.text}")
+                except Exception as e_lead_update:
+                    print(f"amoCRM Lead Update exception: {e_lead_update}")
                     
             if lead_created_or_found and lead_id:
                 # Dynamic Invoices creation and linking
