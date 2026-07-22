@@ -6,11 +6,19 @@ window.Receipts = {
     init: function() {
         this.receiptsList = []; // Har safar tabga o'tganda yangi ma'lumotlarni serverdan yuklash uchun keshni tozalaymiz
         this.setupEventListeners();
+        
+        // Sana maydoniga bugungi sanani sukut bo'yicha yozamiz
+        const dateInput = document.getElementById('receipts-search-date');
+        if (dateInput && !dateInput.value) {
+            const todayStr = new Date().toLocaleDateString('en-CA'); // format: YYYY-MM-DD
+            dateInput.value = todayStr;
+        }
+        
         this.render();
     },
 
     setupEventListeners: function() {
-        const inputs = ['receipts-search', 'receipts-search-seller', 'receipts-search-phone', 'receipts-search-operator'];
+        const inputs = ['receipts-search', 'receipts-search-seller', 'receipts-search-phone', 'receipts-search-operator', 'receipts-search-date'];
         let debounceTimer;
         inputs.forEach(id => {
             const input = document.getElementById(id);
@@ -21,6 +29,11 @@ window.Receipts = {
                         this.render();
                     }, 300);
                 };
+                if (id === 'receipts-search-date') {
+                    input.onchange = () => {
+                        this.render();
+                    };
+                }
             }
         });
     },
@@ -30,6 +43,7 @@ window.Receipts = {
         const sellerVal = document.getElementById('receipts-search-seller')?.value.toLowerCase() || '';
         const phoneVal = document.getElementById('receipts-search-phone')?.value.replace(/\D/g, '') || '';
         const operatorVal = document.getElementById('receipts-search-operator')?.value.toLowerCase() || '';
+        const dateVal = document.getElementById('receipts-search-date')?.value || '';
         const container = document.getElementById('receipts-content');
         if (!container) return;
 
@@ -273,6 +287,10 @@ window.Receipts = {
                 const operatorNorm = window.normalizeUzbek ? window.normalizeUzbek(operatorName) : operatorName.toLowerCase();
                 return operatorNorm.includes(opValNorm);
             });
+        }
+
+        if (dateVal) {
+            filtered = filtered.filter(r => r.created_at && r.created_at.startsWith(dateVal));
         }
 
         // Sort by created_at descending
@@ -711,9 +729,10 @@ window.Receipts = {
         const sellerVal = document.getElementById('receipts-search-seller')?.value.toLowerCase() || '';
         const phoneVal = document.getElementById('receipts-search-phone')?.value.replace(/\D/g, '') || '';
         const operatorVal = document.getElementById('receipts-search-operator')?.value.toLowerCase() || '';
+        const dateVal = document.getElementById('receipts-search-date')?.value || '';
         
         let filtered = this.receiptsList || [];
-        if (searchVal || sellerVal || phoneVal || operatorVal) {
+        if (searchVal || sellerVal || phoneVal || operatorVal || dateVal) {
             filtered = filtered.filter(r => {
                 const codeNorm = r.code ? r.code.toLowerCase() : '';
                 const cashierNorm = r.cashier_name ? r.cashier_name.toLowerCase() : '';
@@ -745,6 +764,9 @@ window.Receipts = {
                 }
                 if (operatorVal) {
                     matches = matches && operatorName.includes(operatorVal);
+                }
+                if (dateVal) {
+                    matches = matches && r.created_at && r.created_at.startsWith(dateVal);
                 }
                 return matches;
             });
