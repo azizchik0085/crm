@@ -626,9 +626,16 @@
                             <i class="fas fa-search"></i>
                             <input type="text" id="kassa-search" class="form-control" placeholder="Chek kodi, xaridor yoki kassa xodimi bo'yicha...">
                         </div>
+                        <div class="search-box" style="width: 180px; margin: 0;">
+                            <i class="fas fa-calendar-alt"></i>
+                            <input type="date" id="kassa-search-date" class="form-control" style="padding-left: 36px; height: 42px; font-family: 'JetBrains Mono';">
+                        </div>
                         <button class="btn btn-secondary" id="kassa-sync-btn" onclick="window.Kassa.syncWithRegos(this)" style="height: 42px; display: flex; align-items: center; gap: 8px;">
                             <i class="fas fa-sync-alt"></i> REGOS-dan yangilash
                         </button>
+                        <a href="tv.html" id="kassa-tv-link" target="_blank" class="btn btn-secondary" style="height: 42px; display: inline-flex; align-items: center; gap: 8px; text-decoration: none; padding: 0 16px; border-radius: 8px; font-weight: 500; font-size: 14px; background: rgba(99, 102, 241, 0.15); color: #818cf8; border: 1px solid rgba(99, 102, 241, 0.3);">
+                            <i class="fas fa-tv"></i> TV Monitor
+                        </a>
                     </div>
                     
                     <div class="kassa-tabs" style="display: flex; gap: 8px; flex-wrap: wrap; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
@@ -1890,7 +1897,7 @@ CREATE TABLE IF NOT EXISTS public.messages (
     <script src="js/erp.js?v=10"></script>
     <script src="js/finance.js?v=4"></script>
     <script src="js/receipts.js?v=7"></script>
-    <script src="js/kassa.js?v=3"></script>
+    <script src="js/kassa.js?v=4"></script>
     <!-- JsBarcode Library -->
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
     <script src="js/seniklar.js?v=6"></script>

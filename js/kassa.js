@@ -17,6 +17,13 @@ window.Kassa = {
             }
         }
 
+        // Setup TV Monitor link dynamically based on active company ID
+        const compId = localStorage.getItem('activeCompanyId') || localStorage.getItem('company_id') || '';
+        const tvLink = document.getElementById('kassa-tv-link');
+        if (tvLink && compId) {
+            tvLink.href = `tv.html?company=${encodeURIComponent(compId)}`;
+        }
+
         this.setupEventListeners();
         await this.loadEmployees();
         // Load initial receipts so known list is populated before polling starts
