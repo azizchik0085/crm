@@ -4655,6 +4655,23 @@ def create_amocrm_deals_for_receipts(receipts, company_id, force=False):
                                 "values": [{"enum_id": operator_enum_id}]
                             })
 
+                        # Check if invoice element already exists to prevent duplicate creation
+                        invoice_exists = False
+                        try:
+                            search_res = requests.get(f"https://{subdomain}.amocrm.ru/api/v4/catalogs/{invoices_catalog_id}/elements", headers=headers, params={"query": f"REGOS: {code}"}, timeout=10)
+                            if search_res.status_code == 200:
+                                elements_found = search_res.json().get("_embedded", {}).get("elements", [])
+                                for el in elements_found:
+                                    if el.get("name") == f"REGOS: {code}":
+                                        invoice_exists = True
+                                        print(f"amoCRM Invoice: 'REGOS: {code}' already exists in catalog. Skipping creation.")
+                                        break
+                        except Exception as e_search:
+                            print(f"amoCRM Invoice: duplicate check failed: {e_search}")
+
+                        if invoice_exists:
+                            continue
+
                         element_payload = [
                             {
                                 "name": f"REGOS: {code}",
