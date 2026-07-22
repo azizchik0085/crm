@@ -892,13 +892,21 @@
                         <h1>Sotuv Cheklari (POS)</h1>
                         <p>Kassada urilgan va yopilgan sotuv cheklari tarixi</p>
                     </div>
-                    <div class="header-actions" style="display: flex; gap: 8px;">
+                    <div class="header-actions" style="display: flex; gap: 8px; align-items: center;">
                         <button class="btn btn-secondary" onclick="CRM.syncAmoCRMLeads(this)" id="btn-amocrm-sync-receipts">
                             <i class="fas fa-sync"></i> amoCRM Sinx
                         </button>
                         <button class="btn btn-warning" id="amocrm-push-receipts-btn" onclick="Receipts.pushReceiptsToAmoCRM(this)" style="background: #f59e0b; border-color: #f59e0b; color: #fff; gap: 6px; display: inline-flex; align-items: center;">
                             <i class="fas fa-upload"></i> amoCRM-ga yuborish
                         </button>
+                        <div class="auto-sync-container" style="display: inline-flex; align-items: center; gap: 8px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.05); padding: 0 12px; border-radius: 20px; height: 38px;">
+                            <div id="auto-sync-status-indicator" style="width: 8px; height: 8px; border-radius: 50%; background-color: #64748b; transition: all 0.3s;" title="Avto-sinx faolsiz"></div>
+                            <span style="font-size: 12px; font-weight: 600; color: var(--text-main); white-space: nowrap;">Avto-sinx (10 min):</span>
+                            <label class="switch" style="position: relative; display: inline-block; width: 36px; height: 20px; margin: 0;">
+                                <input type="checkbox" id="receipts-auto-sync-toggle" onchange="Receipts.toggleAutoSync(this.checked)" style="opacity: 0; width: 0; height: 0;">
+                                <span class="slider" style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(255,255,255,0.1); transition: .3s; border-radius: 34px;"></span>
+                            </label>
+                        </div>
                         <button class="btn btn-primary" id="receipts-sync-btn" onclick="Receipts.syncWithRegos()">
                             <i class="fas fa-sync-alt"></i> REGOS bilan sinxronizatsiya
                         </button>

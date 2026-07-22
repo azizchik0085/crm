@@ -15,6 +15,7 @@ window.Receipts = {
         }
         
         this.render();
+        this.updateAutoSyncIndicator();
     },
 
     setupEventListeners: function() {
@@ -812,6 +813,152 @@ window.Receipts = {
         } finally {
             btn.disabled = false;
             btn.innerHTML = originalText;
+        }
+    },
+
+    initAutoSync: function() {
+        // Inject pulsing dot animations if they don't exist
+        if (!document.getElementById('auto-sync-styles')) {
+            const style = document.createElement('style');
+            style.id = 'auto-sync-styles';
+            style.innerHTML = `
+                @keyframes pulse-green {
+                    0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
+                    70% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+                    100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+                }
+                @keyframes pulse-blue {
+                    0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.6); }
+                    70% { box-shadow: 0 0 0 8px rgba(59, 130, 246, 0); }
+                    100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+                }
+                .pulse-green {
+                    animation: pulse-green 2s infinite;
+                }
+                .pulse-blue {
+                    animation: pulse-blue 1.5s infinite;
+                }
+            `;
+            document.head.appendChild(style);
+        }
+
+        const isEnabled = localStorage.getItem('receipts_auto_sync_enabled') === 'true';
+        if (isEnabled && !window.receiptsAutoSyncIntervalId) {
+            console.log("Auto-sync: Initializing background sync (every 10 minutes)");
+            // Run a silent sync shortly after startup (e.g. 5 seconds) to ensure fresh data, then every 10 minutes
+            setTimeout(() => {
+                if (localStorage.getItem('receipts_auto_sync_enabled') === 'true') {
+                    this.runSilentSync();
+                }
+            }, 5000);
+
+            window.receiptsAutoSyncIntervalId = setInterval(() => {
+                this.runSilentSync();
+            }, 600000); // 10 minutes
+        }
+    },
+
+    toggleAutoSync: function(enabled) {
+        localStorage.setItem('receipts_auto_sync_enabled', enabled ? 'true' : 'false');
+        if (enabled) {
+            this.initAutoSync();
+        } else {
+            if (window.receiptsAutoSyncIntervalId) {
+                clearInterval(window.receiptsAutoSyncIntervalId);
+                window.receiptsAutoSyncIntervalId = null;
+            }
+        }
+        this.updateAutoSyncIndicator();
+    },
+
+    runSilentSync: async function() {
+        try {
+            const statusRes = await fetch('/api/integration/regos/sync-status');
+            if (statusRes.ok) {
+                const status = await statusRes.json();
+                if (status.running) {
+                    console.log("Auto-sync: Sync is already running. Skipping.");
+                    return;
+                }
+            }
+        } catch (e) {
+            console.error("Auto-sync: Failed to check sync status:", e);
+        }
+
+        console.log("Auto-sync: Starting background sync...");
+        this.updateAutoSyncIndicator('syncing');
+
+        try {
+            const response = await fetch('/api/integration/regos/sync-receipts?days=3', {
+                method: 'POST'
+            });
+            if (!response.ok) {
+                throw new Error("Sync failed to trigger");
+            }
+            this.pollSilentSyncStatus();
+        } catch (e) {
+            console.error("Auto-sync: Background sync trigger failed:", e);
+            this.updateAutoSyncIndicator('idle');
+        }
+    },
+
+    pollSilentSyncStatus: function() {
+        const interval = setInterval(async () => {
+            try {
+                const res = await fetch('/api/integration/regos/sync-status');
+                if (!res.ok) return;
+                const status = await res.json();
+                
+                if (!status.running) {
+                    clearInterval(interval);
+                    console.log("Auto-sync: Finished. Status:", status.message);
+                    this.updateAutoSyncIndicator('idle');
+                    
+                    // Refresh data if current view is receipts
+                    if (window.App && window.App.currentView === 'receipts') {
+                        this.receiptsList = [];
+                        this.render();
+                    }
+                    if (window.App && typeof window.App.updateDashboardStats === 'function') {
+                        window.App.updateDashboardStats();
+                    }
+                }
+            } catch (e) {
+                console.error("Auto-sync: Error polling status:", e);
+                clearInterval(interval);
+                this.updateAutoSyncIndicator('idle');
+            }
+        }, 3000);
+    },
+
+    updateAutoSyncIndicator: function(state) {
+        const toggle = document.getElementById('receipts-auto-sync-toggle');
+        const indicator = document.getElementById('auto-sync-status-indicator');
+        
+        const isEnabled = localStorage.getItem('receipts_auto_sync_enabled') === 'true';
+        if (toggle) {
+            toggle.checked = isEnabled;
+        }
+
+        if (!indicator) return;
+
+        if (!isEnabled) {
+            indicator.style.backgroundColor = '#64748b'; // grey
+            indicator.title = "Avto-sinx faolsiz";
+            indicator.classList.remove('pulse-blue', 'pulse-green');
+            return;
+        }
+
+        if (state === 'syncing') {
+            indicator.style.backgroundColor = '#3b82f6'; // blue
+            indicator.title = "Sinxronizatsiya bajarilmoqda...";
+            indicator.classList.add('pulse-blue');
+            indicator.classList.remove('pulse-green');
+        } else {
+            indicator.style.backgroundColor = '#10b981'; // green
+            indicator.title = "Avto-sinx yoqilgan (navbatdagi yangilanish kutilmoqda)";
+            indicator.classList.add('pulse-green');
+            indicator.classList.remove('pulse-blue');
         }
     }
 };

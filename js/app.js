@@ -58,6 +58,11 @@ window.App = {
         this.syncSettingsToBackend();
         this.initAIAssistantWidget();
         this.setupAuth();
+        
+        // Initialize Receipts Auto-Sync if module is available
+        if (window.Receipts && typeof window.Receipts.initAutoSync === 'function') {
+            window.Receipts.initAutoSync();
+        }
     },
 
     loadSettingsFromBackend: async function() {
