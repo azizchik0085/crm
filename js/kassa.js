@@ -32,6 +32,19 @@ window.Kassa = {
             };
         }
 
+        // Date filter
+        const dateInput = document.getElementById('kassa-search-date');
+        if (dateInput) {
+            dateInput.onchange = () => {
+                const btn = document.getElementById('kassa-sync-btn');
+                if (btn) {
+                    this.syncWithRegos(btn);
+                } else {
+                    this.render();
+                }
+            };
+        }
+
         // Tab button filters
         const tabButtons = document.querySelectorAll('.kassa-tab-btn');
         tabButtons.forEach(btn => {
@@ -143,20 +156,31 @@ window.Kassa = {
         let shippedCount = 0;
         let waitingCount = 0;
 
+        const dateVal = document.getElementById('kassa-search-date')?.value || '';
+
         const processedList = this.receiptsList.map(r => {
             const parsedItems = parseItems(r);
             const status = parsedItems.delivery.status;
-
-            if (status === 'pending') pendingCount++;
-            else if (status === 'preparing') preparingCount++;
-            else if (status === 'shipped') shippedCount++;
-            else if (status === 'waiting_cash_confirm') waitingCount++;
 
             return {
                 ...r,
                 parsedItems,
                 deliveryStatus: status
             };
+        });
+
+        // Filter by date first if selected
+        let dateFilteredList = processedList;
+        if (dateVal) {
+            dateFilteredList = processedList.filter(r => r.created_at && r.created_at.startsWith(dateVal));
+        }
+
+        dateFilteredList.forEach(r => {
+            const status = r.deliveryStatus;
+            if (status === 'pending') pendingCount++;
+            else if (status === 'preparing') preparingCount++;
+            else if (status === 'shipped') shippedCount++;
+            else if (status === 'waiting_cash_confirm') waitingCount++;
         });
 
         // Update tab badges
@@ -183,7 +207,7 @@ window.Kassa = {
         }
 
         // Apply filters
-        let filtered = processedList;
+        let filtered = dateFilteredList;
         if (this.activeStatus !== 'all') {
             filtered = filtered.filter(r => r.deliveryStatus === this.activeStatus);
         }
@@ -1181,13 +1205,23 @@ window.Kassa = {
 
     syncWithRegos: async function(btn) {
         if (!btn) return;
+        
+        const dateInput = document.getElementById('kassa-search-date');
+        const syncDate = dateInput ? dateInput.value : '';
+
         const originalText = btn.innerHTML;
         btn.disabled = true;
         btn.innerHTML = `<i class="fas fa-sync fa-spin"></i> Sinxronizatsiya boshlanmoqda...`;
 
         try {
-            // Sync last 45 days of receipts for updates
-            const response = await fetch(`/api/integration/regos/sync-receipts?days=45`, {
+            let url = '/api/integration/regos/sync-receipts';
+            if (syncDate) {
+                url += `?sync_date=${encodeURIComponent(syncDate)}`;
+            } else {
+                url += `?days=45`;
+            }
+
+            const response = await fetch(url, {
                 method: 'POST'
             });
             
