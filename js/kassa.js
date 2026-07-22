@@ -8,6 +8,15 @@ window.Kassa = {
     pollInterval: null,
 
     init: async function() {
+        // Restore saved date filter from localStorage
+        const dateInput = document.getElementById('kassa-search-date');
+        if (dateInput) {
+            const savedDate = localStorage.getItem('kassa_search_date');
+            if (savedDate) {
+                dateInput.value = savedDate;
+            }
+        }
+
         this.setupEventListeners();
         await this.loadEmployees();
         // Load initial receipts so known list is populated before polling starts
@@ -36,6 +45,7 @@ window.Kassa = {
         const dateInput = document.getElementById('kassa-search-date');
         if (dateInput) {
             dateInput.onchange = () => {
+                localStorage.setItem('kassa_search_date', dateInput.value || '');
                 const btn = document.getElementById('kassa-sync-btn');
                 if (btn) {
                     this.syncWithRegos(btn);

@@ -3015,6 +3015,31 @@ def save_parsed_receipt(cheque: dict, company_id: str = None):
             "status": cheque.get("status") or "Closed"
         }
 
+        # Check if the receipt already exists to preserve local custom attributes like delivery
+        existing_items = None
+        try:
+            path = f"receipts?select=items&id=eq.{c_uuid}"
+            if company_id:
+                path += f"&company_id=eq.{company_id}"
+            res = supabase_req("GET", path)
+            if res and isinstance(res, list) and len(res) > 0:
+                existing_items = res[0].get("items")
+        except Exception as e_exist:
+            print(f"Failed to check existing receipt {c_uuid} to preserve local attributes: {e_exist}")
+
+        if existing_items:
+            import json
+            if isinstance(existing_items, str):
+                try:
+                    existing_items = json.loads(existing_items)
+                except Exception:
+                    existing_items = {}
+            if isinstance(existing_items, dict):
+                # Preserve local custom keys (like delivery)
+                for key, val in existing_items.items():
+                    if key not in ["customer_name", "customer_phone", "seller_name", "products", "status"]:
+                        items_payload[key] = val
+
         receipt_payload = {
             "id": c_uuid,
             "code": c_code,
@@ -3029,7 +3054,7 @@ def save_parsed_receipt(cheque: dict, company_id: str = None):
             receipt_payload["company_id"] = company_id
         
         supabase_req("POST", "receipts?on_conflict=id", json_data=receipt_payload)
-        print(f"Successfully saved receipt {c_code} (UUID: {c_uuid}) to database.")
+        print(f"Successfully saved receipt {c_code} (UUID: {c_uuid}) to database (preserved local attributes).")
     except Exception as ex:
         print(f"Error parsing/saving receipt data: {ex}")
 
