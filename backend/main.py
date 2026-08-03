@@ -4578,13 +4578,13 @@ def create_amocrm_deals_for_receipts(receipts, company_id, force=False):
                         
                         # Find matching operator enum ID from pre-fetched list
                         operator_enum_id = None
-                        if operator_field_id and operator_name:
+                        if operator_field_id and amocrm_user_name:
                             for e in operator_enums:
                                 e_val = e.get("value", "").strip().lower()
-                                op_val = operator_name.strip().lower()
+                                op_val = amocrm_user_name.strip().lower()
                                 if e_val == op_val or e_val in op_val or op_val in e_val:
                                     operator_enum_id = e.get("id")
-                                    print(f"amoCRM Invoice Creation: Found matching operator custom field enum {e.get('value')} (ID: {operator_enum_id}) for operator {operator_name}")
+                                    print(f"amoCRM Invoice Creation: Found matching operator custom field enum {e.get('value')} (ID: {operator_enum_id}) for operator {amocrm_user_name}")
                                     break
                                     
                         # 3. Construct products (ITEMS) list from receipt products
