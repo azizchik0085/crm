@@ -1379,6 +1379,84 @@ window.CRM = {
         pagContainer.innerHTML = html;
     },
 
+    openAddFromWarehouseModal: function() {
+        const list = document.getElementById('warehouse-products-list');
+        if (list) {
+            list.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 32px;">Qidirish uchun mahsulot nomini yoki SKU kodini kiriting...</div>`;
+        }
+        const searchInput = document.getElementById('warehouse-search-input');
+        if (searchInput) searchInput.value = '';
+        showModal('add-from-warehouse-modal');
+    },
+
+    searchWarehouseProducts: async function() {
+        const searchInput = document.getElementById('warehouse-search-input');
+        const list = document.getElementById('warehouse-products-list');
+        if (!searchInput || !list) return;
+
+        const val = searchInput.value.trim().toLowerCase();
+        if (val.length < 2) {
+            list.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 32px;">Kamida 2 ta belgi kiriting...</div>`;
+            return;
+        }
+
+        list.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 32px;"><i class="fas fa-spinner fa-spin"></i> Qidirilmoqda...</div>`;
+
+        const allInventory = await DB.getInventory();
+        const warehouseProducts = allInventory.filter(p => p && p.id && p.id.startsWith('i_regos_'));
+
+        const valNorm = window.normalizeUzbek ? window.normalizeUzbek(val) : val;
+
+        const matches = warehouseProducts.filter(p => {
+            const nameNorm = p.name ? (window.normalizeUzbek ? window.normalizeUzbek(p.name) : p.name.toLowerCase()) : '';
+            const skuNorm = p.sku ? (window.normalizeUzbek ? window.normalizeUzbek(p.sku) : p.sku.toLowerCase()) : '';
+            return nameNorm.includes(valNorm) || skuNorm.includes(valNorm);
+        }).slice(0, 50);
+
+        if (matches.length === 0) {
+            list.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 32px;">Mahsulot topilmadi.</div>`;
+            return;
+        }
+
+        let html = '';
+        matches.forEach(p => {
+            html += `
+                <div onclick="CRM.selectWarehouseProduct('${p.id}')" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.05); cursor: pointer; transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.02)'" onmouseout="this.style.background='transparent'">
+                    <div style="text-align: left;">
+                        <div style="color: var(--text-main); font-weight: 600;">${p.name}</div>
+                        <div style="font-size: 0.75rem; color: var(--text-muted);">SKU: ${p.sku || '-'} | Kategoriya: ${p.category || '-'}</div>
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="color: #10b981; font-weight: 700; font-family: 'JetBrains Mono', monospace;">${parseFloat(p.price).toLocaleString()} so'm</div>
+                        <div style="font-size: 0.75rem; color: var(--text-muted);">Qoldiq: ${p.stock} ta</div>
+                    </div>
+                </div>
+            `;
+        });
+        list.innerHTML = html;
+    },
+
+    selectWarehouseProduct: async function(id) {
+        try {
+            const allInventory = await DB.getInventory();
+            const p = allInventory.find(item => item.id === id);
+            if (!p) return;
+
+            document.getElementById('prod-name').value = p.name || '';
+            document.getElementById('prod-sku').value = p.sku || '';
+            document.getElementById('prod-cat').value = p.category || '';
+            document.getElementById('prod-price').value = p.price || 0;
+            document.getElementById('prod-stock').value = p.stock || 0;
+            document.getElementById('prod-desc').value = '';
+            document.getElementById('prod-image').value = '';
+
+            closeModal('add-from-warehouse-modal');
+            showModal('product-modal');
+        } catch (e) {
+            console.error("Ombor mahsulotini tanlashda xatolik:", e);
+        }
+    },
+
     changeProductsPage: function(page) {
         this.productsPage = page;
         this.renderProductsView();

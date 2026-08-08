@@ -741,9 +741,14 @@
                         <h1>Mahsulot Kartochkalari</h1>
                         <p>Mahsulotlar katalogi va ombor qoldiqlari</p>
                     </div>
-                    <button class="btn btn-primary" onclick="CRM.openAddProductModal()" style="height: 42px; display: flex; align-items: center; gap: 8px;">
-                        <i class="fas fa-plus"></i> Kartochka Yaratish
-                    </button>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn btn-secondary" onclick="CRM.openAddFromWarehouseModal()" style="height: 42px; display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: var(--text-main);">
+                            <i class="fas fa-warehouse"></i> Ombordan Qo'shish
+                        </button>
+                        <button class="btn btn-primary" onclick="CRM.openAddProductModal()" style="height: 42px; display: flex; align-items: center; gap: 8px;">
+                            <i class="fas fa-plus"></i> Kartochka Yaratish
+                        </button>
+                    </div>
                 </div>
 
                 <div class="filter-row card" style="padding: 16px;">
@@ -2033,6 +2038,33 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" onclick="closeModal('product-details-modal')">Yopish</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2.3. Ombordan mahsulot tanlab kartochka yaratish modal oynasi -->
+    <div class="modal" id="add-from-warehouse-modal">
+        <div class="modal-content" style="max-width: 650px;">
+            <div class="modal-header">
+                <h3>Ombordan Mahsulot Tanlash</h3>
+                <button class="close-modal-btn" onclick="closeModal('add-from-warehouse-modal')">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 16px;">
+                <div class="form-group" style="margin-bottom: 16px;">
+                    <label style="color: var(--text-main); font-weight: 600;">Ombor mahsulotlarini qidirish:</label>
+                    <div class="search-box" style="margin: 8px 0 0 0; width: 100%; max-width: none; background: rgba(15,23,42,0.4); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px;">
+                        <i class="fas fa-search" style="left: 12px;"></i>
+                        <input type="text" id="warehouse-search-input" class="form-control" placeholder="Mahsulot nomi yoki SKU bo'yicha qidirish..." oninput="CRM.searchWarehouseProducts()" style="padding-left: 36px; height: 42px; background: transparent; border: none; color: var(--text-main);">
+                    </div>
+                </div>
+                <div id="warehouse-products-list" style="max-height: 350px; overflow-y: auto; border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; background: rgba(15,23,42,0.2);">
+                    <div style="text-align: center; color: var(--text-muted); padding: 32px;">
+                        Qidirish uchun mahsulot nomini yoki SKU kodini kiriting...
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('add-from-warehouse-modal')">Yopish</button>
             </div>
         </div>
     </div>
