@@ -684,6 +684,10 @@ window.App = {
                 return true;
             });
             
+            if (allowedViews.includes('crm')) {
+                allowedViews.push('crm-products');
+            }
+            
             document.querySelectorAll('.nav-item, .bottom-nav-item').forEach(item => {
                 const link = item.tagName === 'A' ? item : item.querySelector('a');
                 const targetView = item.getAttribute('data-view') || (link ? link.getAttribute('data-view') : null);
@@ -1043,6 +1047,8 @@ window.App = {
             this.renderDashboard();
         } else if (viewName === 'crm') {
             window.CRM.init();
+        } else if (viewName === 'crm-products') {
+            window.CRM.initProductsView();
         } else if (viewName === 'telephony') {
             window.Telephony.renderCallLogsTab();
         } else if (viewName === 'chats') {

@@ -83,6 +83,9 @@
                     <li class="nav-item" data-view="crm">
                         <a href="#" data-view="crm"><i class="fas fa-users-cog"></i> CRM Tizimi</a>
                     </li>
+                    <li class="nav-item" data-view="crm-products">
+                        <a href="#" data-view="crm-products"><i class="fas fa-box-open"></i> Mahsulot Kartochkalari</a>
+                    </li>
                     <li class="nav-item" data-view="telephony">
                         <a href="#" data-view="telephony"><i class="fas fa-phone-alt"></i> Telefoniya</a>
                     </li>
@@ -728,6 +731,34 @@
 
                 <div id="crm-content">
                     <!-- Dinamik Kanban yoki Ro'yxat ko'rinishi -->
+                </div>
+            </section>
+
+            <!-- 2.1. CRM MAHSULOT KARTOTEKASI BO'LIMI -->
+            <section id="view-crm-products" class="view-section">
+                <div class="header">
+                    <div class="header-title">
+                        <h1>Mahsulot Kartochkalari</h1>
+                        <p>Mahsulotlar katalogi va ombor qoldiqlari</p>
+                    </div>
+                </div>
+
+                <div class="filter-row card" style="padding: 16px;">
+                    <div style="display: flex; gap: 12px; align-items: center; flex-grow: 1; min-width: 250px; max-width: 600px;">
+                        <div class="search-box" style="flex-grow: 1; max-width: none; width: auto; margin: 0;">
+                            <i class="fas fa-search"></i>
+                            <input type="text" id="crm-products-search" class="form-control" placeholder="Mahsulot nomi yoki SKU bo'yicha qidirish...">
+                        </div>
+                        <div id="crm-products-category-filter-container" style="min-width: 180px; width: 180px;">
+                            <select id="crm-products-category-filter" class="form-control" style="height: 42px; background-color: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); color: var(--text-main); border-radius: 8px;">
+                                <option value="">Barcha toifalar</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="crm-products-content">
+                    <!-- Mahsulot kartochkalari tarmog'i -->
                 </div>
             </section>
 

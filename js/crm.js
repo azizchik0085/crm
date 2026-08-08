@@ -1071,7 +1071,11 @@ window.CRM = {
 
             await DB.saveProduct(updatedProduct);
             closeModal('edit-product-modal');
-            await this.render();
+            if (window.App && window.App.currentView === 'crm-products') {
+                await this.renderProductsView();
+            } else {
+                await this.render();
+            }
             if (window.App && typeof window.App.updateDashboardStats === 'function') {
                 window.App.updateDashboardStats();
             }
@@ -1088,7 +1092,11 @@ window.CRM = {
 
         try {
             await DB.deleteProduct(id);
-            await this.render();
+            if (window.App && window.App.currentView === 'crm-products') {
+                await this.renderProductsView();
+            } else {
+                await this.render();
+            }
             if (window.App && typeof window.App.updateDashboardStats === 'function') {
                 window.App.updateDashboardStats();
             }
@@ -1163,5 +1171,65 @@ window.CRM = {
             console.error("Mahsulot tafsilotlarini ko'rsatishda xatolik:", e);
             alert("Xatolik: " + e.message);
         }
+    },
+
+    initProductsView: function() {
+        this.setupEventListeners();
+        this.renderProductsView();
+        this.setupProductsViewEventListeners();
+    },
+
+    setupProductsViewEventListeners: function() {
+        const searchInput = document.getElementById('crm-products-search');
+        if (searchInput) {
+            searchInput.oninput = () => this.renderProductsView();
+        }
+
+        const categoryFilter = document.getElementById('crm-products-category-filter');
+        if (categoryFilter) {
+            categoryFilter.onchange = () => this.renderProductsView();
+        }
+    },
+
+    renderProductsView: async function() {
+        const searchVal = document.getElementById('crm-products-search')?.value.toLowerCase() || '';
+        const container = document.getElementById('crm-products-content');
+        if (!container) return;
+
+        const inventory = await DB.getInventory();
+        
+        // Kategoriya bo'yicha filterlarni yuklash
+        const categories = [...new Set(inventory.map(p => p.category).filter(Boolean))].sort();
+        const categoryFilterSelect = document.getElementById('crm-products-category-filter');
+        if (categoryFilterSelect) {
+            const currentSelected = categoryFilterSelect.value;
+            categoryFilterSelect.innerHTML = '<option value="">Barcha toifalar</option>';
+            categories.forEach(cat => {
+                const opt = document.createElement('option');
+                opt.value = cat;
+                opt.textContent = cat;
+                if (cat === currentSelected) {
+                    opt.selected = true;
+                }
+                categoryFilterSelect.appendChild(opt);
+            });
+        }
+
+        const selectedCategory = categoryFilterSelect ? categoryFilterSelect.value : '';
+        const searchValNorm = window.normalizeUzbek ? window.normalizeUzbek(searchVal) : searchVal.toLowerCase();
+
+        const filteredProducts = inventory.filter(p => {
+            if (selectedCategory && p.category !== selectedCategory) {
+                return false;
+            }
+            const nameNorm = window.normalizeUzbek ? window.normalizeUzbek(p.name) : p.name.toLowerCase();
+            const skuNorm = p.sku ? (window.normalizeUzbek ? window.normalizeUzbek(p.sku) : p.sku.toLowerCase()) : '';
+            const catNorm = p.category ? (window.normalizeUzbek ? window.normalizeUzbek(p.category) : p.category.toLowerCase()) : '';
+            return nameNorm.includes(searchValNorm) || 
+                   skuNorm.includes(searchValNorm) || 
+                   catNorm.includes(searchValNorm);
+        });
+
+        container.innerHTML = this.renderProducts(filteredProducts);
     }
 };
