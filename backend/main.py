@@ -249,6 +249,24 @@ def get_inventory(request: Request):
         return []
     return supabase_get_all(f"inventory?select=*&company_id=eq.{company_id}")
 
+@app.get("/api/inventory/manual")
+def get_manual_inventory(request: Request):
+    company_id = get_company_id(request)
+    if not company_id:
+        return []
+    return supabase_get_all(f"inventory?select=*&company_id=eq.{company_id}&id=not.like.i_regos_*")
+
+@app.get("/api/inventory/search")
+def search_inventory(query: str, request: Request):
+    company_id = get_company_id(request)
+    if not company_id:
+        return []
+    if len(query) < 2:
+        return []
+    import urllib.parse
+    encoded = urllib.parse.quote(query)
+    return supabase_get_all(f"inventory?select=*&company_id=eq.{company_id}&id=like.i_regos_*&or=(name.ilike.*{encoded}*,sku.ilike.*{encoded}*)&limit=50")
+
 @app.post("/api/inventory")
 def save_product(product: dict, request: Request):
     company_id = get_company_id(request)

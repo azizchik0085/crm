@@ -145,16 +145,61 @@ window.DB = {
     },
 
     // --- OMBORXONA (INVENTORY) OPERATSIYALARI ---
-    getInventory: async function() {
+    _inventoryCache: null,
+
+    getInventory: async function(forceRefresh = false) {
+        if (!forceRefresh && this._inventoryCache && this._inventoryCache.length > 0) {
+            return this._inventoryCache;
+        }
+        const cached = AppStorage.load().inventory;
+        if (!forceRefresh && cached && cached.length > 0) {
+            this._inventoryCache = cached;
+            return cached;
+        }
         try {
             const response = await fetch('/api/inventory');
             if (!response.ok) throw new Error("HTTP error " + response.status);
             const data = await response.json();
+            this._inventoryCache = data;
             AppStorage.updateKey('inventory', data);
             return data;
         } catch (e) {
             console.warn("Backend-dan omborni yuklab bo'lmadi, keshdan o'qiladi:", e);
-            return AppStorage.load().inventory;
+            const fallback = AppStorage.load().inventory || [];
+            this._inventoryCache = fallback;
+            return fallback;
+        }
+    },
+
+    getManualInventory: async function() {
+        try {
+            const response = await fetch('/api/inventory/manual');
+            if (!response.ok) throw new Error("HTTP error " + response.status);
+            const data = await response.json();
+            return data;
+        } catch (e) {
+            console.warn("Backend-dan qo'lda kiritilgan tovarlarni yuklab bo'lmadi, keshdan o'qiladi:", e);
+            const all = AppStorage.load().inventory || [];
+            return all.filter(p => p && p.id && !p.id.startsWith('i_regos_'));
+        }
+    },
+
+    searchWarehouseInventory: async function(query) {
+        try {
+            const response = await fetch(`/api/inventory/search?query=${encodeURIComponent(query)}`);
+            if (!response.ok) throw new Error("HTTP error " + response.status);
+            const data = await response.json();
+            return data;
+        } catch (e) {
+            console.warn("Backend-dan ombor qidiruvi amalga oshmadi, keshdan qidiriladi:", e);
+            const all = AppStorage.load().inventory || [];
+            const queryNorm = window.normalizeUzbek ? window.normalizeUzbek(query).toLowerCase() : query.toLowerCase();
+            return all.filter(p => {
+                if (!p || !p.id || !p.id.startsWith('i_regos_')) return false;
+                const nameNorm = window.normalizeUzbek ? window.normalizeUzbek(p.name).toLowerCase() : p.name.toLowerCase();
+                const skuNorm = window.normalizeUzbek ? window.normalizeUzbek(p.sku).toLowerCase() : p.sku.toLowerCase();
+                return nameNorm.includes(queryNorm) || skuNorm.includes(queryNorm);
+            }).slice(0, 50);
         }
     },
 
@@ -174,6 +219,7 @@ window.DB = {
         if (index > -1) data.inventory[index] = product;
         else data.inventory.push(product);
         AppStorage.save(data);
+        this._inventoryCache = data.inventory;
     },
 
     deleteProduct: async function(id) {
@@ -188,6 +234,7 @@ window.DB = {
         const data = AppStorage.load();
         data.inventory = data.inventory.filter(p => p.id !== id);
         AppStorage.save(data);
+        this._inventoryCache = data.inventory;
     },
 
     // --- XODIMLAR (HR) OPERATSIYALARI ---

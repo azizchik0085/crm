@@ -1263,7 +1263,7 @@ window.CRM = {
             const container = document.getElementById('crm-products-content');
             if (!container) return;
 
-            const allInventory = (await DB.getInventory()) || [];
+            const allInventory = (await DB.getManualInventory()) || [];
             if (!Array.isArray(allInventory)) {
                 console.error("Inventory is not an array:", allInventory);
                 container.innerHTML = `<div class="alert alert-danger">Xatolik: Maxsulotlar ro'yxatini yuklab bo'lmadi (format xato).</div>`;
@@ -1393,16 +1393,8 @@ window.CRM = {
 
         list.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 32px;"><i class="fas fa-spinner fa-spin"></i> Qidirilmoqda...</div>`;
 
-        const allInventory = await DB.getInventory();
-        const warehouseProducts = allInventory.filter(p => p && p.id && p.id.startsWith('i_regos_'));
-
-        const valNorm = window.normalizeUzbek ? window.normalizeUzbek(val) : val;
-
-        const matches = warehouseProducts.filter(p => {
-            const nameNorm = p.name ? (window.normalizeUzbek ? window.normalizeUzbek(p.name) : p.name.toLowerCase()) : '';
-            const skuNorm = p.sku ? (window.normalizeUzbek ? window.normalizeUzbek(p.sku) : p.sku.toLowerCase()) : '';
-            return nameNorm.includes(valNorm) || skuNorm.includes(valNorm);
-        }).slice(0, 50);
+        const matches = await DB.searchWarehouseInventory(val);
+        this._warehouseSearchResults = matches;
 
         if (matches.length === 0) {
             list.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 32px;">Mahsulot topilmadi.</div>`;
@@ -1429,15 +1421,13 @@ window.CRM = {
 
     selectWarehouseProduct: async function(id) {
         try {
-            const allInventory = await DB.getInventory();
-            const p = allInventory.find(item => item.id === id);
+            const p = (this._warehouseSearchResults || []).find(item => item.id === id);
             if (!p) return;
 
             document.getElementById('prod-name').value = p.name || '';
             document.getElementById('prod-sku').value = p.sku || '';
             document.getElementById('prod-cat').value = p.category || '';
             document.getElementById('prod-price').value = p.price || 0;
-            document.getElementById('prod-stock').value = p.stock || 0;
             document.getElementById('prod-desc').value = '';
             document.getElementById('prod-image').value = '';
 
