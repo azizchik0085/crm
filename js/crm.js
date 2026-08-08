@@ -990,9 +990,6 @@ window.CRM = {
                 <div class="product-card card" onclick="CRM.openProductDetailsModal('${p.id}')" style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255,255,255,0.05); border-radius: 12px; overflow: hidden; cursor: pointer; transition: all 0.2s ease-in-out; display: flex; flex-direction: column; height: 100%; position: relative; padding: 0;">
                     <div style="background: linear-gradient(135deg, ${grad[0]}, ${grad[1]}); height: 120px; display: flex; align-items: center; justify-content: center; position: relative; width: 100%;">
                         ${imageContent}
-                        <span style="position: absolute; top: 12px; right: 12px; background: ${stockBadgeColor}; color: ${stockBadgeText}; border: 1px solid ${stockBorder}; padding: 4px 8px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; backdrop-filter: blur(4px);">
-                            ${stockLabel}
-                        </span>
                     </div>
                     <div style="padding: 16px; display: flex; flex-direction: column; flex-grow: 1; justify-content: space-between;">
                         <div>
@@ -1059,7 +1056,6 @@ window.CRM = {
             document.getElementById('edit-prod-sku').value = product.sku || '';
             document.getElementById('edit-prod-cat').value = product.category || '';
             document.getElementById('edit-prod-price').value = product.price || 0;
-            document.getElementById('edit-prod-stock').value = product.stock || 0;
             if (document.getElementById('edit-prod-desc')) {
                 document.getElementById('edit-prod-desc').value = description;
             }
@@ -1080,7 +1076,10 @@ window.CRM = {
         const sku = document.getElementById('edit-prod-sku').value;
         const category = document.getElementById('edit-prod-cat').value;
         const price = parseFloat(document.getElementById('edit-prod-price').value) || 0;
-        const stock = parseInt(document.getElementById('edit-prod-stock').value) || 0;
+
+        const inventory = await DB.getInventory();
+        const product = inventory.find(p => p.id === id);
+        const stock = product ? product.stock : 0;
 
         const description = document.getElementById('edit-prod-desc')?.value.trim() || '';
         const image = document.getElementById('edit-prod-image')?.value.trim() || '';
@@ -1187,14 +1186,6 @@ window.CRM = {
                                     <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 6px;">
                                         <span style="color: var(--text-muted);">SKU kod:</span>
                                         <strong style="font-family: 'JetBrains Mono', monospace; color: var(--text-main);">${p.sku || '-'}</strong>
-                                    </div>
-                                    <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 6px;">
-                                        <span style="color: var(--text-muted);">Ombor qoldig'i:</span>
-                                        <strong style="color: ${p.stock <= 0 ? 'var(--danger)' : (p.stock <= 3 ? 'var(--warning)' : 'var(--success)')};">${p.stock} ta</strong>
-                                    </div>
-                                    <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 6px;">
-                                        <span style="color: var(--text-muted);">Status:</span>
-                                        <strong>${p.stock <= 0 ? '<span class="badge badge-danger">Tugagan</span>' : (p.stock <= 3 ? '<span class="badge badge-warning">Kam qolgan</span>' : '<span class="badge badge-success">Mavjud</span>')}</strong>
                                     </div>
                                 </div>
                                 <div style="margin-top: 16px;">

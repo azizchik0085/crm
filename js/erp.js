@@ -314,7 +314,7 @@ window.ERP = {
         const sku = document.getElementById('prod-sku').value;
         const category = document.getElementById('prod-cat').value;
         const price = parseFloat(document.getElementById('prod-price').value) || 0;
-        const stock = parseInt(document.getElementById('prod-stock').value) || 0;
+        const stock = 0;
         const description = document.getElementById('prod-desc')?.value.trim() || '';
         const image = document.getElementById('prod-image')?.value.trim() || '';
 
