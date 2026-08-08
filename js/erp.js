@@ -315,6 +315,8 @@ window.ERP = {
         const category = document.getElementById('prod-cat').value;
         const price = parseFloat(document.getElementById('prod-price').value) || 0;
         const stock = parseInt(document.getElementById('prod-stock').value) || 0;
+        const description = document.getElementById('prod-desc')?.value.trim() || '';
+        const image = document.getElementById('prod-image')?.value.trim() || '';
 
         if (!name || !sku || !category) {
             alert('Iltimos, barcha maydonlarni to\'ldiring!');
@@ -328,9 +330,11 @@ window.ERP = {
             return;
         }
 
+        const serializedName = `${name}###${description}###${image}`;
+
         const newProduct = {
             id: 'i_' + Date.now(),
-            name,
+            name: serializedName,
             sku: sku.toUpperCase(),
             category,
             price,

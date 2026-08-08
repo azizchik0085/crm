@@ -976,10 +976,20 @@ window.CRM = {
             const hash = p.id ? p.id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) : 0;
             const grad = colors[hash % colors.length];
 
+            const parts = (p.name || '').split('###');
+            const displayName = parts[0] || '';
+            const description = parts[1] || '';
+            const imageUrl = parts[2] || '';
+
+            let imageContent = `<i class="fas fa-box" style="font-size: 3rem; color: rgba(255,255,255,0.85);"></i>`;
+            if (imageUrl) {
+                imageContent = `<img src="${imageUrl}" alt="${displayName}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.onerror=null; this.outerHTML='<i class=\"fas fa-box\" style=\"font-size: 3rem; color: rgba(255,255,255,0.85);\"></i>';">`;
+            }
+
             html += `
                 <div class="product-card card" onclick="CRM.openProductDetailsModal('${p.id}')" style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255,255,255,0.05); border-radius: 12px; overflow: hidden; cursor: pointer; transition: all 0.2s ease-in-out; display: flex; flex-direction: column; height: 100%; position: relative; padding: 0;">
                     <div style="background: linear-gradient(135deg, ${grad[0]}, ${grad[1]}); height: 120px; display: flex; align-items: center; justify-content: center; position: relative; width: 100%;">
-                        <i class="fas fa-box" style="font-size: 3rem; color: rgba(255,255,255,0.85);"></i>
+                        ${imageContent}
                         <span style="position: absolute; top: 12px; right: 12px; background: ${stockBadgeColor}; color: ${stockBadgeText}; border: 1px solid ${stockBorder}; padding: 4px 8px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; backdrop-filter: blur(4px);">
                             ${stockLabel}
                         </span>
@@ -989,9 +999,12 @@ window.CRM = {
                             <span style="font-size: 0.75rem; color: var(--accent); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; display: inline-block;">
                                 ${p.category || 'Barchasi'}
                             </span>
-                            <h4 style="margin: 0 0 8px 0; color: var(--text-main); font-size: 1.05rem; line-height: 1.3; font-weight: 600; text-align: left;">
-                                ${p.name}
+                            <h4 style="margin: 0 0 4px 0; color: var(--text-main); font-size: 1.05rem; line-height: 1.3; font-weight: 600; text-align: left;">
+                                ${displayName}
                             </h4>
+                            <p style="margin: 0 0 12px 0; color: var(--text-muted); font-size: 0.85rem; line-height: 1.3; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; text-align: left; height: 34px;">
+                                ${description || 'Tasnif kiritilmagan'}
+                            </p>
                             <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px;">
                                 <span style="font-size: 0.75rem; color: var(--text-muted); background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 4px; font-family: 'JetBrains Mono', monospace;">
                                     SKU: ${p.sku || '-'}
@@ -1036,12 +1049,23 @@ window.CRM = {
                 return;
             }
 
+            const parts = (product.name || '').split('###');
+            const nameOnly = parts[0] || '';
+            const description = parts[1] || '';
+            const image = parts[2] || '';
+
             document.getElementById('edit-prod-id').value = product.id;
-            document.getElementById('edit-prod-name').value = product.name;
+            document.getElementById('edit-prod-name').value = nameOnly;
             document.getElementById('edit-prod-sku').value = product.sku || '';
             document.getElementById('edit-prod-cat').value = product.category || '';
             document.getElementById('edit-prod-price').value = product.price || 0;
             document.getElementById('edit-prod-stock').value = product.stock || 0;
+            if (document.getElementById('edit-prod-desc')) {
+                document.getElementById('edit-prod-desc').value = description;
+            }
+            if (document.getElementById('edit-prod-image')) {
+                document.getElementById('edit-prod-image').value = image;
+            }
 
             showModal('edit-product-modal');
         } catch (e) {
@@ -1058,15 +1082,19 @@ window.CRM = {
         const price = parseFloat(document.getElementById('edit-prod-price').value) || 0;
         const stock = parseInt(document.getElementById('edit-prod-stock').value) || 0;
 
+        const description = document.getElementById('edit-prod-desc')?.value.trim() || '';
+        const image = document.getElementById('edit-prod-image')?.value.trim() || '';
+
         if (!name || !sku || !category) {
             alert('Iltimos, barcha majburiy maydonlarni to\'ldiring!');
             return;
         }
 
         try {
+            const serializedName = `${name}###${description}###${image}`;
             const updatedProduct = {
                 id,
-                name,
+                name: serializedName,
                 sku: sku.toUpperCase(),
                 category,
                 price,
@@ -1132,10 +1160,20 @@ window.CRM = {
                 const hash = p.id ? p.id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) : 0;
                 const grad = colors[hash % colors.length];
 
+                const parts = (p.name || '').split('###');
+                const displayName = parts[0] || '';
+                const description = parts[1] || '';
+                const imageUrl = parts[2] || '';
+
+                let imageContent = `<i class="fas fa-box" style="font-size: 5rem; color: rgba(255,255,255,0.85);"></i>`;
+                if (imageUrl) {
+                    imageContent = `<img src="${imageUrl}" alt="${displayName}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.onerror=null; this.outerHTML='<i class=\"fas fa-box\" style=\"font-size: 5rem; color: rgba(255,255,255,0.85);\"></i>';">`;
+                }
+
                 body.innerHTML = `
                     <div style="display: flex; gap: 24px; flex-wrap: wrap;">
-                        <div style="flex: 1; min-width: 200px; background: linear-gradient(135deg, ${grad[0]}, ${grad[1]}); height: 200px; border-radius: 12px; display: flex; align-items: center; justify-content: center; position: relative;">
-                            <i class="fas fa-box" style="font-size: 5rem; color: rgba(255,255,255,0.85);"></i>
+                        <div style="flex: 1; min-width: 200px; background: linear-gradient(135deg, ${grad[0]}, ${grad[1]}); height: 200px; border-radius: 12px; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden;">
+                            ${imageContent}
                         </div>
                         <div style="flex: 1.5; display: flex; flex-direction: column; justify-content: space-between;">
                             <div>
@@ -1143,7 +1181,7 @@ window.CRM = {
                                     ${p.category || 'Barchasi'}
                                 </span>
                                 <h2 style="margin: 4px 0 12px 0; font-size: 1.6rem; font-weight: 700; color: var(--text-main); line-height: 1.2;">
-                                    ${p.name}
+                                    ${displayName}
                                 </h2>
                                 <div style="display: flex; flex-direction: column; gap: 8px;">
                                     <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 6px;">
@@ -1157,6 +1195,12 @@ window.CRM = {
                                     <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 6px;">
                                         <span style="color: var(--text-muted);">Status:</span>
                                         <strong>${p.stock <= 0 ? '<span class="badge badge-danger">Tugagan</span>' : (p.stock <= 3 ? '<span class="badge badge-warning">Kam qolgan</span>' : '<span class="badge badge-success">Mavjud</span>')}</strong>
+                                    </div>
+                                </div>
+                                <div style="margin-top: 16px;">
+                                    <div style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600; margin-bottom: 4px;">Mahsulot Tasnifi:</div>
+                                    <div style="color: var(--text-main); font-size: 0.9rem; line-height: 1.4; background: rgba(255,255,255,0.02); padding: 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05); text-align: left;">
+                                        ${description || 'Tasnif kiritilmagan'}
                                     </div>
                                 </div>
                             </div>
