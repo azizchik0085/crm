@@ -1,7 +1,7 @@
 // ERP & CRM Tizimi - CRM Moduli (Mijozlar, Sotuvlar va Qo'ng'iroqlar) - SUPABASE & TELEFONIYA BILAN
 
 window.CRM = {
-    activeTab: 'kanban', // 'kanban', 'list' yoki 'calls'
+    activeTab: 'kanban', // 'kanban', 'list', 'calls' yoki 'products'
     pollingInterval: null,
     isDragging: false,
 
@@ -14,7 +14,7 @@ window.CRM = {
             clearInterval(this.pollingInterval);
         }
         this.pollingInterval = setInterval(() => {
-            if (window.App.currentView === 'crm' && !this.isDragging && this.activeTab !== 'calls') {
+            if (window.App.currentView === 'crm' && !this.isDragging && this.activeTab !== 'calls' && this.activeTab !== 'products') {
                 this.render();
             }
         }, 5000);
@@ -25,23 +25,33 @@ window.CRM = {
         const kanbanTabBtn = document.getElementById('crm-tab-kanban');
         const listTabBtn = document.getElementById('crm-tab-list');
         const callsTabBtn = document.getElementById('crm-tab-calls');
+        const productsTabBtn = document.getElementById('crm-tab-products');
         
-        if (kanbanTabBtn && listTabBtn && callsTabBtn) {
+        if (kanbanTabBtn) {
             kanbanTabBtn.onclick = () => {
                 this.activeTab = 'kanban';
-                this.updateTabButtons(kanbanTabBtn, listTabBtn, callsTabBtn);
+                this.updateTabButtons('crm-tab-kanban');
                 this.render();
             };
-
+        }
+        if (listTabBtn) {
             listTabBtn.onclick = () => {
                 this.activeTab = 'list';
-                this.updateTabButtons(listTabBtn, kanbanTabBtn, callsTabBtn);
+                this.updateTabButtons('crm-tab-list');
                 this.render();
             };
-
+        }
+        if (callsTabBtn) {
             callsTabBtn.onclick = () => {
                 this.activeTab = 'calls';
-                this.updateTabButtons(callsTabBtn, kanbanTabBtn, listTabBtn);
+                this.updateTabButtons('crm-tab-calls');
+                this.render();
+            };
+        }
+        if (productsTabBtn) {
+            productsTabBtn.onclick = () => {
+                this.activeTab = 'products';
+                this.updateTabButtons('crm-tab-products');
                 this.render();
             };
         }
@@ -56,6 +66,12 @@ window.CRM = {
         const operatorFilter = document.getElementById('crm-operator-filter');
         if (operatorFilter) {
             operatorFilter.onchange = () => this.render();
+        }
+
+        // Kategoriya bo'yicha filter
+        const categoryFilter = document.getElementById('crm-category-filter');
+        if (categoryFilter) {
+            categoryFilter.onchange = () => this.render();
         }
 
         // Yangi mijoz qo'shish formasi yuborilishi
@@ -75,15 +91,32 @@ window.CRM = {
                 this.saveEditedCustomer();
             };
         }
+
+        // Tahrirlash mahsulot formasi yuborilishi
+        const editProductForm = document.getElementById('edit-product-form');
+        if (editProductForm) {
+            editProductForm.onsubmit = (e) => {
+                e.preventDefault();
+                this.saveEditedProduct();
+            };
+        }
     },
 
-    updateTabButtons: function(activeBtn, secondaryBtn1, secondaryBtn2) {
-        activeBtn.classList.add('btn-primary');
-        activeBtn.classList.remove('btn-secondary');
-        secondaryBtn1.classList.add('btn-secondary');
-        secondaryBtn1.classList.remove('btn-primary');
-        secondaryBtn2.classList.add('btn-secondary');
-        secondaryBtn2.classList.remove('btn-primary');
+    updateTabButtons: function(activeBtnOrId) {
+        const activeId = typeof activeBtnOrId === 'string' ? activeBtnOrId : activeBtnOrId.id;
+        const tabIds = ['crm-tab-kanban', 'crm-tab-list', 'crm-tab-calls', 'crm-tab-products'];
+        tabIds.forEach(id => {
+            const btn = document.getElementById(id);
+            if (btn) {
+                if (id === activeId) {
+                    btn.classList.add('btn-primary');
+                    btn.classList.remove('btn-secondary');
+                } else {
+                    btn.classList.add('btn-secondary');
+                    btn.classList.remove('btn-primary');
+                }
+            }
+        });
     },
 
     render: async function() {
@@ -99,12 +132,17 @@ window.CRM = {
             return;
         }
 
-        document.getElementById('crm-search').placeholder = "Mijoz ismi, telefon yoki operator bo'yicha qidirish...";
+        if (this.activeTab === 'products') {
+            document.getElementById('crm-search').placeholder = "Mahsulot nomi yoki SKU bo'yicha qidirish...";
+        } else {
+            document.getElementById('crm-search').placeholder = "Mijoz ismi, telefon yoki operator bo'yicha qidirish...";
+        }
 
         // Supabase yoki keshdan mijozlarni olamiz
         const customers = await DB.getCustomers();
         const settings = AppStorage.load().settings || {};
         const amocrmMap = settings.amocrmOperatorsMap || {};
+        const inventory = await DB.getInventory();
         
         // Xodimlar ro'yxatini olib, ID-larni ismlarga o'giramiz
         let employeeIdToName = {};
@@ -125,13 +163,21 @@ window.CRM = {
             console.error("Failed to load employees for operator mapping:", e);
         }
 
-        // Display/hide the filter dropdown based on whether user is admin
+        // Display/hide the filter dropdown based on whether user is admin and active tab
         const operatorFilterContainer = document.getElementById('crm-operator-filter-container');
-        if (operatorFilterContainer) {
-            if (isAdmin) {
-                operatorFilterContainer.style.setProperty('display', 'block', 'important');
-            } else {
-                operatorFilterContainer.style.setProperty('display', 'none', 'important');
+        const categoryFilterContainer = document.getElementById('crm-category-filter-container');
+        
+        if (this.activeTab === 'products') {
+            if (operatorFilterContainer) operatorFilterContainer.style.setProperty('display', 'none', 'important');
+            if (categoryFilterContainer) categoryFilterContainer.style.setProperty('display', 'block', 'important');
+        } else {
+            if (categoryFilterContainer) categoryFilterContainer.style.setProperty('display', 'none', 'important');
+            if (operatorFilterContainer) {
+                if (isAdmin) {
+                    operatorFilterContainer.style.setProperty('display', 'block', 'important');
+                } else {
+                    operatorFilterContainer.style.setProperty('display', 'none', 'important');
+                }
             }
         }
 
@@ -162,11 +208,46 @@ window.CRM = {
                 operatorFilterSelect.appendChild(opt);
             });
         }
+
+        // Kategoriya bo'yicha filterlarni yuklash
+        const categories = [...new Set(inventory.map(p => p.category).filter(Boolean))].sort();
+        const categoryFilterSelect = document.getElementById('crm-category-filter');
+        if (categoryFilterSelect) {
+            const currentSelected = categoryFilterSelect.value;
+            categoryFilterSelect.innerHTML = '<option value="">Barcha toifalar</option>';
+            categories.forEach(cat => {
+                const opt = document.createElement('option');
+                opt.value = cat;
+                opt.textContent = cat;
+                if (cat === currentSelected) {
+                    opt.selected = true;
+                }
+                categoryFilterSelect.appendChild(opt);
+            });
+        }
         
         const selectedOperator = operatorFilterSelect ? operatorFilterSelect.value : '';
+        const selectedCategory = categoryFilterSelect ? categoryFilterSelect.value : '';
         
         // Qidiruv bo'yicha filtrlaymiz (Lotin va Kirill transkripsiyasi bilan)
         const searchValNorm = window.normalizeUzbek ? window.normalizeUzbek(searchVal) : searchVal.toLowerCase();
+        
+        if (this.activeTab === 'products') {
+            const filteredProducts = inventory.filter(p => {
+                if (selectedCategory && p.category !== selectedCategory) {
+                    return false;
+                }
+                const nameNorm = window.normalizeUzbek ? window.normalizeUzbek(p.name) : p.name.toLowerCase();
+                const skuNorm = p.sku ? (window.normalizeUzbek ? window.normalizeUzbek(p.sku) : p.sku.toLowerCase()) : '';
+                const catNorm = p.category ? (window.normalizeUzbek ? window.normalizeUzbek(p.category) : p.category.toLowerCase()) : '';
+                return nameNorm.includes(searchValNorm) || 
+                       skuNorm.includes(searchValNorm) || 
+                       catNorm.includes(searchValNorm);
+            });
+            container.innerHTML = this.renderProducts(filteredProducts);
+            return;
+        }
+
         const filteredCustomers = customers.filter(c => {
             // Operator bo'yicha filter
             if (!isAdmin) {
@@ -848,6 +929,239 @@ window.CRM = {
                 btn.disabled = false;
                 btn.innerHTML = originalHTML;
             }
+        }
+    },
+
+    renderProducts: function(products) {
+        if (products.length === 0) {
+            return `
+                <div style="text-align: center; color: var(--text-muted); padding: 48px; width: 100%;">
+                    <i class="fas fa-box-open fa-3x" style="margin-bottom: 12px; color: var(--accent);"></i>
+                    <p>Mahsulotlar topilmadi</p>
+                </div>
+            `;
+        }
+
+        let html = `
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; width: 100%;">
+                <h3 style="margin: 0; font-size: 1.1rem; font-weight: 600; color: var(--text-main);">
+                    Mahsulotlar Ro'yxati (${products.length} ta)
+                </h3>
+                <button class="btn btn-primary" onclick="CRM.openAddProductModal()" style="display: inline-flex; align-items: center; gap: 8px; height: 38px;">
+                    <i class="fas fa-plus"></i> Yangi Mahsulot
+                </button>
+            </div>
+            <div class="products-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; width: 100%;">
+        `;
+
+        products.forEach(p => {
+            const isOutOfStock = p.stock <= 0;
+            const stockBadgeColor = isOutOfStock ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)';
+            const stockBadgeText = isOutOfStock ? '#ef4444' : '#10b981';
+            const stockBorder = isOutOfStock ? 'rgba(239, 68, 68, 0.2)' : 'rgba(16, 185, 129, 0.2)';
+            const stockLabel = isOutOfStock ? 'Tugagan' : `Qoldiq: ${p.stock} ta`;
+            
+            const colors = [
+                ['#3b82f6', '#1d4ed8'],
+                ['#10b981', '#047857'],
+                ['#f59e0b', '#b45309'],
+                ['#8b5cf6', '#6d28d9'],
+                ['#ec4899', '#be185d'],
+                ['#06b6d4', '#0891b2']
+            ];
+            const hash = p.id ? p.id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) : 0;
+            const grad = colors[hash % colors.length];
+
+            html += `
+                <div class="product-card card" onclick="CRM.openProductDetailsModal('${p.id}')" style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255,255,255,0.05); border-radius: 12px; overflow: hidden; cursor: pointer; transition: all 0.2s ease-in-out; display: flex; flex-direction: column; height: 100%; position: relative; padding: 0;">
+                    <div style="background: linear-gradient(135deg, ${grad[0]}, ${grad[1]}); height: 120px; display: flex; align-items: center; justify-content: center; position: relative; width: 100%;">
+                        <i class="fas fa-box" style="font-size: 3rem; color: rgba(255,255,255,0.85);"></i>
+                        <span style="position: absolute; top: 12px; right: 12px; background: ${stockBadgeColor}; color: ${stockBadgeText}; border: 1px solid ${stockBorder}; padding: 4px 8px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; backdrop-filter: blur(4px);">
+                            ${stockLabel}
+                        </span>
+                    </div>
+                    <div style="padding: 16px; display: flex; flex-direction: column; flex-grow: 1; justify-content: space-between;">
+                        <div>
+                            <span style="font-size: 0.75rem; color: var(--accent); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; display: inline-block;">
+                                ${p.category || 'Barchasi'}
+                            </span>
+                            <h4 style="margin: 0 0 8px 0; color: var(--text-main); font-size: 1.05rem; line-height: 1.3; font-weight: 600; text-align: left;">
+                                ${p.name}
+                            </h4>
+                            <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px;">
+                                <span style="font-size: 0.75rem; color: var(--text-muted); background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 4px; font-family: 'JetBrains Mono', monospace;">
+                                    SKU: ${p.sku || '-'}
+                                </span>
+                            </div>
+                        </div>
+                        <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.05); display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Narxi</div>
+                                <div style="color: #10b981; font-weight: 700; font-size: 1.1rem; font-family: 'JetBrains Mono', monospace;">
+                                    ${parseFloat(p.price).toLocaleString()} <span style="font-size: 0.75rem;">so'm</span>
+                                </div>
+                            </div>
+                            <div style="display: flex; gap: 6px;">
+                                <button class="btn btn-secondary" onclick="event.stopPropagation(); CRM.openEditProductModal('${p.id}')" style="padding: 6px 10px; min-width: auto; border-radius: 6px; height: 32px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);">
+                                    <i class="fas fa-edit" style="font-size: 0.8rem; color: var(--text-main);"></i>
+                                </button>
+                                <button class="btn btn-danger" onclick="event.stopPropagation(); CRM.deleteProduct('${p.id}')" style="padding: 6px 10px; min-width: auto; border-radius: 6px; height: 32px; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2); color: #ef4444;">
+                                    <i class="fas fa-trash-alt" style="font-size: 0.8rem;"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+
+        html += `</div>`;
+        return html;
+    },
+
+    openAddProductModal: function() {
+        showModal('product-modal');
+    },
+
+    openEditProductModal: async function(id) {
+        try {
+            const inventory = await DB.getInventory();
+            const product = inventory.find(p => p.id === id);
+            if (!product) {
+                alert("Mahsulot topilmadi!");
+                return;
+            }
+
+            document.getElementById('edit-prod-id').value = product.id;
+            document.getElementById('edit-prod-name').value = product.name;
+            document.getElementById('edit-prod-sku').value = product.sku || '';
+            document.getElementById('edit-prod-cat').value = product.category || '';
+            document.getElementById('edit-prod-price').value = product.price || 0;
+            document.getElementById('edit-prod-stock').value = product.stock || 0;
+
+            showModal('edit-product-modal');
+        } catch (e) {
+            console.error("Mahsulotni tahrirlash oynasini ochishda xatolik:", e);
+            alert("Xatolik: " + e.message);
+        }
+    },
+
+    saveEditedProduct: async function() {
+        const id = document.getElementById('edit-prod-id').value;
+        const name = document.getElementById('edit-prod-name').value;
+        const sku = document.getElementById('edit-prod-sku').value;
+        const category = document.getElementById('edit-prod-cat').value;
+        const price = parseFloat(document.getElementById('edit-prod-price').value) || 0;
+        const stock = parseInt(document.getElementById('edit-prod-stock').value) || 0;
+
+        if (!name || !sku || !category) {
+            alert('Iltimos, barcha majburiy maydonlarni to\'ldiring!');
+            return;
+        }
+
+        try {
+            const updatedProduct = {
+                id,
+                name,
+                sku: sku.toUpperCase(),
+                category,
+                price,
+                stock
+            };
+
+            await DB.saveProduct(updatedProduct);
+            closeModal('edit-product-modal');
+            await this.render();
+            if (window.App && typeof window.App.updateDashboardStats === 'function') {
+                window.App.updateDashboardStats();
+            }
+        } catch (e) {
+            console.error("Mahsulotni saqlashda xatolik:", e);
+            alert("Xatolik: " + e.message);
+        }
+    },
+
+    deleteProduct: async function(id) {
+        if (!confirm("Haqiqatan ham ushbu mahsulotni o'chirmoqchisiz?")) {
+            return;
+        }
+
+        try {
+            await DB.deleteProduct(id);
+            await this.render();
+            if (window.App && typeof window.App.updateDashboardStats === 'function') {
+                window.App.updateDashboardStats();
+            }
+        } catch (e) {
+            console.error("Mahsulotni o'chirishda xatolik:", e);
+            alert("Xatolik: " + e.message);
+        }
+    },
+
+    openProductDetailsModal: async function(id) {
+        try {
+            const inventory = await DB.getInventory();
+            const p = inventory.find(item => item.id === id);
+            if (!p) {
+                alert("Mahsulot topilmadi!");
+                return;
+            }
+
+            const body = document.getElementById('product-details-body');
+            if (body) {
+                const colors = [
+                    ['#3b82f6', '#1d4ed8'],
+                    ['#10b981', '#047857'],
+                    ['#f59e0b', '#b45309'],
+                    ['#8b5cf6', '#6d28d9'],
+                    ['#ec4899', '#be185d'],
+                    ['#06b6d4', '#0891b2']
+                ];
+                const hash = p.id ? p.id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) : 0;
+                const grad = colors[hash % colors.length];
+
+                body.innerHTML = `
+                    <div style="display: flex; gap: 24px; flex-wrap: wrap;">
+                        <div style="flex: 1; min-width: 200px; background: linear-gradient(135deg, ${grad[0]}, ${grad[1]}); height: 200px; border-radius: 12px; display: flex; align-items: center; justify-content: center; position: relative;">
+                            <i class="fas fa-box" style="font-size: 5rem; color: rgba(255,255,255,0.85);"></i>
+                        </div>
+                        <div style="flex: 1.5; display: flex; flex-direction: column; justify-content: space-between;">
+                            <div>
+                                <span style="font-size: 0.8rem; color: var(--accent); font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">
+                                    ${p.category || 'Barchasi'}
+                                </span>
+                                <h2 style="margin: 4px 0 12px 0; font-size: 1.6rem; font-weight: 700; color: var(--text-main); line-height: 1.2;">
+                                    ${p.name}
+                                </h2>
+                                <div style="display: flex; flex-direction: column; gap: 8px;">
+                                    <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 6px;">
+                                        <span style="color: var(--text-muted);">SKU kod:</span>
+                                        <strong style="font-family: 'JetBrains Mono', monospace; color: var(--text-main);">${p.sku || '-'}</strong>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 6px;">
+                                        <span style="color: var(--text-muted);">Ombor qoldig'i:</span>
+                                        <strong style="color: ${p.stock <= 0 ? 'var(--danger)' : (p.stock <= 3 ? 'var(--warning)' : 'var(--success)')};">${p.stock} ta</strong>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 6px;">
+                                        <span style="color: var(--text-muted);">Status:</span>
+                                        <strong>${p.stock <= 0 ? '<span class="badge badge-danger">Tugagan</span>' : (p.stock <= 3 ? '<span class="badge badge-warning">Kam qolgan</span>' : '<span class="badge badge-success">Mavjud</span>')}</strong>
+                                    </div>
+                                </div>
+                            </div>
+                            <div style="margin-top: 20px; padding: 12px; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.15); border-radius: 8px; display: flex; justify-content: space-between; align-items: center;">
+                                <span style="font-size: 0.9rem; color: var(--text-muted);">Sotish narxi:</span>
+                                <span style="color: #10b981; font-weight: 700; font-size: 1.4rem; font-family: 'JetBrains Mono', monospace;">
+                                    ${parseFloat(p.price).toLocaleString()} so'm
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+            showModal('product-details-modal');
+        } catch (e) {
+            console.error("Mahsulot tafsilotlarini ko'rsatishda xatolik:", e);
+            alert("Xatolik: " + e.message);
         }
     }
 };

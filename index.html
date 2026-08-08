@@ -712,11 +712,17 @@
                                 <option value="">Barcha operatorlar</option>
                             </select>
                         </div>
+                        <div id="crm-category-filter-container" style="display: none; min-width: 180px; width: 180px;">
+                            <select id="crm-category-filter" class="form-control" style="height: 42px; background-color: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); color: var(--text-main); border-radius: 8px;">
+                                <option value="">Barcha toifalar</option>
+                            </select>
+                        </div>
                     </div>
                     <div class="filter-group">
                         <button class="btn btn-primary" id="crm-tab-kanban"><i class="fas fa-columns"></i> Kanban</button>
                         <button class="btn btn-secondary" id="crm-tab-list"><i class="fas fa-list"></i> Ro'yxat</button>
                         <button class="btn btn-secondary" id="crm-tab-calls"><i class="fas fa-phone-alt"></i> Qo'ng'iroqlar</button>
+                        <button class="btn btn-secondary" id="crm-tab-products"><i class="fas fa-box-open"></i> Mahsulotlar</button>
                     </div>
                 </div>
 
@@ -1919,6 +1925,61 @@
                     <button type="submit" class="btn btn-primary">Saqlash</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- 2.1. ERP Mahsulotni tahrirlash modal oynasi -->
+    <div class="modal" id="edit-product-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Mahsulotni Tahrirlash</h3>
+                <button class="close-modal-btn" onclick="closeModal('edit-product-modal')">&times;</button>
+            </div>
+            <form id="edit-product-form">
+                <input type="hidden" id="edit-prod-id">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="edit-prod-name">Mahsulot nomi <span style="color:var(--danger)">*</span></label>
+                        <input type="text" id="edit-prod-name" class="form-control" required placeholder="Masalan: iPhone 15 Pro Max">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-prod-sku">SKU kod <span style="color:var(--danger)">*</span></label>
+                        <input type="text" id="edit-prod-sku" class="form-control" required placeholder="IPH-15PM-256">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-prod-cat">Kategoriya <span style="color:var(--danger)">*</span></label>
+                        <input type="text" id="edit-prod-cat" class="form-control" required placeholder="Masalan: Elektronika, Mebel">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-prod-price">Sotish narxi</label>
+                        <input type="number" id="edit-prod-price" class="form-control" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-prod-stock">Ombor qoldig'i (Dona)</label>
+                        <input type="number" id="edit-prod-stock" class="form-control" min="0">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('edit-product-modal')">Bekor qilish</button>
+                    <button type="submit" class="btn btn-primary">Saqlash</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 2.2. Mahsulot tafsilotlari modal oynasi -->
+    <div class="modal" id="product-details-modal">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h3>Mahsulot Tafsilotlari</h3>
+                <button class="close-modal-btn" onclick="closeModal('product-details-modal')">&times;</button>
+            </div>
+            <div class="modal-body" id="product-details-body">
+                <!-- Dinamik ravishda JS orqali to'ldiriladi -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('product-details-modal')">Yopish</button>
+            </div>
         </div>
     </div>
 
