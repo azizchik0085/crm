@@ -1204,11 +1204,13 @@ window.CRM = {
         const container = document.getElementById('crm-products-content');
         if (!container) return;
 
-        const inventory = await DB.getInventory();
+        const allInventory = await DB.getInventory();
+        const inventory = allInventory.filter(p => p.id && p.id.startsWith('p_'));
         
         // Kategoriya bo'yicha filterlarni yuklash
         const categories = [...new Set(inventory.map(p => p.category).filter(Boolean))].sort();
         const categoryFilterSelect = document.getElementById('crm-products-category-filter');
+        
         if (categoryFilterSelect) {
             const currentSelected = categoryFilterSelect.value;
             categoryFilterSelect.innerHTML = '<option value="">Barcha toifalar</option>';
