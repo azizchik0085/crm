@@ -1175,6 +1175,8 @@ window.CRM = {
 
     initProductsView: function() {
         this.setupEventListeners();
+        this.productsPage = 1;
+        this.productsPageSize = 24;
         this.renderProductsView();
         this.setupProductsViewEventListeners();
     },
@@ -1182,12 +1184,18 @@ window.CRM = {
     setupProductsViewEventListeners: function() {
         const searchInput = document.getElementById('crm-products-search');
         if (searchInput) {
-            searchInput.oninput = () => this.renderProductsView();
+            searchInput.oninput = () => {
+                this.productsPage = 1;
+                this.renderProductsView();
+            };
         }
 
         const categoryFilter = document.getElementById('crm-products-category-filter');
         if (categoryFilter) {
-            categoryFilter.onchange = () => this.renderProductsView();
+            categoryFilter.onchange = () => {
+                this.productsPage = 1;
+                this.renderProductsView();
+            };
         }
     },
 
@@ -1222,7 +1230,7 @@ window.CRM = {
             if (selectedCategory && p.category !== selectedCategory) {
                 return false;
             }
-            const nameNorm = window.normalizeUzbek ? window.normalizeUzbek(p.name) : p.name.toLowerCase();
+            const nameNorm = p.name ? (window.normalizeUzbek ? window.normalizeUzbek(p.name) : p.name.toLowerCase()) : '';
             const skuNorm = p.sku ? (window.normalizeUzbek ? window.normalizeUzbek(p.sku) : p.sku.toLowerCase()) : '';
             const catNorm = p.category ? (window.normalizeUzbek ? window.normalizeUzbek(p.category) : p.category.toLowerCase()) : '';
             return nameNorm.includes(searchValNorm) || 
@@ -1230,6 +1238,73 @@ window.CRM = {
                    catNorm.includes(searchValNorm);
         });
 
-        container.innerHTML = this.renderProducts(filteredProducts);
+        // Pagination calculations
+        if (!this.productsPage) this.productsPage = 1;
+        if (!this.productsPageSize) this.productsPageSize = 24;
+
+        const totalItems = filteredProducts.length;
+        const totalPages = Math.ceil(totalItems / this.productsPageSize) || 1;
+        if (this.productsPage > totalPages) this.productsPage = totalPages;
+        if (this.productsPage < 1) this.productsPage = 1;
+        
+        const startIdx = (this.productsPage - 1) * this.productsPageSize;
+        const endIdx = startIdx + this.productsPageSize;
+        const pageItems = filteredProducts.slice(startIdx, endIdx);
+
+        container.innerHTML = this.renderProducts(pageItems);
+        this.renderProductsPagination(totalPages);
+    },
+
+    renderProductsPagination: function(totalPages) {
+        const pagContainer = document.getElementById('crm-products-pagination');
+        if (!pagContainer) return;
+
+        if (totalPages <= 1) {
+            pagContainer.innerHTML = '';
+            return;
+        }
+
+        let html = '';
+        
+        // Oldingi sahifa tugmasi
+        html += `<button class="btn btn-secondary btn-sm" ${this.productsPage === 1 ? 'disabled' : ''} onclick="CRM.changeProductsPage(${this.productsPage - 1})"><i class="fas fa-chevron-left"></i> Oldingi</button>`;
+        
+        // Sahifalar raqami
+        let startPage = Math.max(1, this.productsPage - 2);
+        let endPage = Math.min(totalPages, this.productsPage + 2);
+        
+        if (startPage > 1) {
+            html += `<button class="btn btn-secondary btn-sm" onclick="CRM.changeProductsPage(1)">1</button>`;
+            if (startPage > 2) {
+                html += `<span style="color: var(--text-muted); align-self: center;">...</span>`;
+            }
+        }
+        
+        for (let i = startPage; i <= endPage; i++) {
+            html += `<button class="btn ${i === this.productsPage ? 'btn-primary' : 'btn-secondary'} btn-sm" onclick="CRM.changeProductsPage(${i})">${i}</button>`;
+        }
+        
+        if (endPage < totalPages) {
+            if (endPage < totalPages - 1) {
+                html += `<span style="color: var(--text-muted); align-self: center;">...</span>`;
+            }
+            html += `<button class="btn btn-secondary btn-sm" onclick="CRM.changeProductsPage(${totalPages})">${totalPages}</button>`;
+        }
+        
+        // Keyingi sahifa tugmasi
+        html += `<button class="btn btn-secondary btn-sm" ${this.productsPage === totalPages ? 'disabled' : ''} onclick="CRM.changeProductsPage(${this.productsPage + 1})">Keyingi <i class="fas fa-chevron-right"></i></button>`;
+        
+        pagContainer.innerHTML = html;
+    },
+
+    changeProductsPage: function(page) {
+        this.productsPage = page;
+        this.renderProductsView();
+        
+        // Scroll to top of the view container smoothly
+        const sec = document.getElementById('view-crm-products');
+        if (sec) {
+            sec.scrollIntoView({ behavior: 'smooth' });
+        }
     }
 };
