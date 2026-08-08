@@ -233,7 +233,8 @@ window.CRM = {
         const searchValNorm = window.normalizeUzbek ? window.normalizeUzbek(searchVal) : searchVal.toLowerCase();
         
         if (this.activeTab === 'products') {
-            const filteredProducts = inventory.filter(p => {
+            const manualInventory = inventory.filter(p => p && p.id && (p.id.startsWith('p_') || (p.id.startsWith('i_') && !p.id.startsWith('i_regos_'))));
+            const filteredProducts = manualInventory.filter(p => {
                 if (selectedCategory && p.category !== selectedCategory) {
                     return false;
                 }
@@ -935,9 +936,12 @@ window.CRM = {
     renderProducts: function(products) {
         if (products.length === 0) {
             return `
-                <div style="text-align: center; color: var(--text-muted); padding: 48px; width: 100%;">
-                    <i class="fas fa-box-open fa-3x" style="margin-bottom: 12px; color: var(--accent);"></i>
-                    <p>Mahsulotlar topilmadi</p>
+                <div style="text-align: center; color: var(--text-muted); padding: 48px; width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px;">
+                    <i class="fas fa-box-open fa-3x" style="color: var(--accent);"></i>
+                    <p style="margin: 0;">Mahsulotlar topilmadi</p>
+                    <button class="btn btn-primary" onclick="CRM.openAddProductModal()" style="display: inline-flex; align-items: center; gap: 8px; height: 38px;">
+                        <i class="fas fa-plus"></i> Kartochka Yaratish
+                    </button>
                 </div>
             `;
         }
@@ -948,7 +952,7 @@ window.CRM = {
                     Mahsulotlar Ro'yxati (${products.length} ta)
                 </h3>
                 <button class="btn btn-primary" onclick="CRM.openAddProductModal()" style="display: inline-flex; align-items: center; gap: 8px; height: 38px;">
-                    <i class="fas fa-plus"></i> Yangi Mahsulot
+                    <i class="fas fa-plus"></i> Kartochka Yaratish
                 </button>
             </div>
             <div class="products-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; width: 100%;">
@@ -1219,7 +1223,7 @@ window.CRM = {
                 container.innerHTML = `<div class="alert alert-danger">Xatolik: Maxsulotlar ro'yxatini yuklab bo'lmadi (format xato).</div>`;
                 return;
             }
-            const inventory = allInventory.filter(p => p && p.id && p.id.startsWith('p_'));
+            const inventory = allInventory.filter(p => p && p.id && (p.id.startsWith('p_') || (p.id.startsWith('i_') && !p.id.startsWith('i_regos_'))));
             
             // Kategoriya bo'yicha filterlarni yuklash
             const categories = [...new Set(inventory.map(p => p.category).filter(Boolean))].sort();
