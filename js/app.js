@@ -1128,10 +1128,10 @@ window.App = {
         // Data fetching based on role
         const customers = await DB.getCustomers();
         const calls = await DB.getCalls();
-
         if (isDirector) {
             const transactions = await DB.getTransactions();
-            const inventory = await DB.getInventory();
+            const allInventory = await DB.getInventory();
+            const inventory = allInventory.filter(p => p && p.id && !p.id.startsWith('p_'));
 
             let totalIncome = transactions
                 .filter(t => t.type === 'income')

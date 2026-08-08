@@ -38,8 +38,8 @@ window.ERP = {
     },
 
     renderInventory: async function(container, searchVal) {
-        // Supabase yoki keshdan ombor ma'lumotlarini yuklash
-        const inventory = await DB.getInventory();
+        const allInventory = await DB.getInventory();
+        const inventory = allInventory.filter(p => p && p.id && !p.id.startsWith('p_'));
         
         const settings = AppStorage.load().settings;
         const currency = settings.currency;
@@ -332,8 +332,10 @@ window.ERP = {
 
         const serializedName = `${name}###${description}###${image}`;
 
+        const prefix = (window.App && window.App.currentView === 'crm-products') ? 'p_' : 'i_';
+
         const newProduct = {
-            id: 'i_' + Date.now(),
+            id: prefix + Date.now(),
             name: serializedName,
             sku: sku.toUpperCase(),
             category,
