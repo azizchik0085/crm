@@ -1253,6 +1253,17 @@ window.CRM = {
                 this.renderProductsView();
             };
         }
+
+        const addProductForm = document.getElementById('add-product-form');
+        if (addProductForm) {
+            addProductForm.onsubmit = async (e) => {
+                e.preventDefault();
+                if (window.ERP && typeof window.ERP.addProduct === 'function') {
+                    await window.ERP.addProduct();
+                    await this.renderProductsView();
+                }
+            };
+        }
     },
 
     renderProductsView: async function() {
