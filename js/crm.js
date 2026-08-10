@@ -1369,11 +1369,11 @@ window.CRM = {
         
         if (!dealNameInput || !phoneInput) return;
         
-        const dealName = dealNameInput.value.trim();
+        let dealName = dealNameInput.value.trim();
         const phone = phoneInput.value.trim();
         
-        if (!dealName || !phone || phone === '+998') {
-            alert("Iltimos, bitim nomi va telefon raqamini kiriting!");
+        if (!phone || phone === '+998') {
+            alert("Iltimos, telefon raqamini kiriting!");
             return;
         }
         
@@ -1388,6 +1388,10 @@ window.CRM = {
         const displayName = parts[0] || '';
         const description = parts[1] || '';
         const imageUrl = parts[2] || '';
+        
+        if (!dealName) {
+            dealName = `${displayName} xaridi`;
+        }
         
         try {
             if (pushBtn) {
