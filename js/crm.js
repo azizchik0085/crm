@@ -1227,6 +1227,7 @@ window.CRM = {
             };
 
             await DB.saveProduct(updatedProduct);
+            this._manualInventoryCache = null;
             closeModal('edit-product-modal');
             if (window.App && window.App.currentView === 'crm-products') {
                 await this.renderProductsView();
@@ -1249,6 +1250,7 @@ window.CRM = {
 
         try {
             await DB.deleteProduct(id);
+            this._manualInventoryCache = null;
             if (window.App && window.App.currentView === 'crm-products') {
                 await this.renderProductsView();
             } else {
@@ -1340,6 +1342,7 @@ window.CRM = {
 
     initProductsView: function() {
         this.activeCategoryGroup = null;
+        this._manualInventoryCache = null;
         try {
             this.setupEventListeners();
         } catch (e) {
@@ -1378,6 +1381,7 @@ window.CRM = {
                 e.preventDefault();
                 if (window.ERP && typeof window.ERP.addProduct === 'function') {
                     await window.ERP.addProduct();
+                    this._manualInventoryCache = null;
                     await this.renderProductsView();
                 }
             };
@@ -1390,7 +1394,10 @@ window.CRM = {
             const container = document.getElementById('crm-products-content');
             if (!container) return;
 
-            const allInventory = (await DB.getManualInventory()) || [];
+            if (!this._manualInventoryCache) {
+                this._manualInventoryCache = (await DB.getManualInventory()) || [];
+            }
+            const allInventory = this._manualInventoryCache;
             if (!Array.isArray(allInventory)) {
                 console.error("Inventory is not an array:", allInventory);
                 container.innerHTML = `<div class="alert alert-danger">Xatolik: Maxsulotlar ro'yxatini yuklab bo'lmadi (format xato).</div>`;
