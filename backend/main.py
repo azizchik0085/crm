@@ -4966,7 +4966,54 @@ async def push_deal_to_amocrm(payload: dict, request: Request):
         if not contact_id:
             raise HTTPException(status_code=500, detail="amoCRM kontaktni aniqlash yoki yaratish imkoni bo'lmadi")
             
-        # 3. Create Lead
+        # 3. Search for active lead linked to this contact
+        lead_id = None
+        try:
+            links_url = f"https://{subdomain}.amocrm.ru/api/v4/contacts/{contact_id}/links"
+            links_res = requests.get(links_url, headers=headers, timeout=10)
+            if links_res.status_code == 200:
+                links_list = links_res.json().get("_embedded", {}).get("links", [])
+                linked_lead_ids = [str(lnk.get("to_entity_id")) for lnk in links_list if lnk.get("to_entity_type") == "leads"]
+                
+                if linked_lead_ids:
+                    ids_str = ",".join(linked_lead_ids)
+                    leads_url = f"https://{subdomain}.amocrm.ru/api/v4/leads?filter[id]={ids_str}"
+                    leads_res = requests.get(leads_url, headers=headers, timeout=10)
+                    if leads_res.status_code == 200:
+                        leads_list = leads_res.json().get("_embedded", {}).get("leads", [])
+                        for l in leads_list:
+                            # 142 = won, 143 = lost. Keep active leads only.
+                            if l.get("status_id") not in [142, 143]:
+                                lead_id = l.get("id")
+                                break
+        except Exception as e_lead_search:
+            print(f"amoCRM Push Deal: failed to search active lead: {e_lead_search}")
+
+        # 4. If active lead exists, add a note to it instead of creating a new lead
+        if lead_id:
+            note_text = f"Mijoz so'ragan mahsulot:\n• Nomi: {product_name}\n• SKU: {product_sku}\n• Narxi: {int(product_price):,} so'm\n• Izoh: {deal_name}"
+            notes_payload = [{
+                "note_type": "common",
+                "params": {
+                    "text": note_text
+                }
+            }]
+            notes_url = f"https://{subdomain}.amocrm.ru/api/v4/leads/{lead_id}/notes"
+            notes_res = requests.post(notes_url, headers=headers, json=notes_payload, timeout=10)
+            
+            if notes_res.status_code in [200, 201]:
+                return {
+                    "status": "success",
+                    "message": "Mahsulot ma'lumotlari mavjud bitimga xabar (eslatma) sifatida qo'shildi!",
+                    "lead_id": lead_id,
+                    "contact_id": contact_id,
+                    "is_new_deal": False
+                }
+            else:
+                print(f"amoCRM Note Creation failed: {notes_res.text}")
+                # Fallback to creating a new lead if note creation fails
+                
+        # 5. Create a new lead if none exists or note fallback failed
         lead_title = f"{deal_name} | {product_name} (SKU: {product_sku})"
         lead_payload = [{
             "name": lead_title,
@@ -4977,14 +5024,15 @@ async def push_deal_to_amocrm(payload: dict, request: Request):
         }]
         
         lead_res = requests.post(f"https://{subdomain}.amocrm.ru/api/v4/leads", headers=headers, json=lead_payload, timeout=10)
-        if lead_res.status_code == 200 or lead_res.status_code == 201:
+        if lead_res.status_code in [200, 201]:
             leads_created = lead_res.json().get("_embedded", {}).get("leads", [])
             created_lead_id = leads_created[0].get("id") if leads_created else None
             return {
                 "status": "success",
-                "message": "Ma'lumotlar amoCRM-ga muvaffaqiyatli yuborildi!",
+                "message": "Yangi bitim (sdelka) va kontakt amoCRM-da muvaffaqiyatli yaratildi!",
                 "lead_id": created_lead_id,
-                "contact_id": contact_id
+                "contact_id": contact_id,
+                "is_new_deal": True
             }
         else:
             raise HTTPException(status_code=500, detail=f"amoCRM-da bitim (sdelka) yaratishda xatolik: {lead_res.text}")

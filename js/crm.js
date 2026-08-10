@@ -1409,7 +1409,7 @@ window.CRM = {
             
             const result = await response.json();
             if (response.ok && result.status === 'success') {
-                alert("Muvaffaqiyatli: Bitim va kontakt amoCRM-da muvaffaqiyatli yaratildi!");
+                alert("Muvaffaqiyatli: " + result.message);
                 closeModal('product-details-modal');
             } else {
                 alert("Xatolik: " + (result.detail || "amoCRM-ga yuborishda xatolik yuz berdi"));
