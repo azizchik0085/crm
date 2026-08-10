@@ -4917,6 +4917,8 @@ async def push_deal_to_amocrm(payload: dict, request: Request):
     product_name = payload.get("product_name") or ""
     product_price = payload.get("product_price") or 0.0
     product_sku = payload.get("product_sku") or ""
+    product_desc = payload.get("product_desc") or ""
+    product_image = payload.get("product_image") or ""
     
     if not phone:
         raise HTTPException(status_code=400, detail="Telefon raqami kiritilishi shart")
@@ -4989,9 +4991,22 @@ async def push_deal_to_amocrm(payload: dict, request: Request):
         except Exception as e_lead_search:
             print(f"amoCRM Push Deal: failed to search active lead: {e_lead_search}")
 
+        # Construct note text beautifully
+        note_lines = [
+            "Mijoz so'ragan mahsulot ma'lumotlari:\n",
+            f"📦 Nomi: {product_name}",
+            f"🆔 SKU: {product_sku}",
+            f"💰 Narxi: {int(product_price):,} so'm"
+        ]
+        if product_desc:
+            note_lines.append(f"📝 Tasnifi: {product_desc}")
+        if product_image:
+            note_lines.append(f"🖼️ Rasmi: {product_image}")
+        note_lines.append(f"\n💬 Operator izohi: {deal_name}")
+        note_text = "\n".join(note_lines)
+
         # 4. If active lead exists, add a note to it instead of creating a new lead
         if lead_id:
-            note_text = f"Mijoz so'ragan mahsulot:\n• Nomi: {product_name}\n• SKU: {product_sku}\n• Narxi: {int(product_price):,} so'm\n• Izoh: {deal_name}"
             notes_payload = [{
                 "note_type": "common",
                 "params": {
@@ -5027,6 +5042,18 @@ async def push_deal_to_amocrm(payload: dict, request: Request):
         if lead_res.status_code in [200, 201]:
             leads_created = lead_res.json().get("_embedded", {}).get("leads", [])
             created_lead_id = leads_created[0].get("id") if leads_created else None
+            
+            # Post note to the newly created lead too!
+            if created_lead_id:
+                notes_payload = [{
+                    "note_type": "common",
+                    "params": {
+                        "text": note_text
+                    }
+                }]
+                notes_url = f"https://{subdomain}.amocrm.ru/api/v4/leads/{created_lead_id}/notes"
+                requests.post(notes_url, headers=headers, json=notes_payload, timeout=5)
+                
             return {
                 "status": "success",
                 "message": "Yangi bitim (sdelka) va kontakt amoCRM-da muvaffaqiyatli yaratildi!",

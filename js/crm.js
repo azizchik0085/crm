@@ -1386,6 +1386,8 @@ window.CRM = {
         }
         const parts = (p.name || '').split('###');
         const displayName = parts[0] || '';
+        const description = parts[1] || '';
+        const imageUrl = parts[2] || '';
         
         try {
             if (pushBtn) {
@@ -1403,7 +1405,9 @@ window.CRM = {
                     phone: phone,
                     product_name: displayName,
                     product_price: parseFloat(p.price) || 0,
-                    product_sku: p.sku || ''
+                    product_sku: p.sku || '',
+                    product_desc: description,
+                    product_image: imageUrl
                 })
             });
             
