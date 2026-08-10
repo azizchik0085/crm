@@ -1946,13 +1946,20 @@
                         <label for="prod-name">Mahsulot nomi <span style="color:var(--danger)">*</span></label>
                         <input type="text" id="prod-name" class="form-control" required placeholder="Masalan: iPhone 15 Pro Max">
                     </div>
-                    <div class="form-group">
-                        <label for="prod-sku">SKU kod <span style="color:var(--danger)">*</span></label>
-                        <input type="text" id="prod-sku" class="form-control" required placeholder="IPH-15PM-256">
-                    </div>
+                    <input type="hidden" id="prod-sku">
                     <div class="form-group">
                         <label for="prod-cat">Kategoriya <span style="color:var(--danger)">*</span></label>
-                        <input type="text" id="prod-cat" class="form-control" required placeholder="Masalan: Elektronika, Mebel">
+                        <select id="prod-cat" class="form-control" required style="height: 42px; background-color: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); color: var(--text-main); border-radius: 8px;">
+                            <option value="">Toifani tanlang...</option>
+                            <option value="konditsioner">Konditsionerlar</option>
+                            <option value="televizor">Televizorlar</option>
+                            <option value="muzlatgichlar">Muzlatgichlar</option>
+                            <option value="kirmoshinalar">Kir yuvish mashinalari</option>
+                            <option value="gaz plitalar">Gaz plitalari</option>
+                            <option value="chang yutgich">Changyutgichlar</option>
+                            <option value="mikrovalnovkalar">Mikroto'lqinli pechlar</option>
+                            <option value="boshqalar">Boshqa mahsulotlar</option>
+                        </select>
                     </div>
                     <div class="form-group">
                         <label for="prod-price">Sotish narxi</label>
@@ -1989,13 +1996,19 @@
                         <label for="edit-prod-name">Mahsulot nomi <span style="color:var(--danger)">*</span></label>
                         <input type="text" id="edit-prod-name" class="form-control" required placeholder="Masalan: iPhone 15 Pro Max">
                     </div>
-                    <div class="form-group">
-                        <label for="edit-prod-sku">SKU kod <span style="color:var(--danger)">*</span></label>
-                        <input type="text" id="edit-prod-sku" class="form-control" required placeholder="IPH-15PM-256">
-                    </div>
+                    <input type="hidden" id="edit-prod-sku">
                     <div class="form-group">
                         <label for="edit-prod-cat">Kategoriya <span style="color:var(--danger)">*</span></label>
-                        <input type="text" id="edit-prod-cat" class="form-control" required placeholder="Masalan: Elektronika, Mebel">
+                        <select id="edit-prod-cat" class="form-control" required style="height: 42px; background-color: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); color: var(--text-main); border-radius: 8px;">
+                            <option value="konditsioner">Konditsionerlar</option>
+                            <option value="televizor">Televizorlar</option>
+                            <option value="muzlatgichlar">Muzlatgichlar</option>
+                            <option value="kirmoshinalar">Kir yuvish mashinalari</option>
+                            <option value="gaz plitalar">Gaz plitalari</option>
+                            <option value="chang yutgich">Changyutgichlar</option>
+                            <option value="mikrovalnovkalar">Mikroto'lqinli pechlar</option>
+                            <option value="boshqalar">Boshqa mahsulotlar</option>
+                        </select>
                     </div>
                     <div class="form-group">
                         <label for="edit-prod-price">Sotish narxi</label>

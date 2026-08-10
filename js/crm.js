@@ -4,6 +4,40 @@ window.CRM = {
     activeTab: 'kanban', // 'kanban', 'list', 'calls' yoki 'products'
     pollingInterval: null,
     isDragging: false,
+    activeCategoryGroup: null,
+
+    getProductGroup: function(p) {
+        if (!p) return 'boshqalar';
+        const parts = (p.name || '').split('###');
+        const displayName = (parts[0] || '').toLowerCase();
+        const description = (parts[1] || '').toLowerCase();
+        const category = (p.category || '').toLowerCase();
+        
+        const fullText = `${displayName} ${description} ${category}`;
+        
+        if (fullText.includes('konditsioner') || fullText.includes('kondisioner') || fullText.includes('konditsoner') || fullText.includes('кондиционер') || fullText.includes('кондит') || fullText.includes('breeze') || fullText.includes('bac-')) {
+            return 'konditsioner';
+        }
+        if (fullText.includes('televizor') || fullText.includes('tv') || fullText.includes('smart tv') || fullText.includes('телевизор') || fullText.includes('led tv')) {
+            return 'televizor';
+        }
+        if (fullText.includes('muzlatgich') || fullText.includes('muzlatkich') || fullText.includes('xolodilnik') || fullText.includes('холодильник') || fullText.includes('морозильник') || fullText.includes('ziffer') || fullText.includes('refrigerator')) {
+            return 'muzlatgichlar';
+        }
+        if (fullText.includes('kirmoshina') || fullText.includes('kir yuvish') || fullText.includes('kiryuvish') || fullText.includes('стиральная машина') || fullText.includes('стиралка') || fullText.includes('washer') || fullText.includes('washing')) {
+            return 'kirmoshinalar';
+        }
+        if (fullText.includes('gaz plita') || fullText.includes('gazpech') || fullText.includes('gaz pech') || fullText.includes('pech') || fullText.includes('плита') || fullText.includes('газовая плита') || fullText.includes('духовка') || fullText.includes('duxovka') || fullText.includes('stove') || fullText.includes('burner')) {
+            return 'gaz plitalar';
+        }
+        if (fullText.includes('changyutgich') || fullText.includes('chang yutgich') || fullText.includes('пылесос') || fullText.includes('vacuum')) {
+            return 'chang yutgich';
+        }
+        if (fullText.includes('mikrovalnovka') || fullText.includes('mikravalnovka') || fullText.includes('микроволновка') || fullText.includes('microwave') || fullText.includes('микроволновая') || fullText.includes('микроволновки') || fullText.includes('mikrotolqinli')) {
+            return 'mikrovalnovkalar';
+        }
+        return 'boshqalar';
+    },
 
     init: function() {
         this.render();
@@ -934,37 +968,116 @@ window.CRM = {
     },
 
     renderProducts: function(products) {
-        if (products.length === 0) {
-            return `
-                <div style="text-align: center; color: var(--text-muted); padding: 48px; width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px;">
-                    <i class="fas fa-box-open fa-3x" style="color: var(--accent);"></i>
-                    <p style="margin: 0;">Mahsulotlar topilmadi</p>
+        // Group metadata in user's requested order
+        const groupDefs = {
+            konditsioner: { name: "Konditsionerlar", icon: "fa-snowflake", color: "#3b82f6", rgb: "59, 130, 246" },
+            televizor: { name: "Televizorlar", icon: "fa-tv", color: "#8b5cf6", rgb: "139, 92, 246" },
+            muzlatgichlar: { name: "Muzlatgichlar", icon: "fa-temperature-low", color: "#0ea5e9", rgb: "14, 165, 233" },
+            kirmoshinalar: { name: "Kir yuvish mashinalari", icon: "fa-soap", color: "#10b981", rgb: "16, 185, 129" },
+            "gaz plitalar": { name: "Gaz plitalari", icon: "fa-fire", color: "#f59e0b", rgb: "245, 158, 11" },
+            "chang yutgich": { name: "Changyutgichlar", icon: "fa-broom", color: "#ec4899", rgb: "236, 72, 153" },
+            mikrovalnovkalar: { name: "Mikroto'lqinli pechlar", icon: "fa-wave-square", color: "#f97316", rgb: "249, 115, 22" },
+            boshqalar: { name: "Boshqa mahsulotlar", icon: "fa-box", color: "#64748b", rgb: "100, 116, 139" }
+        };
+
+        if (this.activeCategoryGroup === null) {
+            // Category List View (BIG Cards)
+            let html = `
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; width: 100%;">
+                    <h3 style="margin: 0; font-size: 1.25rem; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-boxes" style="color: var(--accent);"></i> Mahsulot Toifalari
+                    </h3>
                     <button class="btn btn-primary" onclick="CRM.openAddProductModal()" style="display: inline-flex; align-items: center; gap: 8px; height: 38px;">
                         <i class="fas fa-plus"></i> Kartochka Yaratish
                     </button>
                 </div>
+                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 24px; width: 100%;">
             `;
+
+            const counts = this._categoryCounts || {
+                konditsioner: 0,
+                televizor: 0,
+                muzlatgichlar: 0,
+                kirmoshinalar: 0,
+                "gaz plitalar": 0,
+                "chang yutgich": 0,
+                mikrovalnovkalar: 0,
+                boshqalar: 0
+            };
+
+            Object.keys(groupDefs).forEach(key => {
+                const def = groupDefs[key];
+                const count = counts[key] || 0;
+                
+                html += `
+                    <div class="category-folder-card card" onclick="CRM.selectCategoryGroup('${key}')" 
+                         style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 16px; padding: 28px 20px; text-align: center; cursor: pointer; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 200px; position: relative; overflow: hidden;"
+                         onmouseover="this.style.transform='translateY(-6px)'; this.style.borderColor='${def.color}cc'; this.style.boxShadow='0 12px 30px rgba(${def.rgb}, 0.15)'; this.style.background='rgba(30, 41, 59, 0.65)';"
+                         onmouseout="this.style.transform='none'; this.style.borderColor='rgba(255, 255, 255, 0.05)'; this.style.boxShadow='none'; this.style.background='rgba(30, 41, 59, 0.4)';">
+                         
+                         <!-- Glow background element -->
+                         <div style="position: absolute; top: -30px; right: -30px; width: 80px; height: 80px; border-radius: 50%; background: ${def.color}; opacity: 0.06; filter: blur(25px);"></div>
+                         
+                         <!-- Large Icon -->
+                         <div style="width: 72px; height: 72px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(${def.rgb}, 0.12); color: ${def.color}; font-size: 2.2rem; margin-bottom: 16px; border: 1px solid rgba(${def.rgb}, 0.1); transition: all 0.3s;"
+                              class="folder-icon-wrapper">
+                             <i class="fas ${def.icon}"></i>
+                         </div>
+                         
+                         <!-- Title and count badge -->
+                         <h4 style="margin: 0 0 8px 0; color: var(--text-main); font-size: 1.15rem; font-weight: 700; letter-spacing: 0.3px;">${def.name}</h4>
+                         <span style="font-size: 0.8rem; color: ${count > 0 ? '#10b981' : 'var(--text-muted)'}; background: ${count > 0 ? 'rgba(16, 185, 129, 0.12)' : 'rgba(255, 255, 255, 0.02)'}; border: 1px solid ${count > 0 ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255, 255, 255, 0.05)'}; padding: 3px 12px; border-radius: 14px; font-weight: 600; font-family: 'Outfit', sans-serif;">
+                             ${count} ta mahsulot
+                         </span>
+                    </div>
+                `;
+            });
+
+            html += `</div>`;
+            return html;
         }
 
+        // Category Detail View (Nested list)
+        const activeGroupDef = groupDefs[this.activeCategoryGroup];
+        
         let html = `
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; width: 100%;">
-                <h3 style="margin: 0; font-size: 1.1rem; font-weight: 600; color: var(--text-main);">
-                    Mahsulotlar Ro'yxati (${products.length} ta)
-                </h3>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; width: 100%; flex-wrap: wrap; gap: 16px;">
+                <div style="display: flex; align-items: center; gap: 16px;">
+                    <button class="btn btn-secondary" onclick="CRM.activeCategoryGroup = null; CRM.productsPage = 1; CRM.renderProductsView();" 
+                            style="height: 38px; display: inline-flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: var(--text-main); font-weight: 600; transition: all 0.2s;">
+                        <i class="fas fa-chevron-left"></i> Toifalarga
+                    </button>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <div style="width: 38px; height: 38px; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: rgba(${activeGroupDef.rgb}, 0.15); color: ${activeGroupDef.color}; font-size: 1.1rem;">
+                            <i class="fas ${activeGroupDef.icon}"></i>
+                        </div>
+                        <h3 style="margin: 0; font-size: 1.25rem; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 8px;">
+                            ${activeGroupDef.name}
+                        </h3>
+                    </div>
+                </div>
                 <button class="btn btn-primary" onclick="CRM.openAddProductModal()" style="display: inline-flex; align-items: center; gap: 8px; height: 38px;">
                     <i class="fas fa-plus"></i> Kartochka Yaratish
                 </button>
             </div>
-            <div class="products-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; width: 100%;">
         `;
 
+        if (products.length === 0) {
+            html += `
+                <div style="text-align: center; color: var(--text-muted); padding: 48px; width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; border: 1px dashed rgba(255,255,255,0.05); border-radius: 16px; background: rgba(30, 41, 59, 0.2);">
+                    <i class="fas fa-box-open fa-3x" style="color: var(--accent);"></i>
+                    <p style="margin: 0; font-size: 1rem;">Ushbu guruhda mahsulotlar topilmadi</p>
+                    <button class="btn btn-primary" onclick="CRM.openAddProductModal()" style="display: inline-flex; align-items: center; gap: 8px; height: 38px;">
+                        <i class="fas fa-plus"></i> Mahsulot qo'shish
+                    </button>
+                </div>
+            `;
+            return html;
+        }
+
+        html += `<div class="products-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; width: 100%;">`;
+        
         products.forEach(p => {
-            const isOutOfStock = p.stock <= 0;
-            const stockBadgeColor = isOutOfStock ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)';
-            const stockBadgeText = isOutOfStock ? '#ef4444' : '#10b981';
-            const stockBorder = isOutOfStock ? 'rgba(239, 68, 68, 0.2)' : 'rgba(16, 185, 129, 0.2)';
-            const stockLabel = isOutOfStock ? 'Tugagan' : `Qoldiq: ${p.stock} ta`;
-            
             const colors = [
                 ['#3b82f6', '#1d4ed8'],
                 ['#10b981', '#047857'],
@@ -1034,6 +1147,14 @@ window.CRM = {
     },
 
     openAddProductModal: function() {
+        const prodCatSelect = document.getElementById('prod-cat');
+        if (prodCatSelect) {
+            prodCatSelect.value = this.activeCategoryGroup || '';
+        }
+        const prodSkuInput = document.getElementById('prod-sku');
+        if (prodSkuInput) {
+            prodSkuInput.value = 'SKU-' + Math.floor(100000 + Math.random() * 900000);
+        }
         showModal('product-modal');
     },
 
@@ -1054,7 +1175,12 @@ window.CRM = {
             document.getElementById('edit-prod-id').value = product.id;
             document.getElementById('edit-prod-name').value = nameOnly;
             document.getElementById('edit-prod-sku').value = product.sku || '';
-            document.getElementById('edit-prod-cat').value = product.category || '';
+            let catValue = product.category || '';
+            const standardKeys = ['konditsioner', 'televizor', 'muzlatgichlar', 'kirmoshinalar', 'gaz plitalar', 'chang yutgich', 'mikrovalnovkalar', 'boshqalar'];
+            if (!standardKeys.includes(catValue.toLowerCase())) {
+                catValue = this.getProductGroup(product);
+            }
+            document.getElementById('edit-prod-cat').value = catValue;
             document.getElementById('edit-prod-price').value = product.price || 0;
             if (document.getElementById('edit-prod-desc')) {
                 document.getElementById('edit-prod-desc').value = description;
@@ -1213,6 +1339,7 @@ window.CRM = {
     },
 
     initProductsView: function() {
+        this.activeCategoryGroup = null;
         try {
             this.setupEventListeners();
         } catch (e) {
@@ -1304,21 +1431,48 @@ window.CRM = {
                        catNorm.includes(searchValNorm);
             });
 
-            // Pagination calculations
-            if (!this.productsPage) this.productsPage = 1;
-            if (!this.productsPageSize) this.productsPageSize = 24;
+            // Compute counts for categories dynamically based on filtered products
+            const allCounts = {
+                konditsioner: 0,
+                televizor: 0,
+                muzlatgichlar: 0,
+                kirmoshinalar: 0,
+                "gaz plitalar": 0,
+                "chang yutgich": 0,
+                mikrovalnovkalar: 0,
+                boshqalar: 0
+            };
+            filteredProducts.forEach(p => {
+                const group = this.getProductGroup(p);
+                if (allCounts.hasOwnProperty(group)) {
+                    allCounts[group]++;
+                }
+            });
+            this._categoryCounts = allCounts;
 
-            const totalItems = filteredProducts.length;
-            const totalPages = Math.ceil(totalItems / this.productsPageSize) || 1;
-            if (this.productsPage > totalPages) this.productsPage = totalPages;
-            if (this.productsPage < 1) this.productsPage = 1;
-            
-            const startIdx = (this.productsPage - 1) * this.productsPageSize;
-            const endIdx = startIdx + this.productsPageSize;
-            const pageItems = filteredProducts.slice(startIdx, endIdx);
+            if (this.activeCategoryGroup !== null) {
+                // Nested view: Show only products in the active category group
+                const activeGroupProducts = filteredProducts.filter(p => this.getProductGroup(p) === this.activeCategoryGroup);
 
-            container.innerHTML = this.renderProducts(pageItems);
-            this.renderProductsPagination(totalPages);
+                if (!this.productsPage) this.productsPage = 1;
+                if (!this.productsPageSize) this.productsPageSize = 24;
+
+                const totalItems = activeGroupProducts.length;
+                const totalPages = Math.ceil(totalItems / this.productsPageSize) || 1;
+                if (this.productsPage > totalPages) this.productsPage = totalPages;
+                if (this.productsPage < 1) this.productsPage = 1;
+                
+                const startIdx = (this.productsPage - 1) * this.productsPageSize;
+                const endIdx = startIdx + this.productsPageSize;
+                const pageItems = activeGroupProducts.slice(startIdx, endIdx);
+
+                container.innerHTML = this.renderProducts(pageItems);
+                this.renderProductsPagination(totalPages);
+            } else {
+                // Category list view: Show the 8 categories as folder cards
+                container.innerHTML = this.renderProducts(filteredProducts);
+                this.renderProductsPagination(0); // Hide pagination in category view
+            }
         } catch (err) {
             console.error("renderProductsView xatosi:", err);
             const container = document.getElementById('crm-products-content');
@@ -1426,7 +1580,12 @@ window.CRM = {
 
             document.getElementById('prod-name').value = p.name || '';
             document.getElementById('prod-sku').value = p.sku || '';
-            document.getElementById('prod-cat').value = p.category || '';
+            let catValue = p.category || '';
+            const standardKeys = ['konditsioner', 'televizor', 'muzlatgichlar', 'kirmoshinalar', 'gaz plitalar', 'chang yutgich', 'mikrovalnovkalar', 'boshqalar'];
+            if (!standardKeys.includes(catValue.toLowerCase())) {
+                catValue = this.getProductGroup(p);
+            }
+            document.getElementById('prod-cat').value = catValue;
             document.getElementById('prod-price').value = p.price || 0;
             document.getElementById('prod-desc').value = '';
             document.getElementById('prod-image').value = '';
@@ -1443,6 +1602,18 @@ window.CRM = {
         this.renderProductsView();
         
         // Scroll to top of the view container smoothly
+        const sec = document.getElementById('view-crm-products');
+        if (sec) {
+            sec.scrollIntoView({ behavior: 'smooth' });
+        }
+    },
+
+    selectCategoryGroup: function(key) {
+        this.activeCategoryGroup = key;
+        this.productsPage = 1;
+        this.renderProductsView();
+        
+        // Scroll to top smoothly
         const sec = document.getElementById('view-crm-products');
         if (sec) {
             sec.scrollIntoView({ behavior: 'smooth' });
