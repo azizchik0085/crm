@@ -1160,7 +1160,7 @@ window.CRM = {
 
     openEditProductModal: async function(id) {
         try {
-            const inventory = await DB.getInventory();
+            const inventory = await DB.getManualInventory();
             const product = inventory.find(p => p.id === id);
             if (!product) {
                 alert("Mahsulot topilmadi!");
@@ -1203,7 +1203,7 @@ window.CRM = {
         const category = document.getElementById('edit-prod-cat').value;
         const price = parseFloat(document.getElementById('edit-prod-price').value) || 0;
 
-        const inventory = await DB.getInventory();
+        const inventory = await DB.getManualInventory();
         const product = inventory.find(p => p.id === id);
         const stock = product ? product.stock : 0;
 
@@ -1267,7 +1267,7 @@ window.CRM = {
 
     openProductDetailsModal: async function(id) {
         try {
-            const inventory = await DB.getInventory();
+            const inventory = await DB.getManualInventory();
             const p = inventory.find(item => item.id === id);
             if (!p) {
                 alert("Mahsulot topilmadi!");
@@ -1378,7 +1378,7 @@ window.CRM = {
         }
         
         // Find product details
-        const inventory = await DB.getInventory();
+        const inventory = await DB.getManualInventory();
         const p = inventory.find(item => item.id === id);
         if (!p) {
             alert("Mahsulot topilmadi!");
