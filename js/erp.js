@@ -311,23 +311,27 @@ window.ERP = {
             return;
         }
         const name = document.getElementById('prod-name').value;
-        const sku = document.getElementById('prod-sku').value;
+        let sku = document.getElementById('prod-sku').value.trim();
+        if (!sku) {
+            sku = 'SKU-' + Math.floor(100000 + Math.random() * 900000);
+        }
         const category = document.getElementById('prod-cat').value;
         const price = parseFloat(document.getElementById('prod-price').value) || 0;
         const stock = 0;
         const description = document.getElementById('prod-desc')?.value.trim() || '';
         const image = document.getElementById('prod-image')?.value.trim() || '';
 
-        if (!name || !sku || !category) {
+        if (!name || !category) {
             alert('Iltimos, barcha maydonlarni to\'ldiring!');
             return;
         }
 
         // SKU takrorlanishini tekshirish
         const inventory = await DB.getInventory();
-        if (inventory.some(p => p.sku.toUpperCase() === sku.toUpperCase())) {
-            alert('Bu SKU kodli mahsulot allaqachon mavjud!');
-            return;
+        let attempts = 0;
+        while (inventory.some(p => p.sku && p.sku.toUpperCase() === sku.toUpperCase()) && attempts < 10) {
+            sku = 'SKU-' + Math.floor(100000 + Math.random() * 900000);
+            attempts++;
         }
 
         const serializedName = `${name}###${description}###${image}`;
