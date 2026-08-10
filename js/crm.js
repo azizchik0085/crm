@@ -1329,6 +1329,28 @@ window.CRM = {
                                     ${parseFloat(p.price).toLocaleString()} so'm
                                 </span>
                             </div>
+                            
+                            <!-- amoCRM Integration Form -->
+                            <div style="margin-top: 15px; padding: 14px; background: rgba(59, 130, 246, 0.05); border: 1px solid rgba(59, 130, 246, 0.15); border-radius: 10px;">
+                                <h4 style="margin: 0 0 10px 0; color: #3b82f6; font-size: 0.95rem; display: flex; align-items: center; gap: 8px; font-weight: 600;">
+                                    <i class="fas fa-plug"></i> amoCRM-ga yuborish
+                                </h4>
+                                <div style="display: flex; flex-direction: column; gap: 8px;">
+                                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                                        <div style="flex: 1.2; min-width: 140px;">
+                                            <label style="font-size: 0.7rem; color: var(--text-muted); display: block; margin-bottom: 3px;">Bitim (sdelka) nomi</label>
+                                            <input type="text" id="amo-deal-name" placeholder="Masalan: TCL televizor" style="width: 100%; height: 32px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); color: var(--text-main); border-radius: 6px; padding: 0 8px; font-size: 0.8rem;" value="${displayName} xaridi">
+                                        </div>
+                                        <div style="flex: 1; min-width: 140px;">
+                                            <label style="font-size: 0.7rem; color: var(--text-muted); display: block; margin-bottom: 3px;">Telefon raqam</label>
+                                            <input type="text" id="amo-deal-phone" placeholder="Masalan: +998901234567" style="width: 100%; height: 32px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); color: var(--text-main); border-radius: 6px; padding: 0 8px; font-size: 0.8rem;" value="+998">
+                                        </div>
+                                    </div>
+                                    <button type="button" onclick="CRM.pushDealToAmoCRM('${p.id.replace(/'/g, "\\'")}')" id="amo-push-btn" style="height: 34px; background: linear-gradient(135deg, #3b82f6, #1d4ed8); border: none; color: white; font-weight: 600; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 0.8rem; width: 100%; transition: all 0.2s;">
+                                        <i class="fas fa-paper-plane"></i> amoCRM-ga jo'natish
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 `;
@@ -1337,6 +1359,69 @@ window.CRM = {
         } catch (e) {
             console.error("Mahsulot tafsilotlarini ko'rsatishda xatolik:", e);
             alert("Xatolik: " + e.message);
+        }
+    },
+
+    pushDealToAmoCRM: async function(id) {
+        const dealNameInput = document.getElementById('amo-deal-name');
+        const phoneInput = document.getElementById('amo-deal-phone');
+        const pushBtn = document.getElementById('amo-push-btn');
+        
+        if (!dealNameInput || !phoneInput) return;
+        
+        const dealName = dealNameInput.value.trim();
+        const phone = phoneInput.value.trim();
+        
+        if (!dealName || !phone || phone === '+998') {
+            alert("Iltimos, bitim nomi va telefon raqamini kiriting!");
+            return;
+        }
+        
+        // Find product details
+        const inventory = await DB.getInventory();
+        const p = inventory.find(item => item.id === id);
+        if (!p) {
+            alert("Mahsulot topilmadi!");
+            return;
+        }
+        const parts = (p.name || '').split('###');
+        const displayName = parts[0] || '';
+        
+        try {
+            if (pushBtn) {
+                pushBtn.disabled = true;
+                pushBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Yuborilmoqda...`;
+            }
+            
+            const response = await fetch('/api/integration/amocrm/push-deal', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    deal_name: dealName,
+                    phone: phone,
+                    product_name: displayName,
+                    product_price: parseFloat(p.price) || 0,
+                    product_sku: p.sku || ''
+                })
+            });
+            
+            const result = await response.json();
+            if (response.ok && result.status === 'success') {
+                alert("Muvaffaqiyatli: Bitim va kontakt amoCRM-da muvaffaqiyatli yaratildi!");
+                closeModal('product-details-modal');
+            } else {
+                alert("Xatolik: " + (result.detail || "amoCRM-ga yuborishda xatolik yuz berdi"));
+            }
+        } catch (e) {
+            console.error("amoCRM Push error:", e);
+            alert("Xatolik: Tarmoqda xatolik yuz berdi.");
+        } finally {
+            if (pushBtn) {
+                pushBtn.disabled = false;
+                pushBtn.innerHTML = `<i class="fas fa-paper-plane"></i> amoCRM-ga jo'natish`;
+            }
         }
     },
 

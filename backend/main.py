@@ -4909,6 +4909,92 @@ def push_receipts_to_amocrm_endpoint(payload: dict, background_tasks: Background
         print(f"Manual Push Receipts: Error: {e}")
         raise HTTPException(status_code=500, detail=f"Tizim xatoligi yuz berdi: {str(e)}")
 
+@app.post("/api/integration/amocrm/push-deal")
+async def push_deal_to_amocrm(payload: dict, request: Request):
+    company_id = get_company_id(request)
+    deal_name = payload.get("deal_name") or "Yangi buyurtma"
+    phone = payload.get("phone") or ""
+    product_name = payload.get("product_name") or ""
+    product_price = payload.get("product_price") or 0.0
+    product_sku = payload.get("product_sku") or ""
+    
+    if not phone:
+        raise HTTPException(status_code=400, detail="Telefon raqami kiritilishi shart")
+        
+    try:
+        settings = get_company_settings(company_id, bypass_cache=True) if company_id else settings_state
+        subdomain = settings.get("amocrm_subdomain", "")
+        token = settings.get("amocrm_token", "")
+        if not subdomain or not token:
+            raise HTTPException(status_code=400, detail="amoCRM sozlamalari (token yoki subdomain) topilmadi")
+            
+        headers = get_amocrm_headers(token)
+        
+        # Clean phone
+        clean_phone = "".join(c for c in phone if c.isdigit() or c == "+")
+        
+        # 1. Search for existing contact by last 9 digits
+        contact_id = None
+        last_9 = clean_phone[-9:] if len(clean_phone) >= 9 else clean_phone
+        search_url = f"https://{subdomain}.amocrm.ru/api/v4/contacts?query={last_9}"
+        
+        search_res = requests.get(search_url, headers=headers, timeout=10)
+        if search_res.status_code == 200:
+            contacts_found = search_res.json().get("_embedded", {}).get("contacts", [])
+            if contacts_found:
+                contact_id = contacts_found[0].get("id")
+                
+        # 2. Create contact if not found
+        if not contact_id:
+            contact_payload = [{
+                "name": f"Mijoz ({clean_phone})",
+                "custom_fields_values": [
+                    {
+                        "field_code": "PHONE",
+                        "values": [{"value": clean_phone, "enum_code": "MOB"}]
+                    }
+                ]
+            }]
+            contact_res = requests.post(f"https://{subdomain}.amocrm.ru/api/v4/contacts", headers=headers, json=contact_payload, timeout=10)
+            if contact_res.status_code == 200 or contact_res.status_code == 201:
+                contacts_created = contact_res.json().get("_embedded", {}).get("contacts", [])
+                if contacts_created:
+                    contact_id = contacts_created[0].get("id")
+            else:
+                raise HTTPException(status_code=500, detail=f"amoCRM kontakt yaratishda xatolik: {contact_res.text}")
+                
+        if not contact_id:
+            raise HTTPException(status_code=500, detail="amoCRM kontaktni aniqlash yoki yaratish imkoni bo'lmadi")
+            
+        # 3. Create Lead
+        lead_title = f"{deal_name} | {product_name} (SKU: {product_sku})"
+        lead_payload = [{
+            "name": lead_title,
+            "price": int(product_price),
+            "_embedded": {
+                "contacts": [{"id": contact_id}]
+            }
+        }]
+        
+        lead_res = requests.post(f"https://{subdomain}.amocrm.ru/api/v4/leads", headers=headers, json=lead_payload, timeout=10)
+        if lead_res.status_code == 200 or lead_res.status_code == 201:
+            leads_created = lead_res.json().get("_embedded", {}).get("leads", [])
+            created_lead_id = leads_created[0].get("id") if leads_created else None
+            return {
+                "status": "success",
+                "message": "Ma'lumotlar amoCRM-ga muvaffaqiyatli yuborildi!",
+                "lead_id": created_lead_id,
+                "contact_id": contact_id
+            }
+        else:
+            raise HTTPException(status_code=500, detail=f"amoCRM-da bitim (sdelka) yaratishda xatolik: {lead_res.text}")
+            
+    except Exception as e:
+        print(f"amoCRM Push Deal Error: {e}")
+        if isinstance(e, HTTPException):
+            raise e
+        raise HTTPException(status_code=500, detail=f"Tizim xatoligi yuz berdi: {str(e)}")
+
 @app.get("/tv")
 def tv_redirect(company: str = "giperbrendstroy"):
     from fastapi.responses import RedirectResponse
