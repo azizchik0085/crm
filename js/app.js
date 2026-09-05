@@ -685,6 +685,7 @@ window.App = {
             });
             
             if (allowedViews.includes('crm')) {
+                allowedViews.push('crm-customers');
                 allowedViews.push('crm-products');
             }
             
@@ -717,8 +718,10 @@ window.App = {
             if (addEmployeeBtn) addEmployeeBtn.style.setProperty('display', canAddEmployee ? '' : 'none', 'important');
             
             const crmAddCustomerBtn = document.getElementById('crm-add-customer-btn');
+            const custlistAddBtn = document.getElementById('crm-custlist-add-btn');
             const canAddCustomer = allowedViews.includes('crm');
             if (crmAddCustomerBtn) crmAddCustomerBtn.style.setProperty('display', canAddCustomer ? '' : 'none', 'important');
+            if (custlistAddBtn) custlistAddBtn.style.setProperty('display', canAddCustomer ? '' : 'none', 'important');
             
             const financeHeaderBtn = document.getElementById('finance-add-transaction-btn');
             const canAddTransaction = allowedViews.includes('finance');
@@ -726,8 +729,12 @@ window.App = {
             
             // Toggle amoCRM Sync buttons based on permission
             const amocrmSyncBtn = document.getElementById('btn-amocrm-sync');
+            const amocrmSyncCustlistBtn = document.getElementById('btn-amocrm-sync-custlist');
             if (amocrmSyncBtn) {
                 amocrmSyncBtn.style.setProperty('display', canAddCustomer ? 'inline-flex' : 'none', 'important');
+            }
+            if (amocrmSyncCustlistBtn) {
+                amocrmSyncCustlistBtn.style.setProperty('display', canAddCustomer ? 'inline-flex' : 'none', 'important');
             }
             
             const amocrmSyncReceiptsBtn = document.getElementById('btn-amocrm-sync-receipts');
@@ -1047,6 +1054,8 @@ window.App = {
             this.renderDashboard();
         } else if (viewName === 'crm') {
             window.CRM.init();
+        } else if (viewName === 'crm-customers') {
+            window.CRM.initCustomersView();
         } else if (viewName === 'crm-products') {
             window.CRM.initProductsView();
         } else if (viewName === 'telephony') {

@@ -48,8 +48,10 @@ window.CRM = {
             clearInterval(this.pollingInterval);
         }
         this.pollingInterval = setInterval(() => {
-            if (window.App.currentView === 'crm' && !this.isDragging && this.activeTab !== 'calls' && this.activeTab !== 'products') {
+            if (window.App && window.App.currentView === 'crm' && !this.isDragging && this.activeTab !== 'calls' && this.activeTab !== 'products') {
                 this.render();
+            } else if (window.App && window.App.currentView === 'crm-customers') {
+                this.renderCustomersView();
             }
         }, 5000);
     },
@@ -549,6 +551,9 @@ window.CRM = {
             }
 
             await this.render();
+            if (window.App && window.App.currentView === 'crm-customers') {
+                await this.renderCustomersView();
+            }
             // Dashboard yangilanishi uchun
             if (window.App && typeof window.App.updateDashboardStats === 'function') {
                 window.App.updateDashboardStats();
@@ -634,6 +639,9 @@ window.CRM = {
         closeModal('crm-modal');
         
         await this.render();
+        if (window.App && window.App.currentView === 'crm-customers') {
+            await this.renderCustomersView();
+        }
         if (window.App && typeof window.App.updateDashboardStats === 'function') {
             window.App.updateDashboardStats();
         }
@@ -645,6 +653,9 @@ window.CRM = {
         await DB.deleteCustomer(id);
         
         await this.render();
+        if (window.App && window.App.currentView === 'crm-customers') {
+            await this.renderCustomersView();
+        }
         if (window.App && typeof window.App.updateDashboardStats === 'function') {
             window.App.updateDashboardStats();
         }
@@ -909,13 +920,16 @@ window.CRM = {
         window.closeModal('customer-details-modal');
         
         await this.render();
+        if (window.App && window.App.currentView === 'crm-customers') {
+            await this.renderCustomersView();
+        }
         if (window.App && typeof window.App.updateDashboardStats === 'function') {
             window.App.updateDashboardStats();
         }
     },
 
     syncAmoCRMLeads: async function(clickedBtn) {
-        const btn = clickedBtn || document.getElementById('btn-amocrm-sync');
+        const btn = clickedBtn || document.getElementById('btn-amocrm-sync') || document.getElementById('btn-amocrm-sync-custlist');
         let originalHTML = '<i class="fas fa-sync"></i> amoCRM Sinx';
         if (btn) {
             originalHTML = btn.innerHTML;
@@ -950,6 +964,9 @@ window.CRM = {
                             }
                             alert(statusData.message || 'Sinxronizatsiya yakunlandi!');
                             await this.render();
+                            if (window.App && window.App.currentView === 'crm-customers') {
+                                await this.renderCustomersView();
+                            }
                         }
                     }
                 } catch (pollErr) {
@@ -1717,6 +1734,383 @@ window.CRM = {
         const sec = document.getElementById('view-crm-products');
         if (sec) {
             sec.scrollIntoView({ behavior: 'smooth' });
+        }
+    },
+
+    customerListPage: 1,
+    customerListPageSize: 20,
+
+    initCustomersView: function() {
+        this.customerListPage = 1;
+        this.customerListPageSize = 20;
+        try {
+            this.setupEventListeners();
+        } catch (e) {
+            console.warn("setupEventListeners failed:", e);
+        }
+        this.setupCustomersViewEventListeners();
+        this.renderCustomersView();
+
+        if (!this.pollingInterval) {
+            this.pollingInterval = setInterval(() => {
+                if (window.App && window.App.currentView === 'crm' && !this.isDragging && this.activeTab !== 'calls' && this.activeTab !== 'products') {
+                    this.render();
+                } else if (window.App && window.App.currentView === 'crm-customers') {
+                    this.renderCustomersView();
+                }
+            }, 5000);
+        }
+    },
+
+    setupCustomersViewEventListeners: function() {
+        const searchInput = document.getElementById('crm-custlist-search');
+        if (searchInput && !searchInput._bound) {
+            searchInput._bound = true;
+            searchInput.oninput = () => {
+                this.customerListPage = 1;
+                this.renderCustomersView();
+            };
+        }
+
+        const statusFilter = document.getElementById('crm-custlist-status-filter');
+        if (statusFilter && !statusFilter._bound) {
+            statusFilter._bound = true;
+            statusFilter.onchange = () => {
+                this.customerListPage = 1;
+                this.renderCustomersView();
+            };
+        }
+
+        const operatorFilter = document.getElementById('crm-custlist-operator-filter');
+        if (operatorFilter && !operatorFilter._bound) {
+            operatorFilter._bound = true;
+            operatorFilter.onchange = () => {
+                this.customerListPage = 1;
+                this.renderCustomersView();
+            };
+        }
+
+        const sourceFilter = document.getElementById('crm-custlist-source-filter');
+        if (sourceFilter && !sourceFilter._bound) {
+            sourceFilter._bound = true;
+            sourceFilter.onchange = () => {
+                this.customerListPage = 1;
+                this.renderCustomersView();
+            };
+        }
+    },
+
+    renderCustomersView: async function() {
+        const container = document.getElementById('crm-custlist-content');
+        if (!container) return;
+
+        let customers = [];
+        try {
+            customers = await DB.getCustomers();
+        } catch (e) {
+            console.error("Mijozlarni yuklashda xatolik:", e);
+            customers = AppStorage.load().customers || [];
+        }
+
+        // 1. KPI kartochkalarni yangilash
+        const totalStat = document.getElementById('custlist-stat-total');
+        const newStat = document.getElementById('custlist-stat-new');
+        const contactedStat = document.getElementById('custlist-stat-contacted');
+        const wonStat = document.getElementById('custlist-stat-won');
+
+        if (totalStat) totalStat.textContent = customers.length;
+        if (newStat) newStat.textContent = customers.filter(c => c.status === 'lead').length;
+        if (contactedStat) contactedStat.textContent = customers.filter(c => c.status === 'contacted' || c.status === 'proposal').length;
+        if (wonStat) wonStat.textContent = customers.filter(c => c.status === 'won').length;
+
+        // 2. Operatorlar dropdown-ni to'ldirish (agar bo'sh bo'lsa)
+        const operatorFilter = document.getElementById('crm-custlist-operator-filter');
+        if (operatorFilter && operatorFilter.options.length <= 1) {
+            const currentSelected = operatorFilter.value;
+            const opSet = new Set();
+            customers.forEach(c => {
+                const op = c.displayOperator || c.operator;
+                if (op) opSet.add(op);
+            });
+            try {
+                const employees = await DB.getEmployees();
+                employees.forEach(emp => { if (emp.name) opSet.add(emp.name); });
+            } catch (e) {}
+
+            const ops = Array.from(opSet).filter(Boolean).sort();
+            let optHtml = '<option value="">Barcha operatorlar</option>';
+            ops.forEach(op => {
+                optHtml += `<option value="${op}" ${currentSelected === op ? 'selected' : ''}>${op}</option>`;
+            });
+            operatorFilter.innerHTML = optHtml;
+        }
+
+        // 3. Filtrlash
+        const searchInput = document.getElementById('crm-custlist-search');
+        const searchVal = (searchInput ? searchInput.value : '').toLowerCase().trim();
+        const statusVal = document.getElementById('crm-custlist-status-filter')?.value || '';
+        const operatorVal = document.getElementById('crm-custlist-operator-filter')?.value || '';
+        const sourceVal = document.getElementById('crm-custlist-source-filter')?.value || '';
+
+        const filtered = customers.filter(c => {
+            if (statusVal && c.status !== statusVal) return false;
+            if (operatorVal) {
+                const op = c.displayOperator || c.operator || '';
+                if (op !== operatorVal) return false;
+            }
+            if (sourceVal && c.source !== sourceVal) return false;
+            if (searchVal) {
+                const name = (c.name || '').toLowerCase();
+                const phone = (c.phone || '').toLowerCase();
+                const phone2 = (c.phone2 || '').toLowerCase();
+                const notes = (c.notes || '').toLowerCase();
+                const company = (c.company || '').toLowerCase();
+                const op = (c.displayOperator || c.operator || '').toLowerCase();
+                if (!name.includes(searchVal) && !phone.includes(searchVal) && !phone2.includes(searchVal) && !notes.includes(searchVal) && !company.includes(searchVal) && !op.includes(searchVal)) {
+                    return false;
+                }
+            }
+            return true;
+        });
+
+        // 4. Sahifalash (Pagination)
+        const pageSize = this.customerListPageSize || 20;
+        const totalPages = Math.ceil(filtered.length / pageSize) || 1;
+        if (this.customerListPage > totalPages) this.customerListPage = totalPages;
+        if (this.customerListPage < 1) this.customerListPage = 1;
+
+        const startIdx = (this.customerListPage - 1) * pageSize;
+        const pageItems = filtered.slice(startIdx, startIdx + pageSize);
+        const currency = AppStorage.load().settings.currency || "so'm";
+
+        // 5. Jadval HTML yaratish
+        let tableHtml = `
+            <div class="card" style="margin-top: 16px;">
+                <div class="table-responsive">
+                    <table class="custom-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 45px; text-align: center;">#</th>
+                                <th>Mijoz ismi</th>
+                                <th>Telefon raqamlari</th>
+                                <th>Lid Manbasi</th>
+                                <th>Mas'ul Operator</th>
+                                <th>Bitim qiymati</th>
+                                <th>Status</th>
+                                <th style="text-align: right; min-width: 140px;">Amallar</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+        `;
+
+        if (pageItems.length === 0) {
+            tableHtml += `
+                <tr>
+                    <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 40px;">
+                        <i class="fas fa-users-slash" style="font-size: 32px; margin-bottom: 10px; opacity: 0.4; display: block;"></i>
+                        Mijozlar topilmadi.
+                    </td>
+                </tr>
+            `;
+        } else {
+            pageItems.forEach((c, idx) => {
+                const rowNum = startIdx + idx + 1;
+                let badgeClass = 'badge-info';
+                let statusName = 'Yangi';
+                if (c.status === 'contacted') { badgeClass = 'badge-warning'; statusName = 'Muzokarada'; }
+                else if (c.status === 'proposal') { badgeClass = 'badge-primary'; statusName = 'Taklif'; }
+                else if (c.status === 'won') { badgeClass = 'badge-success'; statusName = 'Yutildi'; }
+                else if (c.status === 'lost') { badgeClass = 'badge-danger'; statusName = 'Boy berildi'; }
+
+                let sourceBadge = '';
+                if (c.source === 'telegram') {
+                    sourceBadge = `<span class="badge clickable-badge" style="background:#0088cc; color:#fff; font-size:11px; padding:3px 8px; border-radius:12px; font-weight:500; cursor:pointer;" onclick="event.stopPropagation(); CRM.openChat('${c.id}', '${c.source}', '${(c.name || '').replace(/'/g, "\\'")}')" title="Telegram suhbatini ochish"><i class="fab fa-telegram"></i> Telegram</span>`;
+                } else if (c.source === 'instagram') {
+                    sourceBadge = `<span class="badge clickable-badge" style="background:#E1306C; color:#fff; font-size:11px; padding:3px 8px; border-radius:12px; font-weight:500; cursor:pointer;" onclick="event.stopPropagation(); CRM.openChat('${c.id}', '${c.source}', '${(c.name || '').replace(/'/g, "\\'")}')" title="Instagram suhbatini ochish"><i class="fab fa-instagram"></i> Instagram</span>`;
+                } else if (c.source === 'telephony') {
+                    sourceBadge = `<span class="badge" style="background:#10B981; color:#fff; font-size:11px; padding:3px 8px; border-radius:12px; font-weight:500;"><i class="fas fa-phone-alt"></i> Telefon</span>`;
+                } else {
+                    sourceBadge = `<span class="badge" style="background:#6B7280; color:#fff; font-size:11px; padding:3px 8px; border-radius:12px; font-weight:500;"><i class="fas fa-user-edit"></i> Qo'lda</span>`;
+                }
+
+                let phonesHtml = `
+                    <div style="display:flex; flex-direction:column; gap:3px;">
+                        <a href="javascript:void(0)" onclick="Telephony.dial('${c.phone}')" style="color: var(--text-main); text-decoration: none; font-weight: 500; display:inline-flex; align-items:center; gap:6px;" title="Qo'ng'iroq qilish">
+                            <i class="fas fa-phone-alt" style="color: var(--success); font-size:11px;"></i> ${c.phone || '-'}
+                        </a>
+                `;
+                if (c.phone2) {
+                    phonesHtml += `
+                        <a href="javascript:void(0)" onclick="Telephony.dial('${c.phone2}')" style="color: var(--text-muted); text-decoration: none; font-size: 11.5px; display:inline-flex; align-items:center; gap:6px;" title="2-raqamga qo'ng'iroq qilish">
+                            <i class="fas fa-phone-alt" style="color: var(--warning); font-size:10px;"></i> ${c.phone2}
+                        </a>
+                    `;
+                }
+                phonesHtml += `</div>`;
+
+                const opDisplay = c.displayOperator || c.operator;
+                const opHtml = opDisplay
+                    ? `<span style="font-weight: 500; font-size: 13px;"><i class="fas fa-user-tie" style="color: var(--accent); margin-right: 4px;"></i> ${opDisplay}</span>`
+                    : `<span style="color: var(--text-muted); font-style: italic;">-</span>`;
+
+                tableHtml += `
+                    <tr>
+                        <td style="text-align: center; color: var(--text-muted); font-size: 12px;">${rowNum}</td>
+                        <td>
+                            <strong style="font-size: 13.5px;">
+                                <a href="javascript:void(0)" onclick="CRM.openCustomerDetails('${c.id}', event)" style="color: var(--accent); text-decoration:none;" title="Mijoz tafsilotlarini ko'rish">
+                                    ${c.name}
+                                </a>
+                            </strong>
+                            ${c.company ? `<div style="font-size: 11px; color: var(--text-muted);"><i class="fas fa-building" style="margin-right: 4px;"></i>${c.company}</div>` : ''}
+                        </td>
+                        <td>${phonesHtml}</td>
+                        <td>${sourceBadge}</td>
+                        <td>${opHtml}</td>
+                        <td><span style="color: var(--success); font-weight: 600; font-family: 'JetBrains Mono', monospace;">${formatMoney(c.value || 0, currency)}</span></td>
+                        <td><span class="badge ${badgeClass}" style="font-size: 11px; padding: 4px 8px;">${statusName}</span></td>
+                        <td style="text-align: right;">
+                            <div style="display: inline-flex; gap: 6px; justify-content: flex-end;">
+                                <button class="btn btn-secondary btn-sm" onclick="Telephony.dial('${c.phone}')" title="Qo'ng'iroq qilish" style="padding: 6px 10px;">
+                                    <i class="fas fa-phone-alt" style="color: var(--success)"></i>
+                                </button>
+                                <button class="btn btn-secondary btn-sm" onclick="CRM.openCustomerDetails('${c.id}', event)" title="Tafsilot / Tahrirlash" style="padding: 6px 10px;">
+                                    <i class="fas fa-eye" style="color: var(--accent)"></i>
+                                </button>
+                                <button class="btn btn-secondary btn-sm" onclick="CRM.deleteCustomer('${c.id}')" title="O'chirish" style="padding: 6px 10px;">
+                                    <i class="fas fa-trash-alt" style="color: var(--danger)"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        tableHtml += `
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+
+        container.innerHTML = tableHtml;
+        this.renderCustomerListPagination(filtered.length, totalPages);
+    },
+
+    renderCustomerListPagination: function(totalItems, totalPages) {
+        const pagContainer = document.getElementById('crm-custlist-pagination');
+        if (!pagContainer) return;
+
+        if (totalItems === 0 || totalPages <= 1) {
+            pagContainer.innerHTML = '';
+            return;
+        }
+
+        const currentPage = this.customerListPage;
+        const pageSize = this.customerListPageSize || 20;
+        const startItem = (currentPage - 1) * pageSize + 1;
+        const endItem = Math.min(currentPage * pageSize, totalItems);
+
+        let html = `
+            <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; flex-wrap: wrap; gap: 12px;">
+                <div style="font-size: 13px; color: var(--text-muted);">
+                    Jami <strong>${totalItems}</strong> ta mijozdan <strong>${startItem}</strong>–<strong>${endItem}</strong> ko'rsatilmoqda
+                </div>
+                <div style="display: flex; gap: 6px; align-items: center;">
+                    <button class="btn btn-secondary btn-sm" onclick="CRM.changeCustomerListPage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''} style="padding: 6px 12px;">
+                        <i class="fas fa-chevron-left"></i> Oldingi
+                    </button>
+        `;
+
+        let startPage = Math.max(1, currentPage - 2);
+        let endPage = Math.min(totalPages, currentPage + 2);
+        if (startPage > 1) {
+            html += `<button class="btn btn-secondary btn-sm" onclick="CRM.changeCustomerListPage(1)" style="min-width: 32px; padding: 6px 10px;">1</button>`;
+            if (startPage > 2) html += `<span style="color: var(--text-muted); padding: 0 4px;">...</span>`;
+        }
+
+        for (let p = startPage; p <= endPage; p++) {
+            if (p === currentPage) {
+                html += `<button class="btn btn-primary btn-sm" style="min-width: 32px; padding: 6px 10px;">${p}</button>`;
+            } else {
+                html += `<button class="btn btn-secondary btn-sm" onclick="CRM.changeCustomerListPage(${p})" style="min-width: 32px; padding: 6px 10px;">${p}</button>`;
+            }
+        }
+
+        if (endPage < totalPages) {
+            if (endPage < totalPages - 1) html += `<span style="color: var(--text-muted); padding: 0 4px;">...</span>`;
+            html += `<button class="btn btn-secondary btn-sm" onclick="CRM.changeCustomerListPage(${totalPages})" style="min-width: 32px; padding: 6px 10px;">${totalPages}</button>`;
+        }
+
+        html += `
+                    <button class="btn btn-secondary btn-sm" onclick="CRM.changeCustomerListPage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''} style="padding: 6px 12px;">
+                        Keyingi <i class="fas fa-chevron-right"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+
+        pagContainer.innerHTML = html;
+    },
+
+    changeCustomerListPage: function(page) {
+        this.customerListPage = page;
+        this.renderCustomersView();
+        const sec = document.getElementById('view-crm-customers');
+        if (sec) {
+            sec.scrollIntoView({ behavior: 'smooth' });
+        }
+    },
+
+    exportCustomersToCSV: async function() {
+        try {
+            const customers = await DB.getCustomers();
+            if (!customers || customers.length === 0) {
+                alert("Eksport qilish uchun mijozlar topilmadi.");
+                return;
+            }
+
+            const headers = ["T/r", "Mijoz ismi", "Kompaniya", "Asosiy telefon", "Qo'shimcha telefon", "Manba", "Mas'ul operator", "Status", "Bitim qiymati"];
+            const rows = customers.map((c, index) => {
+                let statusName = 'Yangi';
+                if (c.status === 'contacted') statusName = 'Muzokarada';
+                else if (c.status === 'proposal') statusName = 'Taklif';
+                else if (c.status === 'won') statusName = 'Yutildi';
+                else if (c.status === 'lost') statusName = 'Boy berildi';
+
+                let sourceName = c.source || 'manual';
+                if (sourceName === 'telephony') sourceName = 'Telefon';
+                else if (sourceName === 'telegram') sourceName = 'Telegram';
+                else if (sourceName === 'instagram') sourceName = 'Instagram';
+                else if (sourceName === 'manual') sourceName = "Qo'lda";
+
+                return [
+                    index + 1,
+                    `"${(c.name || '').replace(/"/g, '""')}"`,
+                    `"${(c.company || '').replace(/"/g, '""')}"`,
+                    `"${(c.phone || '').replace(/"/g, '""')}"`,
+                    `"${(c.phone2 || '').replace(/"/g, '""')}"`,
+                    `"${sourceName}"`,
+                    `"${(c.displayOperator || c.operator || '').replace(/"/g, '""')}"`,
+                    `"${statusName}"`,
+                    c.value || 0
+                ].join(';');
+            });
+
+            const csvContent = "\uFEFF" + headers.join(';') + "\r\n" + rows.join("\r\n");
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.setAttribute('href', url);
+            link.setAttribute('download', `Mijozlar_royxati_${new Date().toISOString().slice(0, 10)}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        } catch (e) {
+            console.error("CSV eksport qilishda xatolik:", e);
+            alert("Eksport qilishda xatolik yuz berdi: " + e.message);
         }
     }
 };
