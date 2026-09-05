@@ -251,7 +251,22 @@ def get_clients(request: Request):
     for c in res:
         c["address"] = c.get("email") or ""
         op = c.get("operator") or ""
-        if "__NOTE_SEP__" in op:
+        c["barcode"] = c.get("phone2") or ""
+        c["bonus"] = float(c.get("value") or 0)
+        c["notes"] = ""
+        c["operator"] = ""
+        
+        if op.startswith("{") and op.endswith("}"):
+            try:
+                meta = json.loads(op)
+                c["operator"] = meta.get("op") or ""
+                c["barcode"] = meta.get("barcode") or c.get("phone2") or ""
+                c["bonus"] = float(meta.get("bonus") or c.get("value") or 0)
+                c["debt"] = float(meta.get("debt") or 0)
+                c["notes"] = meta.get("notes") or ""
+            except Exception:
+                c["notes"] = op
+        elif "__NOTE_SEP__" in op:
             parts = op.split("__NOTE_SEP__", 1)
             c["operator"] = parts[0]
             c["notes"] = parts[1]
@@ -261,7 +276,6 @@ def get_clients(request: Request):
             c["notes"] = parts[1]
         else:
             c["operator"] = op
-            c["notes"] = ""
     return res or []
 
 @app.post("/api/clients")
@@ -274,19 +288,30 @@ def save_client(client_data: dict, request: Request):
     address = client_data.get("address") or client_data.get("email") or ""
     notes = (client_data.get("notes") or "").strip()
     operator = (client_data.get("operator") or "").strip()
-    op_val = f"{operator}__NOTE_SEP__{notes}" if (notes or operator) else ""
+    barcode = (client_data.get("barcode") or client_data.get("phone2") or "").strip()
+    bonus = float(client_data.get("bonus") or client_data.get("value") or 0)
+    debt = float(client_data.get("debt") or 0)
+    
+    meta = {
+        "op": operator,
+        "barcode": barcode,
+        "bonus": bonus,
+        "debt": debt,
+        "notes": notes
+    }
+    op_val = json.dumps(meta, ensure_ascii=False)
 
     payload = {
         "id": client_data.get("id") or f"client_{int(time.time() * 1000)}",
         "name": (client_data.get("name") or "").strip(),
         "company": (client_data.get("company") or "").strip(),
         "phone": (client_data.get("phone") or "").strip(),
-        "phone2": (client_data.get("phone2") or "").strip(),
+        "phone2": barcode or (client_data.get("phone2") or "").strip(),
         "email": address,
         "operator": op_val,
         "status": "client",
         "source": "client_directory",
-        "value": float(client_data.get("value") or 0),
+        "value": bonus,
         "company_id": company_id
     }
     if client_data.get("created_at"):
@@ -300,6 +325,119 @@ def delete_client(id: str, request: Request):
     if company_id:
         path += f"&company_id=eq.{company_id}"
     return supabase_req("DELETE", path, company_id=company_id)
+
+# --- REGOS RETAIL CARD SEARCH ENDPOINT ---
+@app.get("/api/integration/regos/search-cards")
+def search_regos_cards(query: str, request: Request):
+    if not query or not query.strip():
+        return {"ok": True, "count": 0, "result": []}
+    
+    clean_q = query.strip()
+    company_id = get_company_id(request)
+    settings = get_company_settings(company_id, bypass_cache=True) if company_id else settings_state
+    regos_endpoint = settings.get("regos_endpoint", "")
+    regos_token = settings.get("regos_token", "")
+    
+    if not regos_endpoint or not regos_token:
+        raise HTTPException(status_code=400, detail="REGOS API sozlanmagan. Iltimos, sozlamalar sahifasida Endpoint va Access Tokenni kiritib saqlang.")
+        
+    endpoint = regos_endpoint.strip().rstrip("/")
+    if not endpoint.startswith(("http://", "https://")):
+        endpoint = "https://" + endpoint
+        
+    if "/v1" not in endpoint:
+        url = f"{endpoint}/v1/retailcard/get"
+    else:
+        url = f"{endpoint}/retailcard/get"
+        
+    headers = {
+        "Authorization": f"Bearer {regos_token}",
+        "Content-Type": "application/json"
+    }
+    
+    cards = []
+    # 1. Agar raqamlar bo'lsa, avval aniq barcode_value bo'yicha qidiramiz
+    digits_only = "".join(ch for ch in clean_q if ch.isdigit())
+    if len(digits_only) >= 5:
+        try:
+            r1 = requests.post(url, headers=headers, json={"barcode_value": digits_only, "limit": 20}, timeout=8)
+            if r1.status_code == 200:
+                data1 = r1.json()
+                if isinstance(data1, dict) and data1.get("ok"):
+                    cards = data1.get("result", [])
+        except Exception as e1:
+            print(f"Error querying REGOS barcode_value: {e1}")
+            
+    # 2. Agar topilmasa yoki matn bo'lsa, search parametri orqali qidiramiz
+    if not cards:
+        try:
+            r2 = requests.post(url, headers=headers, json={"search": clean_q, "limit": 20}, timeout=8)
+            if r2.status_code == 200:
+                data2 = r2.json()
+                if isinstance(data2, dict) and data2.get("ok"):
+                    cards = data2.get("result", [])
+        except Exception as e2:
+            print(f"Error querying REGOS search parameter: {e2}")
+            
+    # 3. Mahalliy bazadagi mijozlar bilan solishtirib, allaqachon qo'shilganini aniqlash
+    existing_barcodes = set()
+    existing_ids = set()
+    try:
+        path = f"customers?select=id,phone,phone2,operator&company_id=eq.{company_id}&source=eq.client_directory"
+        existing = supabase_get_all(path, company_id=company_id)
+        for ex in existing:
+            existing_ids.add(ex.get("id"))
+            if ex.get("phone2"):
+                existing_barcodes.add(str(ex.get("phone2")).strip())
+            op_str = ex.get("operator") or ""
+            if op_str.startswith("{"):
+                try:
+                    m = json.loads(op_str)
+                    if m.get("barcode"):
+                        existing_barcodes.add(str(m.get("barcode")).strip())
+                except Exception:
+                    pass
+    except Exception as e_ex:
+        print(f"Failed to fetch local clients for existence check: {e_ex}")
+        
+    formatted_results = []
+    for card in cards:
+        if not isinstance(card, dict):
+            continue
+        card_id = card.get("id")
+        barcode_val = str(card.get("barcode_value") or "").strip()
+        cust = card.get("customer") or {}
+        full_name = str(cust.get("full_name") or f"Mijoz #{card_id}").strip()
+        main_phone = str(cust.get("main_phone") or "").strip()
+        
+        formatted_phone = main_phone
+        if len(main_phone) == 12 and main_phone.startswith("998"):
+            formatted_phone = f"+998 {main_phone[3:5]} {main_phone[5:8]} {main_phone[8:10]} {main_phone[10:12]}"
+        elif len(main_phone) == 9:
+            formatted_phone = f"+998 {main_phone[:2]} {main_phone[2:5]} {main_phone[5:7]} {main_phone[7:9]}"
+        elif not formatted_phone and barcode_val:
+            formatted_phone = barcode_val
+            
+        group_info = card.get("group") or {}
+        group_name = group_info.get("name") if isinstance(group_info, dict) else ""
+        
+        is_added = (f"regos_card_{card_id}" in existing_ids) or (barcode_val and barcode_val in existing_barcodes)
+        
+        formatted_results.append({
+            "id": f"regos_card_{card_id}",
+            "regos_card_id": card_id,
+            "barcode": barcode_val,
+            "name": full_name,
+            "phone": formatted_phone,
+            "raw_phone": main_phone,
+            "bonus": float(card.get("bonus_amount") or 0),
+            "debt": float(cust.get("debt") or 0),
+            "group": group_name,
+            "address": cust.get("address") or "",
+            "is_already_added": is_added
+        })
+        
+    return {"ok": True, "count": len(formatted_results), "result": formatted_results}
 
 # --- INVENTORY ENDPOINTS ---
 @app.get("/api/inventory")

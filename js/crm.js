@@ -1825,10 +1825,11 @@ window.CRM = {
                 const name = (c.name || '').toLowerCase();
                 const phone = (c.phone || '').toLowerCase();
                 const phone2 = (c.phone2 || '').toLowerCase();
+                const barcode = (c.barcode || '').toLowerCase();
                 const company = (c.company || '').toLowerCase();
                 const address = (c.email || c.address || '').toLowerCase();
                 const notes = (c.notes || '').toLowerCase();
-                if (!name.includes(searchVal) && !phone.includes(searchVal) && !phone2.includes(searchVal) && !company.includes(searchVal) && !address.includes(searchVal) && !notes.includes(searchVal)) {
+                if (!name.includes(searchVal) && !phone.includes(searchVal) && !phone2.includes(searchVal) && !barcode.includes(searchVal) && !company.includes(searchVal) && !address.includes(searchVal) && !notes.includes(searchVal)) {
                     return false;
                 }
             }
@@ -1853,12 +1854,13 @@ window.CRM = {
                             <tr>
                                 <th style="width: 45px; text-align: center;">#</th>
                                 <th>Mijoz (F.I.Sh)</th>
-                                <th>Kompaniya / Korxona</th>
+                                <th>Shtrix-kod (Karta)</th>
                                 <th>Asosiy telefon</th>
+                                <th>Bonus balansi</th>
+                                <th>Kompaniya / Korxona</th>
                                 <th>Qo'shimcha telefon</th>
                                 <th>Manzil / Hudud</th>
                                 <th>Izoh / Eslatma</th>
-                                <th>Qo'shilgan sana</th>
                                 <th style="text-align: right; min-width: 130px;">Amallar</th>
                             </tr>
                         </thead>
@@ -1868,18 +1870,23 @@ window.CRM = {
         if (pageItems.length === 0) {
             tableHtml += `
                 <tr>
-                    <td colspan="9" style="text-align: center; color: var(--text-muted); padding: 50px 20px;">
-                        <div style="max-width: 380px; margin: 0 auto; text-align: center;">
-                            <div style="width: 56px; height: 56px; border-radius: 50%; background: rgba(99, 102, 241, 0.1); color: var(--accent); display: flex; align-items: center; justify-content: center; font-size: 24px; margin: 0 auto 16px;">
-                                <i class="fas fa-user-friends"></i>
+                    <td colspan="10" style="text-align: center; color: var(--text-muted); padding: 50px 20px;">
+                        <div style="max-width: 420px; margin: 0 auto; text-align: center;">
+                            <div style="width: 56px; height: 56px; border-radius: 50%; background: rgba(56, 189, 248, 0.1); color: #38bdf8; display: flex; align-items: center; justify-content: center; font-size: 24px; margin: 0 auto 16px;">
+                                <i class="fas fa-barcode"></i>
                             </div>
                             <h4 style="color: var(--text-main); margin-bottom: 8px; font-weight: 600;">Hozircha mijozlar mavjud emas</h4>
                             <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 20px;">
-                                Ushbu bo'lim faqat siz qo'lda kiritgan mijozlar uchun ajratilgan. Birinchi mijozni qo'shing.
+                                REGOS xaridor kartasini shtrix-kod orqali qidirib qo'shishingiz yoki yangi mijoz kiritishingiz mumkin.
                             </p>
-                            <button class="btn btn-primary btn-sm" onclick="CRM.openAddClientModal()" style="padding: 8px 16px;">
-                                <i class="fas fa-plus" style="margin-right: 6px;"></i> Yangi Mijoz Qo'shish
-                            </button>
+                            <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+                                <button class="btn btn-secondary btn-sm" onclick="CRM.openRegosCardSearchModal()" style="border: 1px solid rgba(56, 189, 248, 0.3); background: rgba(56, 189, 248, 0.08); color: #38bdf8; padding: 8px 16px;">
+                                    <i class="fas fa-barcode" style="margin-right: 6px;"></i> REGOS-dan Karta Qidirish
+                                </button>
+                                <button class="btn btn-primary btn-sm" onclick="CRM.openAddClientModal()" style="padding: 8px 16px;">
+                                    <i class="fas fa-plus" style="margin-right: 6px;"></i> Yangi Mijoz Qo'shish
+                                </button>
+                            </div>
                         </div>
                     </td>
                 </tr>
@@ -1890,16 +1897,22 @@ window.CRM = {
                 const clientName = c.name || '-';
                 const companyName = c.company ? `<span style="font-weight: 500; color: var(--accent);"><i class="fas fa-building" style="margin-right: 5px; font-size: 11px;"></i>${c.company}</span>` : '<span style="color: var(--text-muted); font-style: italic;">Jismoniy shaxs</span>';
                 const mainPhone = c.phone || '-';
-                const extraPhone = c.phone2 || '-';
+                const extraPhone = c.phone2 && c.phone2 !== c.barcode ? c.phone2 : '-';
                 const address = c.email || c.address || '-';
                 const notes = c.notes || '-';
-                let dateStr = '-';
-                if (c.created_at) {
-                    try {
-                        const d = new Date(c.created_at);
-                        dateStr = d.toLocaleDateString('uz-UZ', { year: 'numeric', month: '2-digit', day: '2-digit' });
-                    } catch(e) { dateStr = c.created_at.slice(0, 10); }
-                }
+                
+                const barcodeBadge = c.barcode ? `
+                    <span style="font-family: monospace; font-size: 12px; font-weight: 600; background: rgba(56, 189, 248, 0.12); color: #38bdf8; padding: 3px 8px; border-radius: 5px; display: inline-flex; align-items: center; gap: 5px;" title="Shtrix-kod: ${c.barcode}">
+                        <i class="fas fa-barcode"></i> ${c.barcode}
+                    </span>
+                ` : `<span style="color: var(--text-muted);">-</span>`;
+
+                const bonusVal = Number(c.bonus || c.value || 0);
+                const bonusDisplay = bonusVal > 0 ? `
+                    <span style="color: #10b981; font-weight: 600; font-size: 12.5px;">
+                        ${bonusVal.toLocaleString('uz-UZ')} so'm
+                    </span>
+                ` : `<span style="color: var(--text-muted); font-size: 12px;">0 so'm</span>`;
 
                 tableHtml += `
                     <tr>
@@ -1911,27 +1924,26 @@ window.CRM = {
                                 </a>
                             </strong>
                         </td>
-                        <td>${companyName}</td>
+                        <td>${barcodeBadge}</td>
                         <td>
                             <a href="javascript:void(0)" onclick="Telephony.dial('${c.phone}')" style="color: var(--success); text-decoration: none; font-weight: 500; display:inline-flex; align-items:center; gap:6px;" title="Qo'ng'iroq qilish">
                                 <i class="fas fa-phone-alt" style="font-size: 11px;"></i> ${mainPhone}
                             </a>
                         </td>
+                        <td>${bonusDisplay}</td>
+                        <td>${companyName}</td>
                         <td>
-                            ${c.phone2 ? `
-                                <a href="javascript:void(0)" onclick="Telephony.dial('${c.phone2}')" style="color: var(--text-muted); text-decoration: none; font-size: 12px; display:inline-flex; align-items:center; gap:6px;" title="2-raqamga qo'ng'iroq qilish">
+                            ${extraPhone !== '-' ? `
+                                <a href="javascript:void(0)" onclick="Telephony.dial('${extraPhone}')" style="color: var(--text-muted); text-decoration: none; font-size: 12px; display:inline-flex; align-items:center; gap:6px;" title="2-raqamga qo'ng'iroq qilish">
                                     <i class="fas fa-phone-alt" style="color: var(--warning); font-size: 10px;"></i> ${extraPhone}
                                 </a>
                             ` : `<span style="color: var(--text-muted);">-</span>`}
                         </td>
-                        <td style="font-size: 12.5px; color: var(--text-muted); max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${address}">
+                        <td style="font-size: 12.5px; color: var(--text-muted); max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${address}">
                             ${address !== '-' ? `<i class="fas fa-map-marker-alt" style="margin-right: 4px; color: var(--text-muted); font-size: 11px;"></i>${address}` : '-'}
                         </td>
-                        <td style="font-size: 12.5px; color: var(--text-muted); max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${notes}">
+                        <td style="font-size: 12.5px; color: var(--text-muted); max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${notes}">
                             ${notes}
-                        </td>
-                        <td style="font-size: 12px; color: var(--text-muted); white-space: nowrap;">
-                            ${dateStr}
                         </td>
                         <td style="text-align: right;">
                             <div style="display: inline-flex; gap: 6px; justify-content: flex-end;">
@@ -2063,8 +2075,12 @@ window.CRM = {
         if (compInput) compInput.value = client.company || '';
         const phoneInput = document.getElementById('client-phone');
         if (phoneInput) phoneInput.value = client.phone || '';
+        const barcodeInput = document.getElementById('client-barcode');
+        if (barcodeInput) barcodeInput.value = client.barcode || client.phone2 || '';
+        const bonusInput = document.getElementById('client-bonus');
+        if (bonusInput) bonusInput.value = client.bonus || client.value || '';
         const phone2Input = document.getElementById('client-phone2');
-        if (phone2Input) phone2Input.value = client.phone2 || '';
+        if (phone2Input) phone2Input.value = (client.phone2 && client.phone2 !== client.barcode) ? client.phone2 : '';
         const addrInput = document.getElementById('client-address');
         if (addrInput) addrInput.value = client.email || client.address || '';
         const notesInput = document.getElementById('client-notes');
@@ -2101,6 +2117,8 @@ window.CRM = {
         const name = document.getElementById('client-name')?.value.trim();
         const company = document.getElementById('client-company')?.value.trim() || '';
         const phone = document.getElementById('client-phone')?.value.trim();
+        const barcode = document.getElementById('client-barcode')?.value.trim() || '';
+        const bonus = parseFloat(document.getElementById('client-bonus')?.value) || 0;
         const phone2 = document.getElementById('client-phone2')?.value.trim() || '';
         const address = document.getElementById('client-address')?.value.trim() || '';
         const notes = document.getElementById('client-notes')?.value.trim() || '';
@@ -2122,7 +2140,10 @@ window.CRM = {
                 name,
                 company,
                 phone,
-                phone2,
+                phone2: phone2 || barcode,
+                barcode: barcode || phone2,
+                bonus,
+                value: bonus,
                 email: address,
                 notes,
                 operator,
@@ -2163,6 +2184,190 @@ window.CRM = {
         }
     },
 
+    // --- REGOS XARIDOR KARTASINI QIDIRISH VA QO'SHISH ---
+    _regosSearchResultsCache: [],
+
+    openRegosCardSearchModal: function() {
+        const input = document.getElementById('regos-card-search-input');
+        if (input) input.value = '';
+        const container = document.getElementById('regos-search-results-container');
+        if (container) {
+            container.innerHTML = `
+                <div style="text-align: center; color: var(--text-muted); padding: 40px 10px;">
+                    <i class="fas fa-qrcode" style="font-size: 38px; color: rgba(255,255,255,0.1); margin-bottom: 12px; display: block;"></i>
+                    <span style="font-size: 13.5px;">Shtrix-kodni skaner orqali o'qiting yoki yozib "Qidirish" tugmasini bosing</span>
+                </div>
+            `;
+        }
+        openModal('regos-card-search-modal');
+        setTimeout(() => {
+            if (input) input.focus();
+        }, 200);
+    },
+
+    onRegosSearchKeydown: function(event) {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            this.searchRegosCards();
+        }
+    },
+
+    searchRegosCards: async function() {
+        const input = document.getElementById('regos-card-search-input');
+        const query = input ? input.value.trim() : '';
+        if (!query) {
+            alert("Iltimos, shtrix-kod yoki telefon raqamini kiriting!");
+            if (input) input.focus();
+            return;
+        }
+
+        const btn = document.getElementById('btn-regos-search-submit');
+        const container = document.getElementById('regos-search-results-container');
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Qidirilmoqda...';
+        }
+        if (container) {
+            container.innerHTML = `
+                <div style="text-align: center; color: var(--text-muted); padding: 35px 10px;">
+                    <i class="fas fa-spinner fa-spin" style="font-size: 28px; color: #38bdf8; margin-bottom: 12px; display: block;"></i>
+                    <span>REGOS tizimidan xaridor kartasi qidirilmoqda...</span>
+                </div>
+            `;
+        }
+
+        try {
+            const res = await fetch(`/api/integration/regos/search-cards?query=${encodeURIComponent(query)}`);
+            const data = await res.json();
+            if (!res.ok || !data.ok) {
+                throw new Error(data.detail || "REGOS bilan bog'lanishda xatolik yuz berdi");
+            }
+
+            const cards = data.result || [];
+            this._regosSearchResultsCache = cards;
+
+            if (cards.length === 0) {
+                container.innerHTML = `
+                    <div style="text-align: center; color: var(--text-muted); padding: 35px 15px; background: rgba(255,255,255,0.02); border-radius: 8px; border: 1px dashed rgba(255,255,255,0.1);">
+                        <i class="fas fa-search-minus" style="font-size: 32px; color: var(--warning); margin-bottom: 10px; display: block;"></i>
+                        <h4 style="color: var(--text-main); margin-bottom: 6px;">Hech qanday karta topilmadi</h4>
+                        <p style="font-size: 13px; margin: 0;">«${query}» shtrix-kodi bo'yicha REGOS-da xaridor kartasi topilmadi.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = `
+                <div style="margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-size: 13px; color: var(--text-muted);">Topilgan kartalar: <strong style="color: var(--text-main);">${cards.length} ta</strong></span>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 10px; max-height: 380px; overflow-y: auto; padding-right: 4px;">
+            `;
+
+            cards.forEach(card => {
+                const bonusFormatted = Number(card.bonus || 0).toLocaleString('uz-UZ');
+                const barcodeBadge = card.barcode ? `
+                    <span style="font-family: monospace; font-size: 12.5px; font-weight: 600; background: rgba(56, 189, 248, 0.12); color: #38bdf8; padding: 3px 8px; border-radius: 5px; display: inline-flex; align-items: center; gap: 5px;">
+                        <i class="fas fa-barcode"></i> ${card.barcode}
+                    </span>
+                ` : '<span style="color: var(--text-muted);">-</span>';
+
+                html += `
+                    <div class="card" style="padding: 14px 16px; margin: 0; background: rgba(255,255,255,0.03); border: 1px solid ${card.is_already_added ? 'rgba(16, 185, 129, 0.3)' : 'rgba(255,255,255,0.08)'}; border-radius: 10px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                        <div style="flex-grow: 1; min-width: 220px;">
+                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px; flex-wrap: wrap;">
+                                <strong style="font-size: 15px; color: var(--text-main);">${card.name}</strong>
+                                ${barcodeBadge}
+                            </div>
+                            <div style="display: flex; gap: 16px; flex-wrap: wrap; font-size: 13px; color: var(--text-muted);">
+                                <span><i class="fas fa-phone-alt" style="color: var(--success); font-size: 11px; margin-right: 4px;"></i> ${card.phone || '-'}</span>
+                                <span><i class="fas fa-coins" style="color: #f59e0b; font-size: 11px; margin-right: 4px;"></i> Bonus: <strong style="color: #10b981;">${bonusFormatted} so'm</strong></span>
+                                ${card.group ? `<span><i class="fas fa-layer-group" style="font-size: 11px; margin-right: 4px;"></i> ${card.group}</span>` : ''}
+                            </div>
+                        </div>
+                        <div>
+                            ${card.is_already_added ? `
+                                <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #10b981; padding: 7px 14px; border-radius: 6px; font-size: 12.5px; font-weight: 500; display: inline-flex; align-items: center; gap: 6px;">
+                                    <i class="fas fa-check-circle"></i> Qo'shilgan
+                                </span>
+                            ` : `
+                                <button class="btn btn-primary btn-sm" id="btn-add-card-${card.regos_card_id}" onclick="CRM.addRegosCardToClients(${card.regos_card_id})" style="padding: 8px 16px; font-size: 13px; display: inline-flex; align-items: center; gap: 6px;">
+                                    <i class="fas fa-plus"></i> Ro'yxatga Qo'shish
+                                </button>
+                            `}
+                        </div>
+                    </div>
+                `;
+            });
+
+            html += `</div>`;
+            container.innerHTML = html;
+        } catch (err) {
+            container.innerHTML = `
+                <div style="text-align: center; color: var(--danger); padding: 25px 15px;">
+                    <i class="fas fa-exclamation-triangle" style="font-size: 28px; margin-bottom: 8px; display: block;"></i>
+                    <p style="font-size: 13.5px; margin: 0;">${err.message}</p>
+                </div>
+            `;
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-search" style="margin-right: 6px;"></i> Qidirish';
+            }
+        }
+    },
+
+    addRegosCardToClients: async function(regosCardId) {
+        const cards = this._regosSearchResultsCache || [];
+        const card = cards.find(c => c.regos_card_id === regosCardId);
+        if (!card) {
+            alert("Karta ma'lumotlari topilmadi!");
+            return;
+        }
+
+        const addBtn = document.getElementById(`btn-add-card-${regosCardId}`);
+        if (addBtn) {
+            addBtn.disabled = true;
+            addBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Qo\'shilmoqda...';
+        }
+
+        try {
+            const clientPayload = {
+                id: card.id || `regos_card_${card.regos_card_id}`,
+                name: card.name,
+                phone: card.phone || card.raw_phone || card.barcode,
+                phone2: card.barcode || '',
+                barcode: card.barcode || '',
+                bonus: card.bonus || 0,
+                debt: card.debt || 0,
+                address: card.address || '',
+                operator: 'REGOS',
+                notes: card.group ? `REGOS Guruh: ${card.group}` : 'REGOS Xaridor kartasi',
+                source: 'client_directory',
+                status: 'client'
+            };
+
+            await DB.saveClient(clientPayload);
+            card.is_already_added = true;
+
+            if (addBtn) {
+                addBtn.outerHTML = `
+                    <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #10b981; padding: 7px 14px; border-radius: 6px; font-size: 12.5px; font-weight: 500; display: inline-flex; align-items: center; gap: 6px;">
+                        <i class="fas fa-check-circle"></i> Qo'shildi
+                    </span>
+                `;
+            }
+
+            await this.renderCustomersView();
+        } catch (err) {
+            alert("Mijozni ro'yxatga qo'shishda xatolik: " + err.message);
+            if (addBtn) {
+                addBtn.disabled = false;
+                addBtn.innerHTML = '<i class="fas fa-plus"></i> Ro\'yxatga Qo\'shish';
+            }
+        }
+    },
+
     exportClientsToCSV: async function() {
         try {
             const clients = await DB.getClients();
@@ -2171,7 +2376,7 @@ window.CRM = {
                 return;
             }
 
-            const headers = ["T/r", "Mijoz (F.I.Sh)", "Kompaniya", "Asosiy telefon", "Qo'shimcha telefon", "Manzil", "Izoh", "Qo'shilgan sana"];
+            const headers = ["T/r", "Mijoz (F.I.Sh)", "Shtrix-kod (Karta)", "Asosiy telefon", "Bonus balansi (so'm)", "Kompaniya", "Qo'shimcha telefon", "Manzil", "Izoh", "Qo'shilgan sana"];
             const rows = clients.map((c, index) => {
                 let dateStr = '';
                 if (c.created_at) {
@@ -2182,9 +2387,11 @@ window.CRM = {
                 return [
                     index + 1,
                     `"${(c.name || '').replace(/"/g, '""')}"`,
-                    `"${(c.company || '').replace(/"/g, '""')}"`,
+                    `"${(c.barcode || c.phone2 || '').replace(/"/g, '""')}"`,
                     `"${(c.phone || '').replace(/"/g, '""')}"`,
-                    `"${(c.phone2 || '').replace(/"/g, '""')}"`,
+                    c.bonus || c.value || 0,
+                    `"${(c.company || '').replace(/"/g, '""')}"`,
+                    `"${(c.phone2 && c.phone2 !== c.barcode ? c.phone2 : '').replace(/"/g, '""')}"`,
                     `"${(c.email || c.address || '').replace(/"/g, '""')}"`,
                     `"${(c.notes || '').replace(/"/g, '""')}"`,
                     `"${dateStr}"`

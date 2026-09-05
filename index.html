@@ -749,6 +749,9 @@
                         <p>Kompaniya va jismoniy mijozlar bazasi, kontaktlar va manzillar</p>
                     </div>
                     <div class="header-actions" style="display: flex; gap: 8px; flex-wrap: wrap;">
+                        <button class="btn btn-secondary" onclick="CRM.openRegosCardSearchModal()" id="btn-regos-search" style="border: 1px solid rgba(56, 189, 248, 0.3); background: rgba(56, 189, 248, 0.08); color: #38bdf8;">
+                            <i class="fas fa-barcode"></i> REGOS-dan Karta Qidirish
+                        </button>
                         <button class="btn btn-secondary" onclick="CRM.exportClientsToCSV()" id="btn-export-customers">
                             <i class="fas fa-file-excel" style="color: #10b981;"></i> Excelga yuklash
                         </button>
@@ -2041,8 +2044,18 @@
                             <input type="text" id="client-phone" class="form-control" required placeholder="+998 90 123 45 67">
                         </div>
                         <div class="form-group">
+                            <label for="client-barcode" style="font-weight: 500;"><i class="fas fa-barcode" style="color: #38bdf8; margin-right: 4px;"></i> Shtrix-kod / Karta</label>
+                            <input type="text" id="client-barcode" class="form-control" placeholder="Masalan: 9989140299509" style="font-family: monospace;">
+                        </div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                        <div class="form-group">
                             <label for="client-phone2" style="font-weight: 500;">Qo'shimcha Telefon</label>
                             <input type="text" id="client-phone2" class="form-control" placeholder="+998 90 999 88 77">
+                        </div>
+                        <div class="form-group">
+                            <label for="client-bonus" style="font-weight: 500;"><i class="fas fa-coins" style="color: #10b981; margin-right: 4px;"></i> Bonus Balansi (so'm)</label>
+                            <input type="number" id="client-bonus" class="form-control" placeholder="0">
                         </div>
                     </div>
                     <div class="form-group">
@@ -2065,6 +2078,44 @@
                     <button type="submit" class="btn btn-primary" id="btn-save-client"><i class="fas fa-save" style="margin-right: 6px;"></i> Saqlash</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- 1.15. REGOS XARIDOR KARTASINI QIDIRISH VA QO'SHISH MODALI -->
+    <div class="modal" id="regos-card-search-modal">
+        <div class="modal-content" style="max-width: 680px;">
+            <div class="modal-header">
+                <h3><i class="fas fa-barcode" style="color: #38bdf8; margin-right: 8px;"></i> REGOS Xaridor Kartasini Qidirish</h3>
+                <button class="close-modal-btn" onclick="closeModal('regos-card-search-modal')">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 20px;">
+                <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 14px;">
+                    REGOS tizimidagi xaridor kartasining <strong>shtrix-kodini skanerlang</strong> yoki telefon raqamini kiriting.
+                </p>
+                <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                    <div class="search-box" style="flex-grow: 1; margin: 0; position: relative;">
+                        <i class="fas fa-barcode" style="color: #38bdf8; font-size: 16px;"></i>
+                        <input type="text" id="regos-card-search-input" class="form-control" placeholder="Shtrix-kodni skanerlang yoki kiriting (masalan: 9989140299509)..." onkeydown="CRM.onRegosSearchKeydown(event)" autofocus style="height: 44px; font-size: 14.5px; font-family: monospace;">
+                    </div>
+                    <button class="btn btn-primary" id="btn-regos-search-submit" onclick="CRM.searchRegosCards()" style="padding: 0 20px; white-space: nowrap; height: 44px;">
+                        <i class="fas fa-search" style="margin-right: 6px;"></i> Qidirish
+                    </button>
+                </div>
+
+                <!-- Qidiruv natijalari maydoni -->
+                <div id="regos-search-results-container">
+                    <div style="text-align: center; color: var(--text-muted); padding: 40px 10px;">
+                        <i class="fas fa-qrcode" style="font-size: 38px; color: rgba(255,255,255,0.1); margin-bottom: 12px; display: block;"></i>
+                        <span style="font-size: 13.5px;">Shtrix-kodni skaner orqali o'qiting yoki yozib "Qidirish" tugmasini bosing</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 12px; color: var(--text-muted);">
+                    <i class="fas fa-info-circle" style="margin-right: 4px;"></i> Faqat siz tanlagan kartalar «Mijozlar ro'yxati»ga qo'shiladi
+                </span>
+                <button type="button" class="btn btn-secondary" onclick="closeModal('regos-card-search-modal')">Yopish</button>
+            </div>
         </div>
     </div>
 
