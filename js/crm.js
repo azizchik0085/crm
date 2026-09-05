@@ -733,34 +733,52 @@ window.CRM = {
         purchaseListEl.innerHTML = '<div style="text-align: center; padding: 12px; color: var(--text-muted); font-size: 13px;"><i class="fas fa-spinner fa-spin"></i> Yuklanmoqda...</div>';
         
         try {
-            const receipts = await DB.getReceipts();
             const settings = AppStorage.load().settings || {};
             const currency = settings.currency || "so'm";
             
-            // Telefon raqamlarni tozalash va solishtirish funksiyasi
-            const cleanPhone = (p) => p ? p.replace(/\D/g, '') : '';
-            const p1 = cleanPhone(customer.phone);
-            const p2 = cleanPhone(customer.phone2);
-            
-            const matchesPhone = (recPhone) => {
-                const cleanRec = cleanPhone(recPhone);
-                if (!cleanRec) return false;
-                if (p1 && cleanRec.length >= 9 && p1.length >= 9 && cleanRec.slice(-9) === p1.slice(-9)) return true;
-                if (p2 && cleanRec.length >= 9 && p2.length >= 9 && cleanRec.slice(-9) === p2.slice(-9)) return true;
-                return cleanRec === p1 || cleanRec === p2;
-            };
+            let customerReceipts = [];
+            try {
+                const params = new URLSearchParams();
+                if (customer.phone) params.append('phone', customer.phone);
+                if (customer.phone2) params.append('phone2', customer.phone2);
+                const resp = await fetch(`/api/clients/${encodeURIComponent(customer.id)}/receipts?${params.toString()}`);
+                if (resp.ok) {
+                    const data = await resp.json();
+                    if (data && data.ok && Array.isArray(data.receipts)) {
+                        customerReceipts = data.receipts;
+                    }
+                }
+            } catch (e_api) {
+                console.warn("Lid xarid cheklarini API orqali yuklashda xatolik:", e_api);
+            }
 
-            // Mijozning cheklarini topamiz
-            const customerReceipts = receipts.filter(rec => {
-                let items = rec.items || [];
-                if (typeof items === 'string') {
-                    try { items = JSON.parse(items); } catch(e) { items = []; }
-                }
-                if (items && !Array.isArray(items) && typeof items === 'object') {
-                    return matchesPhone(items.customer_phone);
-                }
-                return false;
-            });
+            if (!customerReceipts || customerReceipts.length === 0) {
+                const receipts = await DB.getReceipts();
+                // Telefon raqamlarni tozalash va solishtirish funksiyasi
+                const cleanPhone = (p) => p ? p.replace(/\D/g, '') : '';
+                const p1 = cleanPhone(customer.phone);
+                const p2 = cleanPhone(customer.phone2);
+                
+                const matchesPhone = (recPhone) => {
+                    const cleanRec = cleanPhone(recPhone);
+                    if (!cleanRec) return false;
+                    if (p1 && cleanRec.length >= 9 && p1.length >= 9 && cleanRec.slice(-9) === p1.slice(-9)) return true;
+                    if (p2 && cleanRec.length >= 9 && p2.length >= 9 && cleanRec.slice(-9) === p2.slice(-9)) return true;
+                    return cleanRec === p1 || cleanRec === p2;
+                };
+
+                // Mijozning cheklarini topamiz
+                customerReceipts = receipts.filter(rec => {
+                    let items = rec.items || [];
+                    if (typeof items === 'string') {
+                        try { items = JSON.parse(items); } catch(e) { items = []; }
+                    }
+                    if (items && !Array.isArray(items) && typeof items === 'object') {
+                        return matchesPhone(items.customer_phone);
+                    }
+                    return false;
+                });
+            }
 
             if (customerReceipts.length === 0) {
                 purchaseListEl.innerHTML = '<div style="text-align: center; padding: 16px; color: var(--text-muted); font-size: 13px; font-style: italic;">Xaridlar tarixi mavjud emas</div>';
@@ -2610,44 +2628,65 @@ window.CRM = {
         }
 
         try {
-            const receipts = await DB.getReceipts();
             const settings = AppStorage.load().settings || {};
             const currency = settings.currency || "so'm";
 
-            // Telefon va shtrix-kodlarni tozalash
-            const cleanPhone = (p) => p ? String(p).replace(/\D/g, '') : '';
-            const p1 = cleanPhone(client.phone);
-            const p2 = cleanPhone(client.phone2);
-            const bc = client.barcode ? String(client.barcode).trim() : '';
+            let clientReceipts = [];
+            try {
+                const params = new URLSearchParams();
+                if (client.phone) params.append('phone', client.phone);
+                if (client.phone2) params.append('phone2', client.phone2);
+                if (client.barcode) params.append('barcode', client.barcode);
 
-            const matches = (rec) => {
-                let items = rec.items || [];
-                if (typeof items === 'string') {
-                    try { items = JSON.parse(items); } catch(e) { items = []; }
-                }
-
-                if (items && typeof items === 'object' && !Array.isArray(items)) {
-                    const recPhone = cleanPhone(items.customer_phone);
-                    if (recPhone) {
-                        if (p1 && recPhone.length >= 9 && p1.length >= 9 && recPhone.slice(-9) === p1.slice(-9)) return true;
-                        if (p2 && recPhone.length >= 9 && p2.length >= 9 && cleanPhone(p2).length >= 9 && recPhone.slice(-9) === cleanPhone(p2).slice(-9)) return true;
-                        if (bc && bc.length >= 9 && recPhone.slice(-9) === cleanPhone(bc).slice(-9)) return true;
+                const resp = await fetch(`/api/clients/${encodeURIComponent(client.id)}/receipts?${params.toString()}`);
+                if (resp.ok) {
+                    const data = await resp.json();
+                    if (data && data.ok && Array.isArray(data.receipts)) {
+                        clientReceipts = data.receipts;
                     }
-                    if (bc && items.card_barcode && String(items.card_barcode).trim() === bc) return true;
-                    if (items.customer_id && (items.customer_id === client.id || items.customer_id === client.phone)) return true;
                 }
+            } catch (e_api) {
+                console.warn("Mijoz cheklarini API orqali yuklashda xatolik:", e_api);
+            }
 
-                if (rec.customer_phone) {
-                    const recPhone = cleanPhone(rec.customer_phone);
-                    if (p1 && recPhone.length >= 9 && p1.length >= 9 && recPhone.slice(-9) === p1.slice(-9)) return true;
-                    if (p2 && recPhone.length >= 9 && p2.length >= 9 && recPhone.slice(-9) === cleanPhone(p2).slice(-9)) return true;
-                }
-                if (bc && rec.card_barcode && String(rec.card_barcode).trim() === bc) return true;
+            // Mahalliy bazadan qidirish (agar API dan bo'sh kelsa yoki oflayn bo'lsa)
+            if (!clientReceipts || clientReceipts.length === 0) {
+                const receipts = await DB.getReceipts();
+                const cleanPhone = (p) => p ? String(p).replace(/\D/g, '') : '';
+                const p1 = cleanPhone(client.phone);
+                const p2 = cleanPhone(client.phone2);
+                const bc = client.barcode ? String(client.barcode).trim() : '';
 
-                return false;
-            };
+                const matches = (rec) => {
+                    let items = rec.items || [];
+                    if (typeof items === 'string') {
+                        try { items = JSON.parse(items); } catch(e) { items = []; }
+                    }
 
-            const clientReceipts = receipts.filter(matches);
+                    if (items && typeof items === 'object' && !Array.isArray(items)) {
+                        const recPhone = cleanPhone(items.customer_phone);
+                        if (recPhone) {
+                            if (p1 && recPhone.length >= 9 && p1.length >= 9 && recPhone.slice(-9) === p1.slice(-9)) return true;
+                            if (p2 && recPhone.length >= 9 && p2.length >= 9 && cleanPhone(p2).length >= 9 && recPhone.slice(-9) === cleanPhone(p2).slice(-9)) return true;
+                            if (bc && bc.length >= 9 && recPhone.slice(-9) === cleanPhone(bc).slice(-9)) return true;
+                        }
+                        if (bc && items.card_barcode && String(items.card_barcode).trim() === bc) return true;
+                        if (items.customer_id && (items.customer_id === client.id || items.customer_id === client.phone)) return true;
+                    }
+
+                    if (rec.customer_phone) {
+                        const recPhone = cleanPhone(rec.customer_phone);
+                        if (p1 && recPhone.length >= 9 && p1.length >= 9 && recPhone.slice(-9) === p1.slice(-9)) return true;
+                        if (p2 && recPhone.length >= 9 && p2.length >= 9 && recPhone.slice(-9) === cleanPhone(p2).slice(-9)) return true;
+                    }
+                    if (bc && rec.card_barcode && String(rec.card_barcode).trim() === bc) return true;
+
+                    return false;
+                };
+
+                clientReceipts = receipts.filter(matches);
+            }
+
             clientReceipts.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
             const totalSpend = clientReceipts.reduce((acc, r) => acc + (parseFloat(r.total_amount) || 0), 0);
@@ -2694,6 +2733,11 @@ window.CRM = {
                 const payBadgeClass = payType === 'Karta' 
                     ? 'badge-primary' 
                     : (payType === 'Elektron' ? 'badge-success' : 'badge-secondary');
+
+                let compName = '';
+                if (rec.company_id) {
+                    compName = rec.company_id === 'giperbrendstroy' ? 'Giper Brend Stroy' : (rec.company_id === 'protechctiy' ? 'Protech City' : rec.company_id);
+                }
 
                 let productsRows = '';
                 products.forEach(p => {
@@ -2757,7 +2801,10 @@ window.CRM = {
                         `}
 
                         <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11.5px; color: var(--text-muted); border-top: 1px dashed rgba(255,255,255,0.06); padding-top: 6px;">
-                            <span>${rec.cashier_name ? `<i class="fas fa-user" style="margin-right: 3px;"></i> Kassir: ${rec.cashier_name}` : ''} ${sellerName ? `| Sotuvchi: ${sellerName}` : ''}</span>
+                            <span>
+                                ${compName ? `<span class="badge" style="background: rgba(255,255,255,0.08); color: var(--text-muted); margin-right: 6px; font-size: 10px; text-transform: uppercase;"><i class="fas fa-store" style="font-size: 9px; margin-right: 3px;"></i>${compName}</span>` : ''}
+                                ${rec.cashier_name ? `<i class="fas fa-user" style="margin-right: 3px;"></i> Kassir: ${rec.cashier_name}` : ''} ${sellerName ? `| Sotuvchi: ${sellerName}` : ''}
+                            </span>
                             <span>Mahsulotlar: <strong>${products.length} ta pozitsiya</strong></span>
                         </div>
                     </div>
@@ -2772,6 +2819,26 @@ window.CRM = {
                 listEl.innerHTML = '<div style="text-align: center; padding: 16px; color: var(--danger); font-size: 13px;">Cheklarni yuklashda xatolik yuz berdi</div>';
             }
         }
+    },
+
+    reloadCurrentClientReceipts: async function() {
+        if (!this._currentDetailClientId) return;
+        const icon = document.getElementById('cdm-receipts-refresh-icon');
+        if (icon) icon.classList.add('fa-spin');
+        
+        let clients = this._clientsCache || [];
+        let client = clients.find(c => c.id === this._currentDetailClientId);
+        if (!client) {
+            try {
+                clients = await DB.getClients();
+                this._clientsCache = clients;
+                client = clients.find(c => c.id === this._currentDetailClientId);
+            } catch(e) {}
+        }
+        if (client) {
+            await this.loadClientReceipts(client);
+        }
+        if (icon) icon.classList.remove('fa-spin');
     },
 
     openEditClientModal: async function(id) {

@@ -2269,13 +2269,18 @@
 
                 <!-- Tab 1: Xarid Cheklari -->
                 <div id="cdm-tab-content-receipts">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
                         <div style="font-size: 13px; color: var(--text-muted);">
-                            Mijoz telefon raqami yoki karta shtrix-kodi bo'yicha biriktirilgan cheklar:
+                            Mijoz telefon raqami yoki karta shtrix-kodi bo'yicha barcha cheklar:
                         </div>
-                        <button type="button" id="cdm-btn-regos-sync" class="btn btn-secondary btn-sm" style="padding: 5px 12px; font-size: 12px; display: inline-flex; align-items: center; gap: 6px; border-radius: 8px;" onclick="CRM.syncCustomerReceiptsFromRegos()">
-                            <i class="fas fa-sync"></i> REGOS-dan yangilash
-                        </button>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="CRM.reloadCurrentClientReceipts()" title="Cheklar ro'yxatini qayta tekshirish" style="padding: 5px 10px; font-size: 12px; border-radius: 8px;">
+                                <i class="fas fa-sync-alt" id="cdm-receipts-refresh-icon"></i>
+                            </button>
+                            <button type="button" id="cdm-btn-regos-sync" class="btn btn-secondary btn-sm" style="padding: 5px 12px; font-size: 12px; display: inline-flex; align-items: center; gap: 6px; border-radius: 8px;" onclick="CRM.syncCustomerReceiptsFromRegos()">
+                                <i class="fas fa-sync"></i> REGOS-dan yangilash
+                            </button>
+                        </div>
                     </div>
 
                     <!-- Jonli sinxronizatsiya indikatori va progress bari -->
@@ -3165,7 +3170,7 @@
     <script src="js/storage.js?v=5"></script>
     <script src="js/db.js?v=8"></script>
     <script src="js/telephony.js?v=6"></script>
-    <script src="js/crm.js?v=13"></script>
+    <script src="js/crm.js?v=14"></script>
     <script src="js/chats.js?v=4"></script>
     <script src="js/erp.js?v=10"></script>
     <script src="js/finance.js?v=4"></script>

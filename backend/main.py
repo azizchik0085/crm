@@ -347,6 +347,83 @@ def delete_client(id: str, request: Request):
         path += f"&company_id=eq.{company_id}"
     return supabase_req("DELETE", path, company_id=company_id)
 
+# --- CLIENT RECEIPTS ENDPOINT ---
+@app.get("/api/clients/{client_id}/receipts")
+def get_client_receipts(
+    client_id: str, 
+    request: Request, 
+    phone: str = None, 
+    phone2: str = None, 
+    barcode: str = None, 
+    card_id: str = None
+):
+    import re
+    
+    # If phone or barcode not passed, try loading from customers table
+    if not phone and not barcode and client_id:
+        try:
+            c_data = supabase_req("GET", f"customers?id=eq.{client_id}")
+            if c_data and isinstance(c_data, list) and len(c_data) > 0:
+                c_item = c_data[0]
+                if not phone:
+                    phone = c_item.get("phone")
+                if not phone2:
+                    phone2 = c_item.get("phone2")
+                op_str = c_item.get("operator") or ""
+                if op_str.startswith("{"):
+                    try:
+                        m = json.loads(op_str)
+                        if not barcode:
+                            barcode = m.get("barcode")
+                    except Exception:
+                        pass
+        except Exception as e_c:
+            print(f"Could not load customer record for receipts lookup: {e_c}")
+
+    clean_p1 = re.sub(r'\D', '', str(phone or ''))
+    p1_9 = clean_p1[-9:] if len(clean_p1) >= 9 else clean_p1
+    
+    clean_p2 = re.sub(r'\D', '', str(phone2 or ''))
+    p2_9 = clean_p2[-9:] if len(clean_p2) >= 9 else clean_p2
+    
+    bc = str(barcode or '').strip()
+    
+    c_id = card_id
+    if not c_id and client_id and client_id.startswith('regos_card_'):
+        c_id = client_id.replace('regos_card_', '')
+
+    collected = {}
+    queries = []
+    
+    if p1_9:
+        queries.append(f"receipts?select=*&items->>customer_phone=ilike.*{p1_9}*&order=created_at.desc&limit=500")
+    if p2_9 and p2_9 != p1_9:
+        queries.append(f"receipts?select=*&items->>customer_phone=ilike.*{p2_9}*&order=created_at.desc&limit=500")
+    if bc:
+        queries.append(f"receipts?select=*&items->>card_barcode=eq.{bc}&order=created_at.desc&limit=500")
+        if len(bc) >= 9:
+            bc_clean = re.sub(r'\D', '', bc)
+            if bc_clean[-9:] != p1_9 and bc_clean[-9:] != p2_9:
+                queries.append(f"receipts?select=*&items->>customer_phone=ilike.*{bc_clean[-9:]}*&order=created_at.desc&limit=500")
+    if c_id:
+        queries.append(f"receipts?select=*&items->>card_id=eq.{c_id}&order=created_at.desc&limit=500")
+    if client_id:
+        queries.append(f"receipts?select=*&items->>customer_id=eq.{client_id}&order=created_at.desc&limit=500")
+
+    for q in queries:
+        try:
+            res = supabase_req("GET", q)
+            if isinstance(res, list):
+                for r in res:
+                    if isinstance(r, dict) and "id" in r:
+                        collected[r["id"]] = r
+        except Exception as e:
+            print(f"Error querying client receipts with {q}: {e}")
+
+    receipts_list = list(collected.values())
+    receipts_list.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+    return {"ok": True, "count": len(receipts_list), "receipts": receipts_list}
+
 # --- REGOS RETAIL CARD SEARCH ENDPOINT ---
 @app.get("/api/integration/regos/search-cards")
 def search_regos_cards(query: str, request: Request):
@@ -3229,7 +3306,11 @@ def save_parsed_receipt(cheque: dict, company_id: str = None):
         card = cheque.get("card")
         cust_name = ""
         cust_phone = ""
+        card_barcode = ""
+        card_id = None
         if isinstance(card, dict):
+            card_id = card.get("id")
+            card_barcode = str(card.get("barcode_value") or card.get("barcode") or "").strip()
             customer = card.get("customer")
             if isinstance(customer, dict):
                 cust_name = (customer.get("full_name") or "").strip()
@@ -3247,6 +3328,8 @@ def save_parsed_receipt(cheque: dict, company_id: str = None):
         items_payload = {
             "customer_name": cust_name,
             "customer_phone": cust_phone,
+            "card_barcode": card_barcode,
+            "card_id": card_id,
             "seller_name": seller_name,
             "products": items_list,
             "status": cheque.get("status") or "Closed"
@@ -3274,7 +3357,7 @@ def save_parsed_receipt(cheque: dict, company_id: str = None):
             if isinstance(existing_items, dict):
                 # Preserve local custom keys (like delivery)
                 for key, val in existing_items.items():
-                    if key not in ["customer_name", "customer_phone", "seller_name", "products", "status"]:
+                    if key not in ["customer_name", "customer_phone", "seller_name", "products", "status", "card_barcode", "card_id"]:
                         items_payload[key] = val
 
         receipt_payload = {
