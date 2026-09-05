@@ -825,60 +825,175 @@ window.CRM = {
         }
     },
 
+    _regosSyncInterval: null,
+
+    checkAndTrackRegosSync: async function() {
+        try {
+            const statusRes = await fetch('/api/integration/regos/sync-status');
+            if (!statusRes.ok) return;
+            const status = await statusRes.json();
+            if (status && status.running) {
+                this.startRegosSyncTracking();
+            }
+        } catch(e) {}
+    },
+
+    startRegosSyncTracking: function() {
+        if (this._regosSyncInterval) return;
+
+        const getElements = () => {
+            const btns = [
+                document.getElementById('cdm-btn-regos-sync'),
+                document.getElementById('btn-customer-regos-sync')
+            ].filter(Boolean);
+            const banner = document.getElementById('cdm-sync-progress-banner');
+            const statusMsg = document.getElementById('cdm-sync-status-msg');
+            const progressText = document.getElementById('cdm-sync-progress-text');
+            const progressBar = document.getElementById('cdm-sync-progress-bar');
+            const spinIcon = document.getElementById('cdm-sync-spin-icon');
+            return { btns, banner, statusMsg, progressText, progressBar, spinIcon };
+        };
+
+        const updateUI = (status) => {
+            const { btns, banner, statusMsg, progressText, progressBar, spinIcon } = getElements();
+            const total = parseInt(status.total) || 0;
+            const processed = parseInt(status.processed) || 0;
+            const pct = total > 0 ? Math.min(100, Math.round((processed / total) * 100)) : 0;
+
+            btns.forEach(btn => {
+                btn.disabled = true;
+                btn.style.opacity = '0.85';
+                btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${pct > 0 ? pct + '%' : 'Yangilanmoqda...'}`;
+            });
+
+            if (banner) {
+                banner.style.display = 'block';
+                banner.style.background = 'rgba(56, 189, 248, 0.08)';
+                banner.style.borderColor = 'rgba(56, 189, 248, 0.3)';
+            }
+            if (spinIcon) {
+                spinIcon.style.display = 'inline-block';
+                spinIcon.className = 'fas fa-sync fa-spin';
+            }
+            if (statusMsg) {
+                statusMsg.style.color = '#38bdf8';
+                statusMsg.textContent = status.message || 'REGOS-dan yangi cheklar olinmoqda...';
+            }
+            if (progressText) {
+                progressText.style.color = '#38bdf8';
+                progressText.textContent = total > 0 ? `${processed}/${total} (${pct}%)` : (processed > 0 ? `${processed} ta` : 'Kutilmoqda...');
+            }
+            if (progressBar) {
+                progressBar.style.width = `${Math.max(5, pct)}%`;
+                progressBar.style.background = 'linear-gradient(90deg, #38bdf8, #818cf8)';
+            }
+        };
+
+        this._regosSyncInterval = setInterval(async () => {
+            try {
+                const res = await fetch('/api/integration/regos/sync-status');
+                if (!res.ok) return;
+                const status = await res.json();
+
+                if (status && status.running) {
+                    updateUI(status);
+                } else {
+                    clearInterval(this._regosSyncInterval);
+                    this._regosSyncInterval = null;
+
+                    const { btns, banner, statusMsg, progressText, progressBar, spinIcon } = getElements();
+
+                    btns.forEach(btn => {
+                        btn.disabled = false;
+                        btn.style.opacity = '1';
+                        btn.innerHTML = `<i class="fas fa-sync"></i> REGOS-dan yangilash`;
+                    });
+
+                    if (banner) {
+                        banner.style.background = 'rgba(16, 185, 129, 0.12)';
+                        banner.style.borderColor = 'rgba(16, 185, 129, 0.35)';
+                    }
+                    if (statusMsg) {
+                        statusMsg.style.color = '#10b981';
+                        statusMsg.innerHTML = `<i class="fas fa-check-circle" style="color: #10b981; margin-right: 4px;"></i> ${status.message || 'Cheklar muvaffaqiyatli yangilandi!'}`;
+                    }
+                    if (progressText) {
+                        progressText.style.color = '#10b981';
+                        progressText.textContent = '100%';
+                    }
+                    if (progressBar) {
+                        progressBar.style.width = '100%';
+                        progressBar.style.background = '#10b981';
+                    }
+                    if (spinIcon) {
+                        spinIcon.className = 'fas fa-check-circle';
+                        spinIcon.style.color = '#10b981';
+                    }
+
+                    setTimeout(() => {
+                        if (banner && !this._regosSyncInterval) {
+                            banner.style.display = 'none';
+                            if (progressBar) progressBar.style.background = 'linear-gradient(90deg, #38bdf8, #818cf8)';
+                        }
+                    }, 4000);
+
+                    // Joriy mijoz cheklarini qayta yuklash
+                    if (this._currentDetailClientId) {
+                        let clients = this._clientsCache || [];
+                        let client = clients.find(c => c.id === this._currentDetailClientId);
+                        if (!client) {
+                            try {
+                                clients = await DB.getClients();
+                                this._clientsCache = clients;
+                                client = clients.find(c => c.id === this._currentDetailClientId);
+                            } catch(e) {}
+                        }
+                        if (client) {
+                            await this.loadClientReceipts(client);
+                        }
+                    }
+
+                    // CRM Lid modali ochilgan bo'lsa
+                    const customerId = document.getElementById('edit-cust-id')?.value;
+                    if (customerId) {
+                        const customers = await DB.getCustomers();
+                        const customer = customers.find(c => c.id === customerId);
+                        if (customer) {
+                            await this.loadCustomerPurchaseHistory(customer);
+                        }
+                    }
+                }
+            } catch(e) {
+                console.error("Sync status poll error:", e);
+            }
+        }, 1200);
+    },
+
     syncCustomerReceiptsFromRegos: async function() {
-        const btn = document.getElementById('btn-customer-regos-sync');
-        if (!btn) return;
-        
-        const originalHTML = btn.innerHTML;
-        btn.disabled = true;
-        btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Yangilanmoqda...`;
+        const banner = document.getElementById('cdm-sync-progress-banner');
+        if (banner) banner.style.display = 'block';
+
+        const btns = [
+            document.getElementById('cdm-btn-regos-sync'),
+            document.getElementById('btn-customer-regos-sync')
+        ].filter(Boolean);
+
+        btns.forEach(btn => {
+            btn.disabled = true;
+            btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Boshlanmoqda...`;
+        });
 
         try {
-            // Regos-dan oxirgi 30 kunlik cheklarni yangilash uchun so'rov yuboramiz
-            const response = await fetch('/api/integration/regos/sync-receipts?days=30', {
+            const response = await fetch('/api/integration/regos/sync-receipts?days=360', {
                 method: 'POST'
             });
             const data = await response.json();
-            
-            if (!response.ok) {
-                throw new Error(data.detail || "Sinxronizatsiya boshlashda xatolik yuz berdi.");
-            }
 
-            // Polling boshlaymiz
-            const interval = setInterval(async () => {
-                try {
-                    const statusRes = await fetch('/api/integration/regos/sync-status');
-                    if (!statusRes.ok) return;
-                    const status = await statusRes.json();
-                    
-                    if (status.running) {
-                        btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${status.processed}/${status.total || '...'}`;
-                    } else {
-                        clearInterval(interval);
-                        btn.disabled = false;
-                        btn.innerHTML = originalHTML;
-                        
-                        // Xaridlar tarixini qayta yuklaymiz
-                        const customerId = document.getElementById('edit-cust-id').value;
-                        if (customerId) {
-                            // Modal ichidagi ro'yxatni yangilash
-                            const customers = await DB.getCustomers();
-                            const customer = customers.find(c => c.id === customerId);
-                            if (customer) {
-                                await this.loadCustomerPurchaseHistory(customer);
-                            }
-                        }
-                    }
-                } catch (e) {
-                    console.error("Regos status poll error:", e);
-                }
-            }, 1500);
+            this.startRegosSyncTracking();
 
         } catch (err) {
             console.error("Regos-dan yangilashda xatolik:", err);
-            alert("Xatolik: " + err.message);
-            btn.disabled = false;
-            btn.innerHTML = originalHTML;
+            this.checkAndTrackRegosSync();
         }
     },
 
@@ -2257,6 +2372,7 @@ window.CRM = {
         // Cheklar va bonus tarixini yuklash
         this.loadClientReceipts(client);
         this.renderClientBonusHistory(client);
+        this.checkAndTrackRegosSync();
     },
 
     switchClientDetailTab: function(tabName) {

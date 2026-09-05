@@ -3802,7 +3802,11 @@ from fastapi import BackgroundTasks
 def sync_regos_receipts(background_tasks: BackgroundTasks, request: Request, days: int = None, sync_date: str = None):
     global sync_progress
     if sync_progress["running"]:
-        raise HTTPException(status_code=400, detail="Sinxronizatsiya jarayoni allaqachon bajarilmoqda.")
+        return {
+            "status": "already_running",
+            "message": "Sinxronizatsiya orqa fonda allaqachon bajarilmoqda.",
+            "progress": sync_progress
+        }
         
     company_id = get_company_id(request)
     
