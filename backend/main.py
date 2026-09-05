@@ -224,7 +224,7 @@ def get_customers(request: Request):
     company_id = get_company_id(request)
     if not company_id:
         return []
-    return supabase_get_all(f"customers?select=*&company_id=eq.{company_id}")
+    return supabase_get_all(f"customers?select=*&company_id=eq.{company_id}&or=(source.neq.client_directory,source.is.null)")
 
 @app.post("/api/customers")
 def save_customer(customer: dict, request: Request):
@@ -240,6 +240,66 @@ def delete_customer(id: str, request: Request):
     if company_id:
         path += f"&company_id=eq.{company_id}"
     return supabase_req("DELETE", path)
+
+# --- DEDICATED CLIENT REGISTRY (MIJOZLAR BAZASI) ENDPOINTS ---
+@app.get("/api/clients")
+def get_clients(request: Request):
+    company_id = get_company_id(request)
+    if not company_id:
+        return []
+    res = supabase_get_all(f"customers?select=*&company_id=eq.{company_id}&source=eq.client_directory&order=created_at.desc")
+    for c in res:
+        c["address"] = c.get("email") or ""
+        op = c.get("operator") or ""
+        if "__NOTE_SEP__" in op:
+            parts = op.split("__NOTE_SEP__", 1)
+            c["operator"] = parts[0]
+            c["notes"] = parts[1]
+        elif " | " in op:
+            parts = op.split(" | ", 1)
+            c["operator"] = parts[0]
+            c["notes"] = parts[1]
+        else:
+            c["operator"] = op
+            c["notes"] = ""
+    return res or []
+
+@app.post("/api/clients")
+def save_client(client_data: dict, request: Request):
+    import time
+    company_id = get_company_id(request)
+    if not company_id:
+        raise HTTPException(status_code=400, detail="Company ID talab qilinadi")
+    
+    address = client_data.get("address") or client_data.get("email") or ""
+    notes = (client_data.get("notes") or "").strip()
+    operator = (client_data.get("operator") or "").strip()
+    op_val = f"{operator}__NOTE_SEP__{notes}" if (notes or operator) else ""
+
+    payload = {
+        "id": client_data.get("id") or f"client_{int(time.time() * 1000)}",
+        "name": (client_data.get("name") or "").strip(),
+        "company": (client_data.get("company") or "").strip(),
+        "phone": (client_data.get("phone") or "").strip(),
+        "phone2": (client_data.get("phone2") or "").strip(),
+        "email": address,
+        "operator": op_val,
+        "status": "client",
+        "source": "client_directory",
+        "value": float(client_data.get("value") or 0),
+        "company_id": company_id
+    }
+    if client_data.get("created_at"):
+        payload["created_at"] = client_data["created_at"]
+    return supabase_req("POST", "customers?on_conflict=id", json_data=payload, company_id=company_id)
+
+@app.delete("/api/clients/{id}")
+def delete_client(id: str, request: Request):
+    company_id = get_company_id(request)
+    path = f"customers?id=eq.{id}"
+    if company_id:
+        path += f"&company_id=eq.{company_id}"
+    return supabase_req("DELETE", path, company_id=company_id)
 
 # --- INVENTORY ENDPOINTS ---
 @app.get("/api/inventory")

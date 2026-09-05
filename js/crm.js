@@ -1739,15 +1739,11 @@ window.CRM = {
 
     customerListPage: 1,
     customerListPageSize: 20,
+    _clientsCache: [],
 
     initCustomersView: function() {
         this.customerListPage = 1;
         this.customerListPageSize = 20;
-        try {
-            this.setupEventListeners();
-        } catch (e) {
-            console.warn("setupEventListeners failed:", e);
-        }
         this.setupCustomersViewEventListeners();
         this.renderCustomersView();
 
@@ -1763,7 +1759,7 @@ window.CRM = {
     },
 
     setupCustomersViewEventListeners: function() {
-        const searchInput = document.getElementById('crm-custlist-search');
+        const searchInput = document.getElementById('crm-clientlist-search') || document.getElementById('crm-custlist-search');
         if (searchInput && !searchInput._bound) {
             searchInput._bound = true;
             searchInput.oninput = () => {
@@ -1772,108 +1768,74 @@ window.CRM = {
             };
         }
 
-        const statusFilter = document.getElementById('crm-custlist-status-filter');
-        if (statusFilter && !statusFilter._bound) {
-            statusFilter._bound = true;
-            statusFilter.onchange = () => {
-                this.customerListPage = 1;
-                this.renderCustomersView();
-            };
-        }
-
-        const operatorFilter = document.getElementById('crm-custlist-operator-filter');
-        if (operatorFilter && !operatorFilter._bound) {
-            operatorFilter._bound = true;
-            operatorFilter.onchange = () => {
-                this.customerListPage = 1;
-                this.renderCustomersView();
-            };
-        }
-
-        const sourceFilter = document.getElementById('crm-custlist-source-filter');
-        if (sourceFilter && !sourceFilter._bound) {
-            sourceFilter._bound = true;
-            sourceFilter.onchange = () => {
+        const typeFilter = document.getElementById('crm-clientlist-type-filter');
+        if (typeFilter && !typeFilter._bound) {
+            typeFilter._bound = true;
+            typeFilter.onchange = () => {
                 this.customerListPage = 1;
                 this.renderCustomersView();
             };
         }
     },
 
+    onClientSearchInput: function() {
+        this.customerListPage = 1;
+        this.renderCustomersView();
+    },
+
     renderCustomersView: async function() {
         const container = document.getElementById('crm-custlist-content');
         if (!container) return;
 
-        let customers = [];
+        let clients = [];
         try {
-            customers = await DB.getCustomers();
+            clients = await DB.getClients();
+            this._clientsCache = clients;
         } catch (e) {
             console.error("Mijozlarni yuklashda xatolik:", e);
-            customers = AppStorage.load().customers || [];
+            clients = this._clientsCache || AppStorage.load().clients || [];
         }
 
         // 1. KPI kartochkalarni yangilash
-        const totalStat = document.getElementById('custlist-stat-total');
-        const newStat = document.getElementById('custlist-stat-new');
-        const contactedStat = document.getElementById('custlist-stat-contacted');
-        const wonStat = document.getElementById('custlist-stat-won');
+        const totalStat = document.getElementById('clientlist-stat-total') || document.getElementById('custlist-stat-total');
+        const corpStat = document.getElementById('clientlist-stat-corporate') || document.getElementById('custlist-stat-new');
+        const indivStat = document.getElementById('clientlist-stat-individual') || document.getElementById('custlist-stat-contacted');
+        const monthStat = document.getElementById('clientlist-stat-month') || document.getElementById('custlist-stat-won');
 
-        if (totalStat) totalStat.textContent = customers.length;
-        if (newStat) newStat.textContent = customers.filter(c => c.status === 'lead').length;
-        if (contactedStat) contactedStat.textContent = customers.filter(c => c.status === 'contacted' || c.status === 'proposal').length;
-        if (wonStat) wonStat.textContent = customers.filter(c => c.status === 'won').length;
+        const now = new Date();
+        const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        const corpCount = clients.filter(c => c.company && c.company.trim().length > 0).length;
+        const indivCount = clients.filter(c => !c.company || c.company.trim().length === 0).length;
+        const monthCount = clients.filter(c => c.created_at && c.created_at.startsWith(currentMonthStr)).length;
 
-        // 2. Operatorlar dropdown-ni to'ldirish (agar bo'sh bo'lsa)
-        const operatorFilter = document.getElementById('crm-custlist-operator-filter');
-        if (operatorFilter && operatorFilter.options.length <= 1) {
-            const currentSelected = operatorFilter.value;
-            const opSet = new Set();
-            customers.forEach(c => {
-                const op = c.displayOperator || c.operator;
-                if (op) opSet.add(op);
-            });
-            try {
-                const employees = await DB.getEmployees();
-                employees.forEach(emp => { if (emp.name) opSet.add(emp.name); });
-            } catch (e) {}
+        if (totalStat) totalStat.textContent = clients.length;
+        if (corpStat) corpStat.textContent = corpCount;
+        if (indivStat) indivStat.textContent = indivCount;
+        if (monthStat) monthStat.textContent = monthCount;
 
-            const ops = Array.from(opSet).filter(Boolean).sort();
-            let optHtml = '<option value="">Barcha operatorlar</option>';
-            ops.forEach(op => {
-                optHtml += `<option value="${op}" ${currentSelected === op ? 'selected' : ''}>${op}</option>`;
-            });
-            operatorFilter.innerHTML = optHtml;
-        }
-
-        // 3. Filtrlash
-        const searchInput = document.getElementById('crm-custlist-search');
+        // 2. Filtrlash
+        const searchInput = document.getElementById('crm-clientlist-search') || document.getElementById('crm-custlist-search');
         const searchVal = (searchInput ? searchInput.value : '').toLowerCase().trim();
-        const statusVal = document.getElementById('crm-custlist-status-filter')?.value || '';
-        const operatorVal = document.getElementById('crm-custlist-operator-filter')?.value || '';
-        const sourceVal = document.getElementById('crm-custlist-source-filter')?.value || '';
+        const typeFilter = document.getElementById('crm-clientlist-type-filter')?.value || '';
 
-        const filtered = customers.filter(c => {
-            if (statusVal && c.status !== statusVal) return false;
-            if (operatorVal) {
-                const op = c.displayOperator || c.operator || '';
-                if (op !== operatorVal) return false;
-            }
-            if (sourceVal && c.source !== sourceVal) return false;
+        const filtered = clients.filter(c => {
+            if (typeFilter === 'corporate' && (!c.company || !c.company.trim())) return false;
+            if (typeFilter === 'individual' && c.company && c.company.trim()) return false;
             if (searchVal) {
                 const name = (c.name || '').toLowerCase();
                 const phone = (c.phone || '').toLowerCase();
                 const phone2 = (c.phone2 || '').toLowerCase();
-                const notes = (c.notes || '').toLowerCase();
                 const company = (c.company || '').toLowerCase();
-                const op = (c.displayOperator || c.operator || '').toLowerCase();
-                if (!name.includes(searchVal) && !phone.includes(searchVal) && !phone2.includes(searchVal) && !notes.includes(searchVal) && !company.includes(searchVal) && !op.includes(searchVal)) {
+                const address = (c.email || c.address || '').toLowerCase();
+                const notes = (c.notes || '').toLowerCase();
+                if (!name.includes(searchVal) && !phone.includes(searchVal) && !phone2.includes(searchVal) && !company.includes(searchVal) && !address.includes(searchVal) && !notes.includes(searchVal)) {
                     return false;
                 }
             }
             return true;
         });
 
-        // 4. Sahifalash (Pagination)
+        // 3. Sahifalash (Pagination)
         const pageSize = this.customerListPageSize || 20;
         const totalPages = Math.ceil(filtered.length / pageSize) || 1;
         if (this.customerListPage > totalPages) this.customerListPage = totalPages;
@@ -1881,9 +1843,8 @@ window.CRM = {
 
         const startIdx = (this.customerListPage - 1) * pageSize;
         const pageItems = filtered.slice(startIdx, startIdx + pageSize);
-        const currency = AppStorage.load().settings.currency || "so'm";
 
-        // 5. Jadval HTML yaratish
+        // 4. Jadval HTML
         let tableHtml = `
             <div class="card" style="margin-top: 16px;">
                 <div class="table-responsive">
@@ -1891,13 +1852,14 @@ window.CRM = {
                         <thead>
                             <tr>
                                 <th style="width: 45px; text-align: center;">#</th>
-                                <th>Mijoz ismi</th>
-                                <th>Telefon raqamlari</th>
-                                <th>Lid Manbasi</th>
-                                <th>Mas'ul Operator</th>
-                                <th>Bitim qiymati</th>
-                                <th>Status</th>
-                                <th style="text-align: right; min-width: 140px;">Amallar</th>
+                                <th>Mijoz (F.I.Sh)</th>
+                                <th>Kompaniya / Korxona</th>
+                                <th>Asosiy telefon</th>
+                                <th>Qo'shimcha telefon</th>
+                                <th>Manzil / Hudud</th>
+                                <th>Izoh / Eslatma</th>
+                                <th>Qo'shilgan sana</th>
+                                <th style="text-align: right; min-width: 130px;">Amallar</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1906,78 +1868,80 @@ window.CRM = {
         if (pageItems.length === 0) {
             tableHtml += `
                 <tr>
-                    <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 40px;">
-                        <i class="fas fa-users-slash" style="font-size: 32px; margin-bottom: 10px; opacity: 0.4; display: block;"></i>
-                        Mijozlar topilmadi.
+                    <td colspan="9" style="text-align: center; color: var(--text-muted); padding: 50px 20px;">
+                        <div style="max-width: 380px; margin: 0 auto; text-align: center;">
+                            <div style="width: 56px; height: 56px; border-radius: 50%; background: rgba(99, 102, 241, 0.1); color: var(--accent); display: flex; align-items: center; justify-content: center; font-size: 24px; margin: 0 auto 16px;">
+                                <i class="fas fa-user-friends"></i>
+                            </div>
+                            <h4 style="color: var(--text-main); margin-bottom: 8px; font-weight: 600;">Hozircha mijozlar mavjud emas</h4>
+                            <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 20px;">
+                                Ushbu bo'lim faqat siz qo'lda kiritgan mijozlar uchun ajratilgan. Birinchi mijozni qo'shing.
+                            </p>
+                            <button class="btn btn-primary btn-sm" onclick="CRM.openAddClientModal()" style="padding: 8px 16px;">
+                                <i class="fas fa-plus" style="margin-right: 6px;"></i> Yangi Mijoz Qo'shish
+                            </button>
+                        </div>
                     </td>
                 </tr>
             `;
         } else {
             pageItems.forEach((c, idx) => {
                 const rowNum = startIdx + idx + 1;
-                let badgeClass = 'badge-info';
-                let statusName = 'Yangi';
-                if (c.status === 'contacted') { badgeClass = 'badge-warning'; statusName = 'Muzokarada'; }
-                else if (c.status === 'proposal') { badgeClass = 'badge-primary'; statusName = 'Taklif'; }
-                else if (c.status === 'won') { badgeClass = 'badge-success'; statusName = 'Yutildi'; }
-                else if (c.status === 'lost') { badgeClass = 'badge-danger'; statusName = 'Boy berildi'; }
-
-                let sourceBadge = '';
-                if (c.source === 'telegram') {
-                    sourceBadge = `<span class="badge clickable-badge" style="background:#0088cc; color:#fff; font-size:11px; padding:3px 8px; border-radius:12px; font-weight:500; cursor:pointer;" onclick="event.stopPropagation(); CRM.openChat('${c.id}', '${c.source}', '${(c.name || '').replace(/'/g, "\\'")}')" title="Telegram suhbatini ochish"><i class="fab fa-telegram"></i> Telegram</span>`;
-                } else if (c.source === 'instagram') {
-                    sourceBadge = `<span class="badge clickable-badge" style="background:#E1306C; color:#fff; font-size:11px; padding:3px 8px; border-radius:12px; font-weight:500; cursor:pointer;" onclick="event.stopPropagation(); CRM.openChat('${c.id}', '${c.source}', '${(c.name || '').replace(/'/g, "\\'")}')" title="Instagram suhbatini ochish"><i class="fab fa-instagram"></i> Instagram</span>`;
-                } else if (c.source === 'telephony') {
-                    sourceBadge = `<span class="badge" style="background:#10B981; color:#fff; font-size:11px; padding:3px 8px; border-radius:12px; font-weight:500;"><i class="fas fa-phone-alt"></i> Telefon</span>`;
-                } else {
-                    sourceBadge = `<span class="badge" style="background:#6B7280; color:#fff; font-size:11px; padding:3px 8px; border-radius:12px; font-weight:500;"><i class="fas fa-user-edit"></i> Qo'lda</span>`;
+                const clientName = c.name || '-';
+                const companyName = c.company ? `<span style="font-weight: 500; color: var(--accent);"><i class="fas fa-building" style="margin-right: 5px; font-size: 11px;"></i>${c.company}</span>` : '<span style="color: var(--text-muted); font-style: italic;">Jismoniy shaxs</span>';
+                const mainPhone = c.phone || '-';
+                const extraPhone = c.phone2 || '-';
+                const address = c.email || c.address || '-';
+                const notes = c.notes || '-';
+                let dateStr = '-';
+                if (c.created_at) {
+                    try {
+                        const d = new Date(c.created_at);
+                        dateStr = d.toLocaleDateString('uz-UZ', { year: 'numeric', month: '2-digit', day: '2-digit' });
+                    } catch(e) { dateStr = c.created_at.slice(0, 10); }
                 }
-
-                let phonesHtml = `
-                    <div style="display:flex; flex-direction:column; gap:3px;">
-                        <a href="javascript:void(0)" onclick="Telephony.dial('${c.phone}')" style="color: var(--text-main); text-decoration: none; font-weight: 500; display:inline-flex; align-items:center; gap:6px;" title="Qo'ng'iroq qilish">
-                            <i class="fas fa-phone-alt" style="color: var(--success); font-size:11px;"></i> ${c.phone || '-'}
-                        </a>
-                `;
-                if (c.phone2) {
-                    phonesHtml += `
-                        <a href="javascript:void(0)" onclick="Telephony.dial('${c.phone2}')" style="color: var(--text-muted); text-decoration: none; font-size: 11.5px; display:inline-flex; align-items:center; gap:6px;" title="2-raqamga qo'ng'iroq qilish">
-                            <i class="fas fa-phone-alt" style="color: var(--warning); font-size:10px;"></i> ${c.phone2}
-                        </a>
-                    `;
-                }
-                phonesHtml += `</div>`;
-
-                const opDisplay = c.displayOperator || c.operator;
-                const opHtml = opDisplay
-                    ? `<span style="font-weight: 500; font-size: 13px;"><i class="fas fa-user-tie" style="color: var(--accent); margin-right: 4px;"></i> ${opDisplay}</span>`
-                    : `<span style="color: var(--text-muted); font-style: italic;">-</span>`;
 
                 tableHtml += `
                     <tr>
                         <td style="text-align: center; color: var(--text-muted); font-size: 12px;">${rowNum}</td>
                         <td>
-                            <strong style="font-size: 13.5px;">
-                                <a href="javascript:void(0)" onclick="CRM.openCustomerDetails('${c.id}', event)" style="color: var(--accent); text-decoration:none;" title="Mijoz tafsilotlarini ko'rish">
-                                    ${c.name}
+                            <strong style="font-size: 13.5px; color: var(--text-main);">
+                                <a href="javascript:void(0)" onclick="CRM.openEditClientModal('${c.id}')" style="color: var(--text-main); text-decoration:none;" title="Mijozni tahrirlash">
+                                    ${clientName}
                                 </a>
                             </strong>
-                            ${c.company ? `<div style="font-size: 11px; color: var(--text-muted);"><i class="fas fa-building" style="margin-right: 4px;"></i>${c.company}</div>` : ''}
                         </td>
-                        <td>${phonesHtml}</td>
-                        <td>${sourceBadge}</td>
-                        <td>${opHtml}</td>
-                        <td><span style="color: var(--success); font-weight: 600; font-family: 'JetBrains Mono', monospace;">${formatMoney(c.value || 0, currency)}</span></td>
-                        <td><span class="badge ${badgeClass}" style="font-size: 11px; padding: 4px 8px;">${statusName}</span></td>
+                        <td>${companyName}</td>
+                        <td>
+                            <a href="javascript:void(0)" onclick="Telephony.dial('${c.phone}')" style="color: var(--success); text-decoration: none; font-weight: 500; display:inline-flex; align-items:center; gap:6px;" title="Qo'ng'iroq qilish">
+                                <i class="fas fa-phone-alt" style="font-size: 11px;"></i> ${mainPhone}
+                            </a>
+                        </td>
+                        <td>
+                            ${c.phone2 ? `
+                                <a href="javascript:void(0)" onclick="Telephony.dial('${c.phone2}')" style="color: var(--text-muted); text-decoration: none; font-size: 12px; display:inline-flex; align-items:center; gap:6px;" title="2-raqamga qo'ng'iroq qilish">
+                                    <i class="fas fa-phone-alt" style="color: var(--warning); font-size: 10px;"></i> ${extraPhone}
+                                </a>
+                            ` : `<span style="color: var(--text-muted);">-</span>`}
+                        </td>
+                        <td style="font-size: 12.5px; color: var(--text-muted); max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${address}">
+                            ${address !== '-' ? `<i class="fas fa-map-marker-alt" style="margin-right: 4px; color: var(--text-muted); font-size: 11px;"></i>${address}` : '-'}
+                        </td>
+                        <td style="font-size: 12.5px; color: var(--text-muted); max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${notes}">
+                            ${notes}
+                        </td>
+                        <td style="font-size: 12px; color: var(--text-muted); white-space: nowrap;">
+                            ${dateStr}
+                        </td>
                         <td style="text-align: right;">
                             <div style="display: inline-flex; gap: 6px; justify-content: flex-end;">
-                                <button class="btn btn-secondary btn-sm" onclick="Telephony.dial('${c.phone}')" title="Qo'ng'iroq qilish" style="padding: 6px 10px;">
+                                <button class="btn btn-secondary btn-sm" onclick="Telephony.dial('${c.phone}')" title="Qo'ng'iroq qilish" style="padding: 6px 9px;">
                                     <i class="fas fa-phone-alt" style="color: var(--success)"></i>
                                 </button>
-                                <button class="btn btn-secondary btn-sm" onclick="CRM.openCustomerDetails('${c.id}', event)" title="Tafsilot / Tahrirlash" style="padding: 6px 10px;">
-                                    <i class="fas fa-eye" style="color: var(--accent)"></i>
+                                <button class="btn btn-secondary btn-sm" onclick="CRM.openEditClientModal('${c.id}')" title="Tahrirlash" style="padding: 6px 9px;">
+                                    <i class="fas fa-edit" style="color: var(--accent)"></i>
                                 </button>
-                                <button class="btn btn-secondary btn-sm" onclick="CRM.deleteCustomer('${c.id}')" title="O'chirish" style="padding: 6px 10px;">
+                                <button class="btn btn-secondary btn-sm" onclick="CRM.deleteClient('${c.id}')" title="O'chirish" style="padding: 6px 9px;">
                                     <i class="fas fa-trash-alt" style="color: var(--danger)"></i>
                                 </button>
                             </div>
@@ -2063,27 +2027,157 @@ window.CRM = {
         }
     },
 
-    exportCustomersToCSV: async function() {
+    openAddClientModal: async function() {
+        const form = document.getElementById('client-form');
+        if (form) form.reset();
+        const idInput = document.getElementById('client-id');
+        if (idInput) idInput.value = '';
+        const title = document.getElementById('client-modal-title');
+        if (title) title.innerHTML = '<i class="fas fa-user-plus" style="color: var(--accent); margin-right: 8px;"></i> Yangi Mijoz Qo\'shish';
+        
+        await this.populateClientOperators();
+        openModal('client-modal');
+    },
+
+    openEditClientModal: async function(id) {
+        let clients = this._clientsCache || [];
+        let client = clients.find(c => c.id === id);
+        if (!client) {
+            try {
+                clients = await DB.getClients();
+                this._clientsCache = clients;
+                client = clients.find(c => c.id === id);
+            } catch(e) {}
+        }
+
+        if (!client) {
+            alert("Mijoz ma'lumotlari topilmadi!");
+            return;
+        }
+
+        const idInput = document.getElementById('client-id');
+        if (idInput) idInput.value = client.id;
+        const nameInput = document.getElementById('client-name');
+        if (nameInput) nameInput.value = client.name || '';
+        const compInput = document.getElementById('client-company');
+        if (compInput) compInput.value = client.company || '';
+        const phoneInput = document.getElementById('client-phone');
+        if (phoneInput) phoneInput.value = client.phone || '';
+        const phone2Input = document.getElementById('client-phone2');
+        if (phone2Input) phone2Input.value = client.phone2 || '';
+        const addrInput = document.getElementById('client-address');
+        if (addrInput) addrInput.value = client.email || client.address || '';
+        const notesInput = document.getElementById('client-notes');
+        if (notesInput) notesInput.value = client.notes || '';
+
+        const title = document.getElementById('client-modal-title');
+        if (title) title.innerHTML = '<i class="fas fa-user-edit" style="color: var(--accent); margin-right: 8px;"></i> Mijoz Ma\'lumotlarini Tahrirlash';
+
+        await this.populateClientOperators(client.operator);
+        openModal('client-modal');
+    },
+
+    populateClientOperators: async function(selectedOperator = '') {
+        const select = document.getElementById('client-operator');
+        if (!select) return;
+        select.innerHTML = '<option value="">Tanlanmagan</option>';
         try {
-            const customers = await DB.getCustomers();
-            if (!customers || customers.length === 0) {
+            const emps = await DB.getEmployees();
+            emps.forEach(emp => {
+                if (emp.name) {
+                    const opt = document.createElement('option');
+                    opt.value = emp.name;
+                    opt.textContent = `${emp.name} (${emp.role || 'Xodim'})`;
+                    if (emp.name === selectedOperator) opt.selected = true;
+                    select.appendChild(opt);
+                }
+            });
+        } catch(e) {}
+    },
+
+    saveClientForm: async function(event) {
+        if (event) event.preventDefault();
+        const id = document.getElementById('client-id')?.value.trim();
+        const name = document.getElementById('client-name')?.value.trim();
+        const company = document.getElementById('client-company')?.value.trim() || '';
+        const phone = document.getElementById('client-phone')?.value.trim();
+        const phone2 = document.getElementById('client-phone2')?.value.trim() || '';
+        const address = document.getElementById('client-address')?.value.trim() || '';
+        const notes = document.getElementById('client-notes')?.value.trim() || '';
+        const operator = document.getElementById('client-operator')?.value || '';
+
+        if (!name || !phone) {
+            alert("Iltimos, mijoz ismi va asosiy telefon raqamini kiriting!");
+            return;
+        }
+
+        const saveBtn = document.getElementById('btn-save-client');
+        if (saveBtn) {
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saqlanmoqda...';
+        }
+
+        try {
+            const clientData = {
+                name,
+                company,
+                phone,
+                phone2,
+                email: address,
+                notes,
+                operator,
+                source: 'client_directory',
+                status: 'client'
+            };
+            if (id) {
+                clientData.id = id;
+                const existing = (this._clientsCache || []).find(c => c.id === id);
+                if (existing && existing.created_at) {
+                    clientData.created_at = existing.created_at;
+                }
+            } else {
+                clientData.id = 'client_' + Date.now();
+                clientData.created_at = new Date().toISOString();
+            }
+
+            await DB.saveClient(clientData);
+            closeModal('client-modal');
+            await this.renderCustomersView();
+        } catch(e) {
+            alert("Mijozni saqlashda xatolik yuz berdi: " + e.message);
+        } finally {
+            if (saveBtn) {
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = '<i class="fas fa-save" style="margin-right: 6px;"></i> Saqlash';
+            }
+        }
+    },
+
+    deleteClient: async function(id) {
+        if (!confirm("Haqiqatan ham ushbu mijozni o'chirmoqchimisiz?")) return;
+        try {
+            await DB.deleteClient(id);
+            await this.renderCustomersView();
+        } catch(e) {
+            alert("Mijozni o'chirishda xatolik: " + e.message);
+        }
+    },
+
+    exportClientsToCSV: async function() {
+        try {
+            const clients = await DB.getClients();
+            if (!clients || clients.length === 0) {
                 alert("Eksport qilish uchun mijozlar topilmadi.");
                 return;
             }
 
-            const headers = ["T/r", "Mijoz ismi", "Kompaniya", "Asosiy telefon", "Qo'shimcha telefon", "Manba", "Mas'ul operator", "Status", "Bitim qiymati"];
-            const rows = customers.map((c, index) => {
-                let statusName = 'Yangi';
-                if (c.status === 'contacted') statusName = 'Muzokarada';
-                else if (c.status === 'proposal') statusName = 'Taklif';
-                else if (c.status === 'won') statusName = 'Yutildi';
-                else if (c.status === 'lost') statusName = 'Boy berildi';
-
-                let sourceName = c.source || 'manual';
-                if (sourceName === 'telephony') sourceName = 'Telefon';
-                else if (sourceName === 'telegram') sourceName = 'Telegram';
-                else if (sourceName === 'instagram') sourceName = 'Instagram';
-                else if (sourceName === 'manual') sourceName = "Qo'lda";
+            const headers = ["T/r", "Mijoz (F.I.Sh)", "Kompaniya", "Asosiy telefon", "Qo'shimcha telefon", "Manzil", "Izoh", "Qo'shilgan sana"];
+            const rows = clients.map((c, index) => {
+                let dateStr = '';
+                if (c.created_at) {
+                    try { dateStr = new Date(c.created_at).toISOString().slice(0, 10); }
+                    catch(e) { dateStr = c.created_at; }
+                }
 
                 return [
                     index + 1,
@@ -2091,10 +2185,9 @@ window.CRM = {
                     `"${(c.company || '').replace(/"/g, '""')}"`,
                     `"${(c.phone || '').replace(/"/g, '""')}"`,
                     `"${(c.phone2 || '').replace(/"/g, '""')}"`,
-                    `"${sourceName}"`,
-                    `"${(c.displayOperator || c.operator || '').replace(/"/g, '""')}"`,
-                    `"${statusName}"`,
-                    c.value || 0
+                    `"${(c.email || c.address || '').replace(/"/g, '""')}"`,
+                    `"${(c.notes || '').replace(/"/g, '""')}"`,
+                    `"${dateStr}"`
                 ].join(';');
             });
 
@@ -2110,7 +2203,7 @@ window.CRM = {
             URL.revokeObjectURL(url);
         } catch (e) {
             console.error("CSV eksport qilishda xatolik:", e);
-            alert("Eksport qilishda xatolik yuz berdi: " + e.message);
+            alert("Eksport qilishda xatolik: " + e.message);
         }
     }
 };

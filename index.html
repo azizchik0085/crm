@@ -746,16 +746,13 @@
                 <div class="header">
                     <div class="header-title">
                         <h1>Mijozlar Ro'yxati</h1>
-                        <p>Barcha mijozlar bazasi, kontaktlar, holatlar va savdo tarixi</p>
+                        <p>Kompaniya va jismoniy mijozlar bazasi, kontaktlar va manzillar</p>
                     </div>
                     <div class="header-actions" style="display: flex; gap: 8px; flex-wrap: wrap;">
-                        <button class="btn btn-secondary" onclick="CRM.syncAmoCRMLeads(this)" id="btn-amocrm-sync-custlist">
-                            <i class="fas fa-sync"></i> amoCRM Sinx
-                        </button>
-                        <button class="btn btn-secondary" onclick="CRM.exportCustomersToCSV()" id="btn-export-customers">
+                        <button class="btn btn-secondary" onclick="CRM.exportClientsToCSV()" id="btn-export-customers">
                             <i class="fas fa-file-excel" style="color: #10b981;"></i> Excelga yuklash
                         </button>
-                        <button class="btn btn-primary" onclick="CRM.openAddCustomerModal()" id="crm-custlist-add-btn">
+                        <button class="btn btn-primary" onclick="CRM.openAddClientModal()" id="crm-custlist-add-btn">
                             <i class="fas fa-plus"></i> Yangi Mijoz
                         </button>
                     </div>
@@ -766,62 +763,45 @@
                     <div class="card stat-card">
                         <div class="stat-info">
                             <h3>Jami Mijozlar</h3>
-                            <div class="stat-value" id="custlist-stat-total" style="color: var(--accent);">0</div>
+                            <div class="stat-value" id="clientlist-stat-total" style="color: var(--accent);">0</div>
                         </div>
                         <div class="stat-icon-box clients"><i class="fas fa-users"></i></div>
                     </div>
                     <div class="card stat-card">
                         <div class="stat-info">
-                            <h3>Yangi Lidlar</h3>
-                            <div class="stat-value" id="custlist-stat-new" style="color: #38bdf8;">0</div>
+                            <h3>Kompaniyalar (Yuridik)</h3>
+                            <div class="stat-value" id="clientlist-stat-corporate" style="color: #38bdf8;">0</div>
                         </div>
-                        <div class="stat-icon-box income"><i class="fas fa-user-plus"></i></div>
+                        <div class="stat-icon-box income"><i class="fas fa-building"></i></div>
                     </div>
                     <div class="card stat-card">
                         <div class="stat-info">
-                            <h3>Muzokarada</h3>
-                            <div class="stat-value" id="custlist-stat-contacted" style="color: #f59e0b;">0</div>
+                            <h3>Jismoniy Shaxslar</h3>
+                            <div class="stat-value" id="clientlist-stat-individual" style="color: #10b981;">0</div>
                         </div>
-                        <div class="stat-icon-box inventory"><i class="fas fa-comments"></i></div>
+                        <div class="stat-icon-box inventory"><i class="fas fa-user-check"></i></div>
                     </div>
                     <div class="card stat-card">
                         <div class="stat-info">
-                            <h3>Muvaffaqiyatli (Yutildi)</h3>
-                            <div class="stat-value" id="custlist-stat-won" style="color: var(--success);">0</div>
+                            <h3>Shu Oyda Qo'shilgan</h3>
+                            <div class="stat-value" id="clientlist-stat-month" style="color: #f59e0b;">0</div>
                         </div>
-                        <div class="stat-icon-box expense" style="background: rgba(16, 185, 129, 0.1); color: var(--success);"><i class="fas fa-trophy"></i></div>
+                        <div class="stat-icon-box expense" style="background: rgba(245, 158, 11, 0.1); color: #f59e0b;"><i class="fas fa-calendar-check"></i></div>
                     </div>
                 </div>
 
                 <!-- Qidiruv va filtrlar -->
                 <div class="filter-row card" style="padding: 16px;">
                     <div style="display: flex; gap: 12px; align-items: center; flex-grow: 1; flex-wrap: wrap;">
-                        <div class="search-box" style="flex: 1 1 250px; min-width: 220px; margin: 0;">
+                        <div class="search-box" style="flex: 1 1 280px; min-width: 240px; margin: 0;">
                             <i class="fas fa-search"></i>
-                            <input type="text" id="crm-custlist-search" class="form-control" placeholder="Mijoz ismi yoki telefon raqami bo'yicha qidirish...">
+                            <input type="text" id="crm-clientlist-search" class="form-control" placeholder="Mijoz ismi, telefon, kompaniya yoki manzil bo'yicha qidirish..." oninput="CRM.onClientSearchInput()">
                         </div>
-                        <div style="min-width: 160px;">
-                            <select id="crm-custlist-status-filter" class="form-control" style="height: 42px; background-color: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); color: var(--text-main); border-radius: 8px;">
-                                <option value="">Barcha statuslar</option>
-                                <option value="lead">Yangi lidlar</option>
-                                <option value="contacted">Muzokarada</option>
-                                <option value="proposal">Taklif berilgan</option>
-                                <option value="won">Yutildi (Muvaffaqiyatli)</option>
-                                <option value="lost">Boy berildi</option>
-                            </select>
-                        </div>
-                        <div style="min-width: 160px;">
-                            <select id="crm-custlist-operator-filter" class="form-control" style="height: 42px; background-color: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); color: var(--text-main); border-radius: 8px;">
-                                <option value="">Barcha operatorlar</option>
-                            </select>
-                        </div>
-                        <div style="min-width: 150px;">
-                            <select id="crm-custlist-source-filter" class="form-control" style="height: 42px; background-color: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); color: var(--text-main); border-radius: 8px;">
-                                <option value="">Barcha manbalar</option>
-                                <option value="telegram">Telegram</option>
-                                <option value="instagram">Instagram</option>
-                                <option value="telephony">Telefoniya</option>
-                                <option value="manual">Qo'lda kiritilgan</option>
+                        <div style="min-width: 180px;">
+                            <select id="crm-clientlist-type-filter" class="form-control" style="height: 42px; background-color: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); color: var(--text-main); border-radius: 8px;" onchange="CRM.renderCustomersView()">
+                                <option value="">Barcha mijozlar</option>
+                                <option value="corporate">Faqat Kompaniyalar</option>
+                                <option value="individual">Faqat Jismoniy shaxslar</option>
                             </select>
                         </div>
                     </div>
@@ -2032,6 +2012,57 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" onclick="closeModal('crm-modal')">Bekor qilish</button>
                     <button type="submit" class="btn btn-primary">Qo'shish</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 1.1. ALOHIDA MIJOZLAR BAZASI - YANGI MIJOZ QO'SHISH / TAHRIRLASH MODALI -->
+    <div class="modal" id="client-modal">
+        <div class="modal-content" style="max-width: 540px;">
+            <div class="modal-header">
+                <h3 id="client-modal-title"><i class="fas fa-user-plus" style="color: var(--accent); margin-right: 8px;"></i> Yangi Mijoz Qo'shish</h3>
+                <button class="close-modal-btn" onclick="closeModal('client-modal')">&times;</button>
+            </div>
+            <form id="client-form" onsubmit="CRM.saveClientForm(event)">
+                <input type="hidden" id="client-id" value="">
+                <div class="modal-body" style="display: flex; flex-direction: column; gap: 14px;">
+                    <div class="form-group">
+                        <label for="client-name" style="font-weight: 500;">Mijoz F.I.Sh / Nomi <span style="color:var(--danger)">*</span></label>
+                        <input type="text" id="client-name" class="form-control" required placeholder="Masalan: Sardor Komilov">
+                    </div>
+                    <div class="form-group">
+                        <label for="client-company" style="font-weight: 500;">Kompaniya / Tashkilot nomi</label>
+                        <input type="text" id="client-company" class="form-control" placeholder="Masalan: Stroy Lyuks MCHJ (ixtiyoriy)">
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                        <div class="form-group">
+                            <label for="client-phone" style="font-weight: 500;">Asosiy Telefon <span style="color:var(--danger)">*</span></label>
+                            <input type="text" id="client-phone" class="form-control" required placeholder="+998 90 123 45 67">
+                        </div>
+                        <div class="form-group">
+                            <label for="client-phone2" style="font-weight: 500;">Qo'shimcha Telefon</label>
+                            <input type="text" id="client-phone2" class="form-control" placeholder="+998 90 999 88 77">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="client-address" style="font-weight: 500;">Manzil / Hudud</label>
+                        <input type="text" id="client-address" class="form-control" placeholder="Masalan: Toshkent sh., Chilonzor tumani">
+                    </div>
+                    <div class="form-group">
+                        <label for="client-operator" style="font-weight: 500;">Mas'ul Xodim / Operator</label>
+                        <select id="client-operator" class="form-control class-operator-select">
+                            <option value="">Tanlanmagan</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="client-notes" style="font-weight: 500;">Izoh / Eslatma</label>
+                        <textarea id="client-notes" class="form-control" rows="2" placeholder="Mijoz haqida qo'shimcha eslatmalar..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer" style="margin-top: 10px;">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('client-modal')">Bekor qilish</button>
+                    <button type="submit" class="btn btn-primary" id="btn-save-client"><i class="fas fa-save" style="margin-right: 6px;"></i> Saqlash</button>
                 </div>
             </form>
         </div>

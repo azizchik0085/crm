@@ -59,7 +59,8 @@ const DEFAULT_DATA = {
         { id: 't6', type: 'income', category: 'Xizmat ko\'rsatish', amount: 4200000, date: '2026-06-19', description: 'Konsultatsiya va sozlash ishlari' }
     ],
     calls: [],
-    receipts: []
+    receipts: [],
+    clients: []
 };
 
 const STORAGE_KEY = 'erp_crm_system_data';
@@ -74,6 +75,7 @@ const AppStorage = {
         }
         try {
             const data = JSON.parse(stored);
+            if (!data.clients) data.clients = [];
             // Agar foydalanuvchida eski localStorage kesh bo'lsa va unda Supabase ulanmagan bo'lsa, yangi defaultni yozamiz
             if (data && data.settings && !data.settings.supabaseUrl) {
                 data.settings.supabaseUrl = DEFAULT_DATA.settings.supabaseUrl;

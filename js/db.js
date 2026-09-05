@@ -144,6 +144,55 @@ window.DB = {
         AppStorage.save(data);
     },
 
+    // --- ALOHIDA HAQIQIY MIJOZLAR (CLIENTS REGISTRY) OPERATSIYALARI ---
+    getClients: async function() {
+        try {
+            const response = await fetch('/api/clients');
+            if (!response.ok) throw new Error("HTTP error " + response.status);
+            const data = await response.json();
+            AppStorage.updateKey('clients', data);
+            return data;
+        } catch (e) {
+            console.warn("Backend-dan mijozlar bazasini yuklab bo'lmadi, keshdan o'qiladi:", e);
+            return AppStorage.load().clients || [];
+        }
+    },
+
+    saveClient: async function(client) {
+        try {
+            const response = await fetch('/api/clients', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(client)
+            });
+            if (!response.ok) throw new Error("HTTP error " + response.status);
+        } catch (e) {
+            console.error("Backend-ga mijozni saqlashda xatolik:", e);
+        }
+        const data = AppStorage.load();
+        if (!data.clients) data.clients = [];
+        const index = data.clients.findIndex(c => c.id === client.id);
+        if (index > -1) data.clients[index] = client;
+        else data.clients.unshift(client);
+        AppStorage.save(data);
+    },
+
+    deleteClient: async function(id) {
+        try {
+            const response = await fetch(`/api/clients/${id}`, {
+                method: 'DELETE'
+            });
+            if (!response.ok) throw new Error("HTTP error " + response.status);
+        } catch (e) {
+            console.error("Backend-dan mijozni o'chirishda xatolik:", e);
+        }
+        const data = AppStorage.load();
+        if (data.clients) {
+            data.clients = data.clients.filter(c => c.id !== id);
+            AppStorage.save(data);
+        }
+    },
+
     // --- OMBORXONA (INVENTORY) OPERATSIYALARI ---
     _inventoryCache: null,
 
