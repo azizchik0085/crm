@@ -264,24 +264,27 @@ window.MobileApp = {
             if (resp.ok) {
                 const data = await resp.json();
                 if (data && data.ok) {
-                    if (document.getElementById('m-kpi-clients')) {
-                        document.getElementById('m-kpi-clients').textContent = `${data.clients_count || 0} ta`;
+                    if (document.getElementById('m-kpi-ustalar')) {
+                        document.getElementById('m-kpi-ustalar').textContent = `${data.ustalar_count || 0} ta`;
                     }
-                    if (document.getElementById('m-kpi-sales')) {
-                        const sum = Number(data.today_sales || 0);
-                        document.getElementById('m-kpi-sales').textContent = `${sum.toLocaleString('uz-UZ')} so'm`;
-                    }
-                    if (document.getElementById('m-kpi-inventory')) {
-                        document.getElementById('m-kpi-inventory').textContent = `${data.inventory_count || 0} ta`;
-                    }
-                    if (document.getElementById('m-kpi-receipts')) {
-                        document.getElementById('m-kpi-receipts').textContent = `${data.today_receipts_count || 0} ta`;
+                    if (document.getElementById('m-kpi-qurilish')) {
+                        document.getElementById('m-kpi-qurilish').textContent = `${data.qurilish_count || 0} ta`;
                     }
                 }
             }
         } catch(e) {
             console.warn('Dashboard load error:', e);
         }
+    },
+
+    openCategory: function(catName) {
+        this.switchView('clients');
+        setTimeout(() => {
+            const pill = document.querySelector(`.filter-pill[data-cat="${catName}"]`);
+            if (pill) {
+                this.setClientCategoryFilter(catName, pill);
+            }
+        }, 120);
     },
 
     renderHomeActions: function() {
@@ -356,6 +359,21 @@ window.MobileApp = {
             const clients = await resp.json();
             this.clientsCache = clients || [];
             this.renderClientsList(this.clientsCache);
+
+            const uCount = this.clientsCache.filter(c => {
+                const cat = (c.category || (c.company ? 'qurilish' : 'ustalar')).toLowerCase();
+                return cat !== 'qurilish';
+            }).length;
+            const qCount = this.clientsCache.filter(c => {
+                const cat = (c.category || (c.company ? 'qurilish' : 'ustalar')).toLowerCase();
+                return cat === 'qurilish';
+            }).length;
+            if (document.getElementById('m-kpi-ustalar')) {
+                document.getElementById('m-kpi-ustalar').textContent = `${uCount} ta`;
+            }
+            if (document.getElementById('m-kpi-qurilish')) {
+                document.getElementById('m-kpi-qurilish').textContent = `${qCount} ta`;
+            }
         } catch (err) {
             listEl.innerHTML = `<div style="text-align: center; padding: 24px; color: var(--danger); font-size: 13px;">${err.message}</div>`;
         }

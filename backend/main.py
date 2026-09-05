@@ -4394,38 +4394,21 @@ def get_mobile_dashboard(request: Request):
         return {"ok": False, "detail": "Unauthorized"}
         
     try:
-        # Clients count
-        c_res = supabase_req("GET", f"customers?select=id&company_id=eq.{company_id}&source=eq.client_directory")
-        clients_count = len(c_res) if isinstance(c_res, list) else 0
-        
-        # Today's sales
-        import datetime
-        now = datetime.datetime.now(datetime.timezone.utc)
-        today_start = now.strftime("%Y-%m-%dT00:00:00Z")
-        
-        recs = supabase_req("GET", f"receipts?select=total_amount,created_at&company_id=eq.{company_id}&created_at=gte.{today_start}&order=created_at.desc&limit=100")
-        today_sum = 0.0
-        today_count = 0
-        if isinstance(recs, list):
-            today_count = len(recs)
-            for r in recs:
-                today_sum += float(r.get("total_amount") or 0)
-                
-        # Inventory count
-        inv_count = 0
-        try:
-            inv_all = supabase_req("GET", f"inventory?select=id&company_id=eq.{company_id}")
-            if isinstance(inv_all, list):
-                inv_count = len(inv_all)
-        except Exception:
-            pass
+        clients = get_clients(request) or []
+        ustalar_count = 0
+        qurilish_count = 0
+        for c in clients:
+            cat = str(c.get("category") or ("qurilish" if c.get("company") else "ustalar")).lower()
+            if "qurilish" in cat:
+                qurilish_count += 1
+            else:
+                ustalar_count += 1
 
         return {
             "ok": True,
-            "clients_count": clients_count,
-            "today_sales": today_sum,
-            "today_receipts_count": today_count,
-            "inventory_count": inv_count,
+            "ustalar_count": ustalar_count,
+            "qurilish_count": qurilish_count,
+            "clients_count": len(clients),
             "company_id": company_id
         }
     except Exception as e:
