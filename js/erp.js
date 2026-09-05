@@ -1038,6 +1038,20 @@ window.HR = {
             permContainer.innerHTML = html;
         }
         
+        const mPermContainer = document.getElementById('add-role-mobile-permissions-container');
+        if (mPermContainer) {
+            let mhtml = '';
+            this.ALL_MOBILE_PERMISSIONS.forEach(p => {
+                mhtml += `
+                    <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: #38bdf8; cursor: pointer; user-select: none;">
+                        <input type="checkbox" name="new-role-mobile-perm" value="${p.key}" style="width: 14px; height: 14px;" checked>
+                        ${p.label}
+                    </label>
+                `;
+            });
+            mPermContainer.innerHTML = mhtml;
+        }
+        
         this.renderRolesList();
         showModal('hr-roles-modal');
     },
@@ -1055,6 +1069,7 @@ window.HR = {
             roles.forEach((role, idx) => {
                 const roleName = typeof role === 'string' ? role : role.name;
                 const rolePerms = typeof role === 'string' ? [] : (role.permissions || []);
+                const mobilePerms = typeof role === 'string' ? [] : (role.mobile_permissions || []);
                 
                 html += `
                     <div class="role-item" style="border: 1px solid var(--border-color); border-radius: 8px; background: rgba(255,255,255,0.02); overflow: hidden; margin-bottom: 10px;">
@@ -1063,19 +1078,41 @@ window.HR = {
                                 <i class="fas fa-chevron-right" id="role-chevron-${idx}" style="font-size: 10px; transition: transform 0.2s;"></i> ${roleName}
                             </span>
                             <div style="display: flex; gap: 8px; align-items: center;">
-                                <span style="font-size: 11px; color: var(--text-muted);">${rolePerms.length} ta ruxsatnoma</span>
+                                <span style="font-size: 11px; background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 4px; color: var(--text-muted);">🖥 ${rolePerms.length} ta</span>
+                                <span style="font-size: 11px; background: rgba(56,189,248,0.12); color: #38bdf8; padding: 2px 6px; border-radius: 4px; font-weight: 600;">📱 ${mobilePerms.length} ta mobil</span>
                                 <button type="button" class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); HR.deleteRole('${roleName.replace(/'/g, "\\'")}')" style="padding: 4px 8px; min-width: auto; height: auto;">
                                     <i class="fas fa-trash-alt" style="color: var(--danger); font-size: 12px;"></i>
                                 </button>
                             </div>
                         </div>
-                        <div id="role-permissions-panel-${idx}" style="display: none; padding: 12px; background: rgba(0,0,0,0.15); border-top: 1px solid var(--border-color);">
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                        <div id="role-permissions-panel-${idx}" style="display: none; padding: 12px; background: rgba(0,0,0,0.2); border-top: 1px solid var(--border-color);">
+                            <!-- Desktop Permissions -->
+                            <div style="font-size: 12px; font-weight: 700; color: var(--text-muted); margin-bottom: 8px; padding-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+                                <i class="fas fa-desktop"></i> Kompyuter (Desktop) Bo'limlari
+                            </div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px;">
                                 ${this.ALL_PERMISSIONS.map(p => {
                                     const checked = rolePerms.includes(p.key) ? 'checked' : '';
                                     return `
                                         <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-main); cursor: pointer; user-select: none;">
                                             <input type="checkbox" style="width: 14px; height: 14px;" ${checked} onchange="HR.toggleRolePermission('${roleName.replace(/'/g, "\\'")}', '${p.key}', this.checked)">
+                                            ${p.label}
+                                        </label>
+                                    `;
+                                }).join('')}
+                            </div>
+
+                            <!-- Mobile Permissions -->
+                            <div style="font-size: 12px; font-weight: 700; color: #38bdf8; margin-bottom: 8px; padding-bottom: 4px; border-bottom: 1px solid rgba(56,189,248,0.2); display: flex; justify-content: space-between; align-items: center;">
+                                <span><i class="fas fa-mobile-screen"></i> Mobil Ilova (Mobile App) Funksiyalari</span>
+                                <span style="font-size: 10px; color: var(--text-muted); font-weight: normal;">Admin ruxsati</span>
+                            </div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                                ${this.ALL_MOBILE_PERMISSIONS.map(p => {
+                                    const checked = mobilePerms.includes(p.key) ? 'checked' : '';
+                                    return `
+                                        <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: #38bdf8; cursor: pointer; user-select: none;">
+                                            <input type="checkbox" style="width: 14px; height: 14px;" ${checked} onchange="HR.toggleRoleMobilePermission('${roleName.replace(/'/g, "\\'")}', '${p.key}', this.checked)">
                                             ${p.label}
                                         </label>
                                     `;
@@ -1103,6 +1140,46 @@ window.HR = {
         }
     },
 
+    toggleRoleMobilePermission: async function(roleName, permissionKey, isChecked) {
+        const data = AppStorage.load();
+        data.settings.roles = data.settings.roles || [];
+        
+        const role = data.settings.roles.find(r => {
+            const name = typeof r === 'string' ? r : r.name;
+            return name.toLowerCase() === roleName.toLowerCase();
+        });
+        
+        if (role) {
+            role.mobile_permissions = role.mobile_permissions || [];
+            if (isChecked) {
+                if (!role.mobile_permissions.includes(permissionKey)) {
+                    role.mobile_permissions.push(permissionKey);
+                }
+            } else {
+                role.mobile_permissions = role.mobile_permissions.filter(p => p !== permissionKey);
+            }
+            AppStorage.save(data);
+            this.renderRolesList();
+
+            // Sync to backend mobile permissions endpoint
+            try {
+                await fetch('/api/mobile/role-permissions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        role_name: roleName,
+                        mobile_permissions: role.mobile_permissions
+                    })
+                });
+            } catch(e) {
+                console.warn('Sync mobile perms failed:', e);
+            }
+
+            if (window.App && typeof window.App.syncSettingsToBackend === 'function') {
+                window.App.syncSettingsToBackend();
+            }
+        }
+    },
     toggleRolePermission: function(roleName, permissionKey, isChecked) {
         const data = AppStorage.load();
         data.settings.roles = data.settings.roles || [];
@@ -1154,16 +1231,24 @@ window.HR = {
             return;
         }
         
-        // Collect checked permissions
+        // Collect checked desktop permissions
         const perms = [];
         const checkboxes = document.querySelectorAll('input[name="new-role-perm"]:checked');
         checkboxes.forEach(cb => {
             perms.push(cb.value);
         });
+
+        // Collect checked mobile permissions
+        const mobilePerms = [];
+        const mCheckboxes = document.querySelectorAll('input[name="new-role-mobile-perm"]:checked');
+        mCheckboxes.forEach(cb => {
+            mobilePerms.push(cb.value);
+        });
         
         data.settings.roles.push({
             name: roleName,
-            permissions: perms
+            permissions: perms,
+            mobile_permissions: mobilePerms
         });
         AppStorage.save(data);
         
@@ -1211,6 +1296,18 @@ window.HR = {
         }
     },
     
+    ALL_MOBILE_PERMISSIONS: [
+        { key: 'm_crm', label: '📱 Mijozlar bazasi (CRM)' },
+        { key: 'm_regos_cards', label: '📱 REGOS Kartalari' },
+        { key: 'm_receipts', label: '📱 Xarid Cheklari' },
+        { key: 'm_bonus', label: '📱 Bonus Boshqarish (+/-)' },
+        { key: 'm_erp', label: '📱 Omborxona (ERP)' },
+        { key: 'm_scanner', label: '📱 Shtrix-kod / QR Skaner' },
+        { key: 'm_kassa', label: '📱 Kassa & Savdo' },
+        { key: 'm_telephony', label: '📱 Telefoniya' },
+        { key: 'm_chats', label: '📱 Muloqotlar' },
+        { key: 'm_finance', label: '📱 Moliya' }
+    ],
     ALL_PERMISSIONS: [
         { key: 'crm', label: 'Mijozlar (CRM)' },
         { key: 'telephony', label: 'Telefoniya' },

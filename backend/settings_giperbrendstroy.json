@@ -1,0 +1,190 @@
+{
+    "roles": [
+        {
+            "name": "Sotuvchi",
+            "permissions": [
+                "crm",
+                "telephony",
+                "chats",
+                "erp",
+                "receipts",
+                "seniklar",
+                "kassa"
+            ],
+            "mobile_permissions": [
+                "m_crm",
+                "m_regos_cards",
+                "m_receipts",
+                "m_bonus",
+                "m_erp",
+                "m_scanner",
+                "m_kassa"
+            ]
+        },
+        {
+            "name": "Omborchi",
+            "permissions": [
+                "erp",
+                "receipts",
+                "seniklar",
+                "kassa"
+            ],
+            "mobile_permissions": [
+                "m_erp",
+                "m_scanner",
+                "m_receipts"
+            ]
+        },
+        {
+            "name": "Operator",
+            "permissions": [
+                "crm",
+                "telephony",
+                "chats",
+                "erp",
+                "receipts",
+                "seniklar"
+            ],
+            "mobile_permissions": [
+                "m_crm",
+                "m_regos_cards",
+                "m_receipts",
+                "m_telephony",
+                "m_chats"
+            ]
+        },
+        {
+            "name": "Kassir",
+            "permissions": [
+                "receipts",
+                "seniklar",
+                "kassa"
+            ],
+            "mobile_permissions": [
+                "m_kassa",
+                "m_receipts",
+                "m_bonus",
+                "m_scanner",
+                "m_crm"
+            ]
+        },
+        {
+            "name": "Direktor",
+            "permissions": [
+                "crm",
+                "telephony",
+                "erp",
+                "finance",
+                "chats",
+                "hr",
+                "settings",
+                "receipts",
+                "seniklar",
+                "kassa"
+            ],
+            "mobile_permissions": [
+                "m_crm",
+                "m_regos_cards",
+                "m_receipts",
+                "m_bonus",
+                "m_erp",
+                "m_scanner",
+                "m_kassa",
+                "m_telephony",
+                "m_chats",
+                "m_finance"
+            ]
+        },
+        {
+            "name": "ROP",
+            "permissions": [
+                "crm",
+                "telephony",
+                "erp",
+                "chats",
+                "hr",
+                "receipts",
+                "tasks"
+            ],
+            "mobile_permissions": [
+                "m_crm",
+                "m_regos_cards",
+                "m_receipts",
+                "m_bonus",
+                "m_scanner",
+                "m_telephony",
+                "m_chats"
+            ]
+        },
+        {
+            "name": "MARKETOLOG",
+            "permissions": [
+                "crm",
+                "erp",
+                "marketing",
+                "documents",
+                "telephony",
+                "chats",
+                "receipts",
+                "tasks",
+                "service"
+            ],
+            "mobile_permissions": [
+                "m_crm",
+                "m_regos_cards",
+                "m_receipts",
+                "m_chats"
+            ]
+        },
+        {
+            "name": "Kuryer",
+            "permissions": [],
+            "mobile_permissions": [
+                "m_receipts",
+                "m_scanner"
+            ]
+        }
+    ],
+    "sip_wss": "",
+    "currency": "UZS",
+    "sip_user": "",
+    "enable_crm": true,
+    "sip_server": "",
+    "ai_provider": "local",
+    "regos_token": "https://integration.regos.uz/gateway/out/bbdef54d1a37402eb4a0597d7da2c4b7",
+    "taplink_web": "",
+    "amocrm_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImp0aSI6ImJiMjRhMGU3MGIwM2MwMjIxMGM0ZDU0Y2UxODA4MDkzZTdiMzAyNTc5NDRhZjViMGM1ZDAxNzM3NDVjMTc0NTQzYzk1OTUyMTdkNzY0YTEzIn0.eyJhdWQiOiI5ZDRjNzhmNi1mN2JkLTQ4YTEtOTIzNC1mODk2MGMwYjQ1ODIiLCJqdGkiOiJiYjI0YTBlNzBiMDNjMDIyMTBjNGQ1NGNlMTgwODA5M2U3YjMwMjU3OTQ0YWY1YjBjNWQwMTczNzQ1YzE3NDU0M2M5NTk1MjE3ZDc2NGExMyIsImlhdCI6MTc4MjI3NjQwMCwibmJmIjoxNzgyMjc2NDAwLCJleHAiOjE4MDM1MTM2MDAsInN1YiI6IjEzODU1MTc0IiwiZ3JhbnRfdHlwZSI6IiIsImFjY291bnRfaWQiOjMzMDY4NzM0LCJiYXNlX2RvbWFpbiI6ImFtb2NybS5ydSIsInZlcnNpb24iOjIsInNjb3BlcyI6WyJwdXNoX25vdGlmaWNhdGlvbnMiLCJmaWxlcyIsImNybSIsImZpbGVzX2RlbGV0ZSIsIm5vdGlmaWNhdGlvbnMiXSwiaGFzaF91dWlkIjoiNGY3Njc5MGUtNmVlMy00MGQ2LWIwYjMtZmZhNGM3M2UzMTM1IiwiYXBpX2RvbWFpbiI6ImFwaS1iLmFtb2NybS5ydSJ9.Aez6uwy_TgXMjjvkoM6NwaiWzvM8HN69SA7Bj0qJoKwg_wQvsezRw64cQrgR3_mxWN8JdEWRMnen0F-tjI5ABwphMA1FrhfeCc9pgaf_vjI_Otv4t_BU__b_BDJSjtlDdhiU6y0pkxLbPWMoV5tM-m0hMNXXpRGL5SSNo29Dmyfh5Hcn8M9TEqjHPRych5Jt57PQMz1hcVJJqgJltlGMWUT70FsBWULMItolEW2uXgRnR0fOgbCou6lDC3rBnnEpG5eF6JkiqFyTw9ruFrACTP0mLDZAX_Y0EeHzmQwJwJX5GGQM7kYrLl6hN55mYZRu9hJwAWOfRHH0VBN5Ix7AlQ",
+    "company_name": "",
+    "enable_kassa": true,
+    "groq_api_key": "",
+    "sip_password": "",
+    "supabase_key": "",
+    "supabase_url": "",
+    "taplink_desc": "BARCHA QURILISH MAHSULOTLARI BIR JOYDA",
+    "taplink_logo": "",
+    "ai_auto_reply": true,
+    "max_employees": 25,
+    "taplink_phone": "+998787074240",
+    "gemini_api_key": "AQ.Ab8RN6I6AxpciBpgJL_PJba5CYDBW6eCLaTrRtMSBTzE0d6qGw",
+    "openai_api_key": "",
+    "regos_endpoint": "https://integration.regos.uz/gateway/out/bbdef54d1a37402eb4a0597d7da2c4b7",
+    "taplink_slogan": "SIFATLI-MAXSULOT  ISHONCHLI-XAMKOR",
+    "telegram_token": "8652170204:AAEX1-1Bs5Y_72lTkrq6XMhjyJDAczkVhBI",
+    "instagram_token": "",
+    "taplink_youtube": "https://www.youtube.com/@giperbrendstroy1607",
+    "amocrm_subdomain": "giperstroy01",
+    "enable_warehouse": true,
+    "taplink_telegram": "https://t.me/ROPFERUZA",
+    "taplink_whatsapp": "+998914474240",
+    "meta_access_token": "",
+    "taplink_instagram": "https://www.instagram.com/giperbrendstroy/",
+    "meta_ad_account_id": "",
+    "telephony_provider": "sarkor",
+    "amocrm_lead_creation": false,
+    "amocrm_operators_map": {
+        "MADINA": "e_1782205397506",
+        "GULSHODA": "e_1782204705905",
+        "YULDUZOY": "e_1782205956987",
+        "ERGASHOVA FERUZA": "e_1782719372462"
+    }
+}

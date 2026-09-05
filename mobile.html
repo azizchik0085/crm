@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>SmartCore Mobile</title>
+
+    <!-- PWA & Mobile Web App Meta -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="SmartCore">
+    <meta name="theme-color" content="#090d16">
+    <meta name="mobile-web-app-capable" content="yes">
+    <link rel="manifest" href="/manifest-mobile.json">
+    <link rel="apple-touch-icon" href="/assets/icon-192.png">
+
+    <!-- Fonts & Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Mobile Custom Stylesheet -->
+    <link rel="stylesheet" href="/css/mobile-app.css">
+</head>
+<body>
+
+    <!-- ========================================== -->
+    <!-- 1. MOBIL LOGIN VIEW                        -->
+    <!-- ========================================== -->
+    <div id="mobile-login-view" style="display: none; padding: 40px 20px; min-height: 100vh; background: radial-gradient(circle at top, #1e293b 0%, #090d16 100%);">
+        <div style="max-width: 360px; margin: 40px auto 0; text-align: center;">
+            <div style="width: 72px; height: 72px; border-radius: 20px; background: linear-gradient(135deg, #0ea5e9, #6366f1); display: inline-flex; align-items: center; justify-content: center; color: #fff; font-size: 32px; box-shadow: 0 10px 25px rgba(14, 165, 233, 0.4); margin-bottom: 20px;">
+                <i class="fas fa-cubes"></i>
+            </div>
+            <h1 style="font-size: 24px; font-weight: 800; color: #fff; margin-bottom: 6px;">SmartCore Mobile</h1>
+            <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 28px;">Kompaniya xodimlari uchun mobil ilova</p>
+
+            <div id="m-login-error" style="display: none; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #f87171; font-size: 13px; padding: 12px; border-radius: 10px; margin-bottom: 16px; text-align: left;"></div>
+
+            <form onsubmit="MobileApp.login(event)" style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 20px; padding: 22px; text-align: left; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+                
+                <div class="form-group">
+                    <label><i class="fas fa-building" style="margin-right: 4px;"></i> Kompaniya</label>
+                    <select id="m-login-company" class="form-control">
+                        <option value="giperbrendstroy" selected>Giper Brend Stroy</option>
+                        <option value="protechctiy">Protech City</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label><i class="fas fa-user" style="margin-right: 4px;"></i> Login (Foydalanuvchi nomi)</label>
+                    <input type="text" id="m-login-username" class="form-control" placeholder="Masalan: admin yoki sotuvchi" required autocomplete="username">
+                </div>
+
+                <div class="form-group" style="margin-bottom: 20px;">
+                    <label><i class="fas fa-lock" style="margin-right: 4px;"></i> Parol</label>
+                    <input type="password" id="m-login-password" class="form-control" placeholder="••••••••" required autocomplete="current-password">
+                </div>
+
+                <button type="submit" id="m-btn-login" class="btn btn-primary btn-block" style="height: 48px; font-size: 15px;">
+                    <i class="fas fa-sign-in-alt"></i> Ilovaga Kirish
+                </button>
+            </form>
+
+            <div style="margin-top: 24px; font-size: 11.5px; color: var(--text-muted);">
+                SmartCore ERP & CRM • Versiya 2.5
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- 2. MOBIL HEADER                           -->
+    <!-- ========================================== -->
+    <header class="mobile-header" id="mobile-app-header" style="display: none;">
+        <div class="header-brand">
+            <div class="header-logo">
+                <i class="fas fa-cubes"></i>
+            </div>
+            <div class="header-title-box">
+                <h1>SmartCore</h1>
+                <div class="header-company-badge">
+                    <i class="fas fa-circle" style="font-size: 7px; color: #10b981;"></i>
+                    <span id="m-header-company">Giper Brend Stroy</span>
+                </div>
+            </div>
+        </div>
+        <div class="header-actions">
+            <button class="header-btn" title="Yangilash" onclick="MobileApp.switchView(MobileApp.activeView)">
+                <i class="fas fa-rotate-right"></i>
+            </button>
+            <button class="header-btn" title="Skaner" onclick="MobileApp.openScanner()">
+                <i class="fas fa-barcode"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- ========================================== -->
+    <!-- 3. VIEWS CONTAINER                         -->
+    <!-- ========================================== -->
+    <main id="mobile-main-views">
+
+        <!-- A. HOME (BOSH SAHIFA) VIEW -->
+        <section id="m-view-home" class="view-container">
+            
+            <!-- PWA Install Prompt Banner -->
+            <div id="mobile-install-banner" class="install-banner" style="display: none;">
+                <div class="install-banner-text">
+                    <h4><i class="fas fa-download"></i> Mobil Ilovani O'rnatish</h4>
+                    <p>Ilovani asosiy ekranga qo'shib, qulay foydalaning</p>
+                </div>
+                <button class="btn btn-primary" style="height: 36px; padding: 0 12px; font-size: 12px;" onclick="MobileApp.installPwa()">
+                    O'rnatish
+                </button>
+            </div>
+
+            <!-- KPI Cards Grid -->
+            <div class="kpi-grid">
+                <div class="kpi-card">
+                    <span class="kpi-label"><i class="fas fa-wallet" style="color: #10b981;"></i> Bugungi Savdo</span>
+                    <span class="kpi-value" id="m-kpi-sales">0 so'm</span>
+                </div>
+                <div class="kpi-card">
+                    <span class="kpi-label"><i class="fas fa-users" style="color: #38bdf8;"></i> Jami Mijozlar</span>
+                    <span class="kpi-value" id="m-kpi-clients">0 ta</span>
+                </div>
+                <div class="kpi-card">
+                    <span class="kpi-label"><i class="fas fa-receipt" style="color: #f59e0b;"></i> Bugungi Cheklar</span>
+                    <span class="kpi-value" id="m-kpi-receipts">0 ta</span>
+                </div>
+                <div class="kpi-card">
+                    <span class="kpi-label"><i class="fas fa-boxes" style="color: #a78bfa;"></i> Ombor Mahsulotlari</span>
+                    <span class="kpi-value" id="m-kpi-inventory">0 ta</span>
+                </div>
+            </div>
+
+            <!-- Quick Action Grid (Admin-controlled permissions) -->
+            <h3 style="font-size: 13px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin: 16px 0 10px;">
+                Tezkor Amallar
+            </h3>
+            <div class="actions-grid" id="m-home-actions-grid">
+                <!-- Populated dynamically based on user mobile_permissions -->
+            </div>
+
+            <!-- Quick Scan Promo Box -->
+            <div class="m-card" style="background: linear-gradient(135deg, rgba(56, 189, 248, 0.12), rgba(99, 102, 241, 0.12)); border: 1px solid rgba(56, 189, 248, 0.25); display: flex; align-items: center; justify-content: space-between; padding: 16px;">
+                <div>
+                    <h4 style="font-size: 14.5px; font-weight: 700; color: #fff; margin-bottom: 4px;">
+                        <i class="fas fa-camera" style="color: #38bdf8; margin-right: 6px;"></i> Mijoz / Mahsulot Skaneri
+                    </h4>
+                    <p style="font-size: 12px; color: var(--text-muted); margin: 0;">Mijoz kartasi yoki mahsulot shtrix-kodini kamerada skanerlang</p>
+                </div>
+                <button class="btn btn-primary" style="height: 40px; padding: 0 14px; font-size: 13px; border-radius: 12px;" onclick="MobileApp.openScanner()">
+                    <i class="fas fa-barcode"></i> Skaner
+                </button>
+            </div>
+
+            <!-- REGOS Card Quick Finder -->
+            <div class="m-card" style="margin-top: 10px; display: flex; align-items: center; justify-content: space-between;">
+                <div>
+                    <h4 style="font-size: 14px; font-weight: 700; color: #fff; margin-bottom: 2px;">
+                        <i class="fas fa-id-card" style="color: #10b981; margin-right: 6px;"></i> REGOS Kartalari
+                    </h4>
+                    <p style="font-size: 11.5px; color: var(--text-muted); margin: 0;">REGOS-dagi chegirma kartasini qidirish va bog'lash</p>
+                </div>
+                <button class="btn btn-secondary" style="height: 38px; padding: 0 12px; font-size: 12px;" onclick="MobileApp.openAddCardModal()">
+                    Qidirish
+                </button>
+            </div>
+
+        </section>
+
+        <!-- B. CLIENTS (MIJOZLAR) VIEW -->
+        <section id="m-view-clients" class="view-container">
+            <!-- Search Bar -->
+            <div class="m-search-box">
+                <div class="m-search-input-wrapper">
+                    <i class="fas fa-search m-search-icon"></i>
+                    <input type="text" id="m-clients-search" class="m-search-input" placeholder="Mijoz ismi, telefon, shtrix-kod..." oninput="MobileApp.filterClients()">
+                </div>
+                <button class="m-search-scan-btn" title="Karta skaneri" onclick="MobileApp.openScanner()">
+                    <i class="fas fa-barcode"></i>
+                </button>
+            </div>
+
+            <!-- Filter Pills (Barchasi, Ustalar, Qurilish obyekti) -->
+            <div class="filter-pills">
+                <button class="filter-pill active" data-cat="all" onclick="MobileApp.setClientCategoryFilter('all', this)">
+                    <i class="fas fa-list" style="margin-right: 4px;"></i> Barchasi
+                </button>
+                <button class="filter-pill" data-cat="ustalar" onclick="MobileApp.setClientCategoryFilter('ustalar', this)">
+                    <i class="fas fa-hammer" style="margin-right: 4px;"></i> Ustalar
+                </button>
+                <button class="filter-pill" data-cat="qurilish" onclick="MobileApp.setClientCategoryFilter('qurilish', this)">
+                    <i class="fas fa-building" style="margin-right: 4px;"></i> Qurilish Obyekti
+                </button>
+            </div>
+
+            <!-- Clients List -->
+            <div id="m-clients-list">
+                <!-- Dynamically populated -->
+            </div>
+
+            <!-- Floating Action Button to add REGOS card -->
+            <button class="m-fab" title="Yangi mijoz qo'shish" onclick="MobileApp.openAddCardModal()">
+                <i class="fas fa-plus"></i>
+            </button>
+        </section>
+
+        <!-- C. INVENTORY (OMBOR) VIEW -->
+        <section id="m-view-inventory" class="view-container">
+            <div class="m-search-box">
+                <div class="m-search-input-wrapper">
+                    <i class="fas fa-search m-search-icon"></i>
+                    <input type="text" id="m-inventory-search" class="m-search-input" placeholder="Tovar nomi yoki SKU..." oninput="MobileApp.filterInventory()">
+                </div>
+            </div>
+
+            <div id="m-inventory-list">
+                <!-- Dynamically populated -->
+            </div>
+        </section>
+
+        <!-- D. RECEIPTS (CHEKLAR) VIEW -->
+        <section id="m-view-receipts" class="view-container">
+            <h3 style="font-size: 14px; font-weight: 700; color: var(--text-muted); margin-bottom: 12px;">
+                <i class="fas fa-receipt"></i> So'nggi Sotuv Cheklari
+            </h3>
+            <div id="m-all-receipts-list">
+                <!-- Dynamically populated -->
+            </div>
+        </section>
+
+        <!-- E. PROFILE (PROFIL) VIEW -->
+        <section id="m-view-profile" class="view-container">
+            <div class="m-card" style="text-align: center; padding: 24px 16px;">
+                <div style="width: 64px; height: 64px; border-radius: 20px; background: linear-gradient(135deg, #6366f1, #38bdf8); display: inline-flex; align-items: center; justify-content: center; color: #fff; font-size: 26px; font-weight: 800; margin-bottom: 12px; box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);">
+                    <i class="fas fa-user"></i>
+                </div>
+                <h3 id="m-profile-name" style="font-size: 18px; font-weight: 800; color: #fff; margin-bottom: 2px;">Foydalanuvchi</h3>
+                <span id="m-profile-role" class="badge" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; font-weight: 700; font-size: 12px; padding: 4px 12px; border-radius: 20px; display: inline-block;">
+                    Xodim
+                </span>
+            </div>
+
+            <div class="m-card">
+                <h4 style="font-size: 13.5px; font-weight: 700; color: var(--text-main); margin-bottom: 10px;">
+                    <i class="fas fa-shield-alt" style="color: #10b981; margin-right: 6px;"></i> Admin Ruxsatnomalari
+                </h4>
+                <p style="font-size: 11.5px; color: var(--text-muted); margin-bottom: 12px;">
+                    Admin tomonidan ushbu xodim roliga berilgan mobil funksiyalar:
+                </p>
+                <div id="m-profile-permissions-list">
+                    <!-- Dynamically populated -->
+                </div>
+            </div>
+
+            <div class="m-card">
+                <button class="btn btn-danger btn-block" onclick="MobileApp.logout()">
+                    <i class="fas fa-right-from-bracket"></i> Ilovadan Chiqish
+                </button>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- ========================================== -->
+    <!-- 4. BOTTOM NAVIGATION                       -->
+    <!-- ========================================== -->
+    <nav class="mobile-nav" id="mobile-app-nav" style="display: none;">
+        <!-- Dynamically rendered based on active permissions -->
+    </nav>
+
+    <!-- ========================================== -->
+    <!-- 5. CLIENT DETAIL BOTTOM SHEET              -->
+    <!-- ========================================== -->
+    <div id="m-client-sheet" class="m-modal">
+        <div class="m-sheet">
+            <div class="m-sheet-header">
+                <div class="m-sheet-drag-handle"></div>
+                <div class="m-sheet-title">Mijoz Tafsilotlari</div>
+                <button class="m-sheet-close" onclick="MobileApp.closeClientDetail()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="m-sheet-content">
+                <!-- Client Info Card -->
+                <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 14px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 14px; padding: 14px;">
+                    <div id="m-sheet-client-avatar" class="client-avatar" style="width: 50px; height: 50px; font-size: 20px;">M</div>
+                    <div style="flex: 1;">
+                        <div id="m-sheet-client-name" style="font-size: 17px; font-weight: 800; color: var(--text-main); margin-bottom: 4px;">Mijoz Ismi</div>
+                        <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                            <span id="m-sheet-client-cat" class="badge-ustalar">Ustalar</span>
+                            <span class="badge-barcode"><i class="fas fa-barcode"></i> <span id="m-sheet-client-barcode">-</span></span>
+                        </div>
+                    </div>
+                    <a id="m-sheet-client-phone-link" href="#" style="width: 44px; height: 44px; border-radius: 12px; background: #10b981; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 17px; text-decoration: none; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);">
+                        <i class="fas fa-phone-alt"></i>
+                    </a>
+                </div>
+
+                <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 14px;">
+                    <span><i class="fas fa-phone"></i> Telefon: <strong id="m-sheet-client-phone" style="color: var(--text-main);">-</strong></span>
+                </div>
+
+                <!-- Bonus Balance Card & Management -->
+                <div class="m-card" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(56, 189, 248, 0.08)); border-color: rgba(16, 185, 129, 0.3);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <span style="font-size: 12.5px; font-weight: 600; color: #10b981;">
+                            <i class="fas fa-gift"></i> Joriy Bonus Balansi:
+                        </span>
+                        <span id="m-sheet-bonus-val" style="font-size: 20px; font-weight: 800; color: #10b981;">0 so'm</span>
+                    </div>
+
+                    <!-- Bonus Action Buttons -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 10px;">
+                        <button class="btn btn-secondary" style="height: 36px; font-size: 12px; padding: 0;" onclick="MobileApp.toggleBonusForm('add')">
+                            <i class="fas fa-plus" style="color: #10b981;"></i> Qo'shish
+                        </button>
+                        <button class="btn btn-secondary" style="height: 36px; font-size: 12px; padding: 0;" onclick="MobileApp.toggleBonusForm('subtract')">
+                            <i class="fas fa-minus" style="color: #ef4444;"></i> Ayirish
+                        </button>
+                        <button class="btn btn-secondary" style="height: 36px; font-size: 12px; padding: 0;" onclick="MobileApp.toggleBonusForm('set')">
+                            <i class="fas fa-equals" style="color: #38bdf8;"></i> Belgilash
+                        </button>
+                    </div>
+
+                    <!-- Inline Bonus Adjust Form (Hidden by default) -->
+                    <div id="m-bonus-action-box" style="display: none; margin-top: 14px; padding-top: 14px; border-top: 1px dashed var(--border-color);">
+                        <input type="hidden" id="m-bonus-type" value="add">
+                        <div id="m-bonus-form-title" style="font-size: 13px; font-weight: 700; color: var(--text-main); margin-bottom: 8px;">Bonus Qo'shish</div>
+                        <div class="form-group" style="margin-bottom: 8px;">
+                            <label>Summa (so'm)</label>
+                            <input type="number" id="m-bonus-amount" class="form-control" placeholder="Masalan: 50000" inputmode="numeric">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 10px;">
+                            <label>Izoh (Sabab)</label>
+                            <input type="text" id="m-bonus-note" class="form-control" placeholder="Masalan: Maxsus xarid bonusi">
+                        </div>
+                        <div style="display: flex; gap: 8px;">
+                            <button type="button" class="btn btn-secondary" style="flex: 1; height: 38px; font-size: 13px;" onclick="MobileApp.toggleBonusForm(null)">Bekor qilish</button>
+                            <button type="button" id="m-btn-save-bonus" class="btn btn-primary" style="flex: 1; height: 38px; font-size: 13px;" onclick="MobileApp.saveBonusAdjustment(event)">Saqlash</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Purchases Summary Row -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin: 16px 0 8px;">
+                    <h4 style="font-size: 14px; font-weight: 700; color: var(--text-main);">
+                        <i class="fas fa-receipt" style="color: #38bdf8;"></i> Xarid Cheklari (REGOS & ERP)
+                    </h4>
+                    <span id="m-sheet-receipts-count" class="badge" style="background: rgba(255,255,255,0.08); color: var(--text-muted); font-size: 11px; padding: 2px 8px;">0 ta</span>
+                </div>
+                <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">
+                    Jami xarid summasi: <strong id="m-sheet-total-purchases" style="color: #10b981; font-size: 13px;">0 so'm</strong>
+                </div>
+
+                <!-- Receipts list loaded dynamically from /api/clients/{id}/receipts -->
+                <div id="m-sheet-receipts-list">
+                    <!-- Receipts will render here -->
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- 6. CAMERA SCANNER MODAL (BARCODE / QR)    -->
+    <!-- ========================================== -->
+    <div id="m-scanner-modal" class="m-modal">
+        <div class="m-sheet" style="max-height: 95vh;">
+            <div class="m-sheet-header">
+                <div class="m-sheet-drag-handle"></div>
+                <div class="m-sheet-title"><i class="fas fa-camera"></i> Shtrix-kod / QR Skaner</div>
+                <button class="m-sheet-close" onclick="MobileApp.closeScanner()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="m-sheet-content" style="text-align: center;">
+                <!-- Video viewport rendered by Html5Qrcode -->
+                <div id="scanner-reader"></div>
+
+                <div id="m-scanner-result" style="font-size: 12.5px; color: var(--text-muted); margin-bottom: 16px;">
+                    Skanerlash uchun kamerani shtrix-kodga qarating
+                </div>
+
+                <!-- Manual input fallback -->
+                <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 12px; padding: 12px;">
+                    <div style="font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 8px;">Yoki kodni qo'lda kiriting:</div>
+                    <form onsubmit="MobileApp.manualBarcodeSubmit(event)" style="display: flex; gap: 8px;">
+                        <input type="text" id="m-manual-barcode-input" class="form-control" placeholder="Shtrix-kod raqami" inputmode="numeric">
+                        <button type="submit" class="btn btn-primary" style="height: 44px; padding: 0 16px;">
+                            <i class="fas fa-arrow-right"></i>
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- 7. SEARCH & ADD REGOS CARD MODAL           -->
+    <!-- ========================================== -->
+    <div id="m-add-card-modal" class="m-modal">
+        <div class="m-sheet">
+            <div class="m-sheet-header">
+                <div class="m-sheet-drag-handle"></div>
+                <div class="m-sheet-title"><i class="fas fa-id-card"></i> Karta Qidirish / Qo'shish</div>
+                <button class="m-sheet-close" onclick="MobileApp.closeAddCardModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="m-sheet-content">
+                <p style="font-size: 12.5px; color: var(--text-muted); margin-bottom: 12px;">
+                    REGOS tizimidan mijoz kartasini shtrix-kod yoki telefon orqali qidiring:
+                </p>
+
+                <div style="display: flex; gap: 8px; margin-bottom: 14px;">
+                    <input type="text" id="m-regos-search-input" class="form-control" placeholder="Shtrix-kod yoki telefon...">
+                    <button type="button" id="m-btn-regos-search" class="btn btn-primary" style="width: 48px; padding: 0;" onclick="MobileApp.searchRegosCards()">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </div>
+
+                <div id="m-regos-search-results">
+                    <!-- Search results render here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Html5Qrcode Library for Camera Barcode Scanning -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+
+    <!-- Mobile App Main Script -->
+    <script src="/js/mobile-app.js"></script>
+
+    <!-- Register Service Worker for PWA Offline / Standalone Installation -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw-mobile.js')
+                    .then(reg => console.log('SmartCore Mobile SW registered'))
+                    .catch(err => console.log('SmartCore Mobile SW registration failed:', err));
+            });
+        }
+    </script>
+</body>
+</html>

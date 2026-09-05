@@ -4167,6 +4167,40 @@ async def regos_webhook(request: Request):
     
     return {"status": "success", "message": "Webhook processed successfully"}
 
+def resolve_mobile_permissions(role_str, roles_list):
+    clean_role = (role_str or "").split(";")[0].strip().lower()
+    all_mob = ["m_crm", "m_regos_cards", "m_receipts", "m_bonus", "m_erp", "m_scanner", "m_kassa", "m_telephony", "m_chats", "m_finance"]
+    if clean_role in ["admin", "superadmin", "direktor"]:
+        return all_mob
+        
+    found = None
+    if isinstance(roles_list, list):
+        for r in roles_list:
+            if isinstance(r, dict) and r.get("name", "").strip().lower() == clean_role:
+                found = r
+                break
+                
+    if found and "mobile_permissions" in found and isinstance(found["mobile_permissions"], list):
+        return found["mobile_permissions"]
+        
+    perms = (found.get("permissions") if found else []) or []
+    m_perms = []
+    if "crm" in perms:
+        m_perms.extend(["m_crm", "m_regos_cards", "m_receipts", "m_bonus", "m_scanner"])
+    if "erp" in perms:
+        m_perms.extend(["m_erp", "m_scanner"])
+    if "receipts" in perms or "kassa" in perms:
+        m_perms.extend(["m_receipts", "m_kassa", "m_scanner"])
+    if "telephony" in perms:
+        m_perms.append("m_telephony")
+    if "chats" in perms:
+        m_perms.append("m_chats")
+    if "finance" in perms:
+        m_perms.append("m_finance")
+    if not m_perms:
+        m_perms = ["m_crm", "m_scanner"]
+    return list(dict.fromkeys(m_perms))
+
 @app.post("/api/auth/login")
 def auth_login(payload: dict):
     login = payload.get("login")
@@ -4184,7 +4218,8 @@ def auth_login(payload: dict):
                 "id": "admin",
                 "name": "Super Admin",
                 "role": "superadmin",
-                "company_id": "admin"
+                "company_id": "admin",
+                "mobile_permissions": ["m_crm", "m_regos_cards", "m_receipts", "m_bonus", "m_erp", "m_scanner", "m_kassa", "m_telephony", "m_chats", "m_finance"]
             }
         }
         
@@ -4216,13 +4251,18 @@ def auth_login(payload: dict):
                 break
                 
         if found:
+            c_settings = get_company_settings(company_id, bypass_cache=True)
+            roles_list = c_settings.get("roles", [])
+            mobile_perms = resolve_mobile_permissions(found.get("role"), roles_list)
+            
             return {
                 "status": "success",
                 "user": {
                     "id": found.get("id"),
                     "name": found.get("name"),
                     "role": found.get("role"),
-                    "company_id": company_id
+                    "company_id": company_id,
+                    "mobile_permissions": mobile_perms
                 }
             }
         else:
@@ -4231,6 +4271,191 @@ def auth_login(payload: dict):
         raise he
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+# --- MOBILE APP ENDPOINTS ---
+
+MOBILE_ALL_MODULES = [
+    {"key": "m_crm", "label": "Mijozlar bazasi (CRM)", "icon": "fa-users", "desc": "Mijozlar ro'yxati, toifalar va qidiruv"},
+    {"key": "m_regos_cards", "label": "REGOS Kartalari", "icon": "fa-id-card", "desc": "Shtrix-kod orqali xaridor kartasini qidirish va biriktirish"},
+    {"key": "m_receipts", "label": "Xarid Cheklari", "icon": "fa-receipt", "desc": "Mijozning xarid cheklari va mahsulotlar tafsiloti"},
+    {"key": "m_bonus", "label": "Bonus Boshqaruvi", "icon": "fa-coins", "desc": "Bonuslarni ko'rish, qo'shish va hisobdan chiqarish"},
+    {"key": "m_erp", "label": "Omborxona (ERP)", "icon": "fa-boxes", "desc": "Mahsulotlar qoldig'i, narxlari va SKU bo'yicha qidiruv"},
+    {"key": "m_scanner", "label": "Kamera Skaneri", "icon": "fa-qrcode", "desc": "Telefon kamerasi orqali karta yoki tovar shtrix-kodini o'qish"},
+    {"key": "m_kassa", "label": "Kassa & Tezkor Savdo", "icon": "fa-cash-register", "desc": "Mobil ilovadan savdo qilish va chek chiqarish"},
+    {"key": "m_telephony", "label": "Telefoniya", "icon": "fa-phone-alt", "desc": "Mijozlarga bir bosishda qo'ng'iroq qilish"},
+    {"key": "m_chats", "label": "Muloqotlar", "icon": "fa-comments", "desc": "Telegram va Instagram chatlari"},
+    {"key": "m_finance", "label": "Moliya", "icon": "fa-wallet", "desc": "Kunlik kassa va tushumlar xulosasi"}
+]
+
+@app.get("/api/mobile/permissions")
+def get_mobile_permissions(request: Request, role: str = None, employee_id: str = None):
+    company_id = get_company_id(request)
+    settings = get_company_settings(company_id, bypass_cache=True) if company_id else settings_state
+    roles_list = settings.get("roles", [])
+    
+    target_role = role
+    if not target_role and employee_id:
+        try:
+            emps = supabase_req("GET", f"employees?id=eq.{employee_id}")
+            if emps and isinstance(emps, list) and len(emps) > 0:
+                target_role = emps[0].get("role")
+        except Exception:
+            pass
+            
+    my_perms = resolve_mobile_permissions(target_role, roles_list) if target_role else []
+    
+    return {
+        "ok": True,
+        "all_modules": MOBILE_ALL_MODULES,
+        "roles": roles_list,
+        "my_permissions": my_perms
+    }
+
+@app.post("/api/mobile/role-permissions")
+def save_mobile_role_permissions(payload: dict, request: Request):
+    company_id = get_company_id(request)
+    if not company_id:
+        raise HTTPException(status_code=400, detail="Company ID talab qilinadi")
+        
+    role_name = (payload.get("role_name") or "").strip()
+    mobile_perms = payload.get("mobile_permissions") or []
+    if not role_name:
+        raise HTTPException(status_code=400, detail="Rol nomi kiritilishi shart")
+        
+    settings = get_company_settings(company_id, bypass_cache=True)
+    roles_list = settings.get("roles", [])
+    
+    found = False
+    for r in roles_list:
+        if isinstance(r, dict) and r.get("name", "").strip().lower() == role_name.lower():
+            r["mobile_permissions"] = mobile_perms
+            found = True
+            break
+            
+    if not found:
+        roles_list.append({
+            "name": role_name,
+            "permissions": [],
+            "mobile_permissions": mobile_perms
+        })
+        
+    settings["roles"] = roles_list
+    save_company_settings(company_id, settings)
+    return {"ok": True, "message": f"{role_name} roli uchun mobil ruxsatnomalar saqlandi", "roles": roles_list}
+
+@app.get("/api/mobile/dashboard")
+def get_mobile_dashboard(request: Request):
+    company_id = get_company_id(request)
+    if not company_id:
+        return {"ok": False, "detail": "Unauthorized"}
+        
+    try:
+        # Clients count
+        c_res = supabase_req("GET", f"customers?select=id&company_id=eq.{company_id}&source=eq.client_directory")
+        clients_count = len(c_res) if isinstance(c_res, list) else 0
+        
+        # Today's sales
+        import datetime
+        now = datetime.datetime.now(datetime.timezone.utc)
+        today_start = now.strftime("%Y-%m-%dT00:00:00Z")
+        
+        recs = supabase_req("GET", f"receipts?select=total_amount,created_at&company_id=eq.{company_id}&created_at=gte.{today_start}&order=created_at.desc&limit=100")
+        today_sum = 0.0
+        today_count = 0
+        if isinstance(recs, list):
+            today_count = len(recs)
+            for r in recs:
+                today_sum += float(r.get("total_amount") or 0)
+                
+        # Inventory count
+        inv_count = 0
+        try:
+            inv_all = supabase_req("GET", f"inventory?select=id&company_id=eq.{company_id}")
+            if isinstance(inv_all, list):
+                inv_count = len(inv_all)
+        except Exception:
+            pass
+
+        return {
+            "ok": True,
+            "clients_count": clients_count,
+            "today_sales": today_sum,
+            "today_receipts_count": today_count,
+            "inventory_count": inv_count,
+            "company_id": company_id
+        }
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+@app.get("/api/mobile/barcode-lookup")
+def mobile_barcode_lookup(barcode: str, request: Request):
+    if not barcode or not barcode.strip():
+        return {"ok": False, "message": "Shtrix-kod kiritilmadi"}
+        
+    company_id = get_company_id(request)
+    clean_b = barcode.strip()
+    
+    # 1. Check local clients
+    try:
+        clients = supabase_req("GET", f"customers?company_id=eq.{company_id}&source=eq.client_directory&phone2=eq.{clean_b}")
+        if clients and isinstance(clients, list) and len(clients) > 0:
+            c = clients[0]
+            op_str = c.get("operator") or ""
+            cat = "ustalar"
+            bonus = float(c.get("value") or 0)
+            if op_str.startswith("{"):
+                try:
+                    m = json.loads(op_str)
+                    cat = m.get("category") or "ustalar"
+                    bonus = float(m.get("bonus") or bonus)
+                except Exception:
+                    pass
+            c["category"] = cat
+            c["bonus"] = bonus
+            c["barcode"] = c.get("phone2")
+            return {"ok": True, "found": True, "type": "client", "data": c}
+    except Exception as e_cl:
+        print(f"Mobile barcode lookup client error: {e_cl}")
+
+    # 2. Check REGOS retailcard
+    try:
+        settings = get_company_settings(company_id, bypass_cache=True) if company_id else settings_state
+        ep = settings.get("regos_endpoint", "").strip().rstrip("/")
+        token = settings.get("regos_token", "")
+        if ep and token:
+            url = f"{ep}/v1/retailcard/get" if "/v1" not in ep else f"{ep}/retailcard/get"
+            r = requests.post(url, headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"}, json={"barcode_value": clean_b}, timeout=5)
+            if r.status_code == 200:
+                res = r.json()
+                if res.get("ok") and res.get("result"):
+                    card = res["result"][0]
+                    cust = card.get("customer") or {}
+                    grp = card.get("group") or {}
+                    grp_name = grp.get("name") or ""
+                    is_qurilish = any(w in grp_name.lower() or w in str(cust.get("full_name", "")).lower() for w in ["qurilish", "stroy", "mchj", "ooo", "obyekt"])
+                    formatted_client = {
+                        "id": f"regos_card_{card.get('id')}",
+                        "name": cust.get("full_name") or f"Karta #{card.get('id')}",
+                        "phone": cust.get("main_phone") or "",
+                        "barcode": card.get("barcode_value") or clean_b,
+                        "bonus": float(card.get("bonus_amount") or 0),
+                        "category": "qurilish" if is_qurilish else "ustalar",
+                        "group": grp_name,
+                        "is_new_regos": True
+                    }
+                    return {"ok": True, "found": True, "type": "client", "data": formatted_client}
+    except Exception as e_reg:
+        print(f"Mobile barcode lookup regos error: {e_reg}")
+
+    # 3. Check inventory
+    try:
+        inv = supabase_req("GET", f"inventory?company_id=eq.{company_id}&sku=eq.{clean_b}")
+        if inv and isinstance(inv, list) and len(inv) > 0:
+            return {"ok": True, "found": True, "type": "product", "data": inv[0]}
+    except Exception as e_inv:
+        print(f"Mobile barcode lookup inventory error: {e_inv}")
+
+    return {"ok": True, "found": False, "message": "Ushbu shtrix-kod bo'yicha hech narsa topilmadi"}
 
 @app.post("/api/courier/login")
 def courier_login(payload: dict):
