@@ -2155,6 +2155,7 @@ window.CRM = {
                 </tr>
             `;
         } else {
+            const canEditBonus = this.canManageBonus();
             pageItems.forEach((c, idx) => {
                 const rowNum = startIdx + idx + 1;
                 const clientName = c.name || '-';
@@ -2206,7 +2207,7 @@ window.CRM = {
                             </a>
                         </td>
                         <td>
-                            <a href="javascript:void(0)" onclick="CRM.openClientDetailsModal('${c.id}'); setTimeout(() => CRM.toggleBonusAction('add'), 200);" title="Bonusni boshqarish" style="text-decoration:none;">
+                            <a href="javascript:void(0)" onclick="CRM.openClientDetailsModal('${c.id}')${canEditBonus ? `; setTimeout(() => CRM.toggleBonusAction('add'), 200)` : ''};" title="${canEditBonus ? 'Bonusni boshqarish' : 'Mijoz tafsilotlari'}" style="text-decoration:none;">
                                 ${bonusDisplay}
                             </a>
                         </td>
@@ -2423,6 +2424,13 @@ window.CRM = {
             bonusDisp.textContent = `${bonus.toLocaleString('uz-UZ')} so'm`;
         }
 
+        // Bonus o'zgartirish ruxsati (Admin tomonidan boshqariladi)
+        const canEditBonus = this.canManageBonus();
+        const bonusActionBtns = document.getElementById('cdm-bonus-action-btns');
+        const bonusNoPermMsg = document.getElementById('cdm-bonus-no-permission-msg');
+        if (bonusActionBtns) bonusActionBtns.style.display = canEditBonus ? 'flex' : 'none';
+        if (bonusNoPermMsg) bonusNoPermMsg.style.display = canEditBonus ? 'none' : 'block';
+
         // Profil ma'lumotlari (Tab 2)
         const phone = client.phone || '-';
         const phone2 = (client.phone2 && client.phone2 !== client.barcode) ? client.phone2 : '-';
@@ -2499,7 +2507,51 @@ window.CRM = {
         });
     },
 
+    canManageBonus: function() {
+        const activeUserId = localStorage.getItem('activeUserId') || 'admin';
+        const activeUserRole = (localStorage.getItem('activeUserRole') || 'admin').toLowerCase();
+        
+        if (activeUserId === 'admin' || 
+            activeUserRole === 'admin' || 
+            activeUserRole.includes('superadmin') || 
+            activeUserRole.includes('direktor')) {
+            return true;
+        }
+
+        try {
+            const data = (typeof AppStorage !== 'undefined' && AppStorage.load) ? AppStorage.load() : {};
+            
+            // 1. Agar xodimga individual ruxsatlar biriktirilgan bo'lsa
+            const employees = data.employees || [];
+            const currentEmp = employees.find(e => e.id === activeUserId);
+            if (currentEmp && Array.isArray(currentEmp.mobile_permissions)) {
+                return currentEmp.mobile_permissions.includes('m_bonus');
+            }
+
+            // 2. Aks holda xodimning roliga berilgan ruxsat tekshiriladi
+            const customRoles = (data.settings && data.settings.roles) || [];
+            let roleName = activeUserRole;
+            if (roleName.includes(';')) roleName = roleName.split(';')[0].trim();
+            
+            const roleObj = customRoles.find(r => {
+                const name = typeof r === 'string' ? r : (r ? r.name : '');
+                return name && name.toLowerCase() === roleName.toLowerCase();
+            });
+
+            if (roleObj && typeof roleObj === 'object' && Array.isArray(roleObj.mobile_permissions)) {
+                return roleObj.mobile_permissions.includes('m_bonus');
+            }
+        } catch (e) {
+            console.error("Error checking bonus permission:", e);
+        }
+        return false;
+    },
+
     toggleBonusAction: function(actionType) {
+        if (actionType && !this.canManageBonus()) {
+            alert("Kechirasiz, bonus balansini o'zgartirish huquqi administrator tomonidan cheklangan!");
+            return;
+        }
         const box = document.getElementById('cdm-bonus-action-box');
         if (!box) return;
 
@@ -2567,6 +2619,10 @@ window.CRM = {
 
     submitBonusAdjustment: async function(event) {
         if (event) event.preventDefault();
+        if (!this.canManageBonus()) {
+            alert("Kechirasiz, bonus balansini o'zgartirish huquqi administrator tomonidan cheklangan!");
+            return;
+        }
         const clientId = this._currentDetailClientId;
         if (!clientId) return;
 

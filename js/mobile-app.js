@@ -60,6 +60,7 @@ window.MobileApp = {
                 this.updateHeaderUserInfo();
                 this.renderNavigation();
                 this.switchView('home');
+                this.refreshUserPermissions();
                 return;
             } catch(e) {
                 localStorage.removeItem('mobile_auth');
@@ -70,6 +71,41 @@ window.MobileApp = {
         document.getElementById('mobile-login-view').style.display = 'block';
         document.getElementById('mobile-app-header').style.display = 'none';
         document.getElementById('mobile-app-nav').style.display = 'none';
+    },
+
+    refreshUserPermissions: async function() {
+        if (!this.currentUser) return;
+        const role = (this.currentUser.role || '').toLowerCase();
+        if (role.includes('admin') || role.includes('superadmin') || role.includes('direktor')) return;
+        
+        try {
+            const url = this.currentUser.id 
+                ? `/api/mobile/permissions?employee_id=${encodeURIComponent(this.currentUser.id)}`
+                : `/api/mobile/permissions?role=${encodeURIComponent(this.currentUser.role || '')}`;
+            const res = await fetch(url);
+            if (res.ok) {
+                const data = await res.json();
+                if (data && data.ok && Array.isArray(data.my_permissions)) {
+                    this.currentUser.mobile_permissions = data.my_permissions;
+                    const saved = JSON.parse(localStorage.getItem('mobile_auth') || '{}');
+                    saved.user = this.currentUser;
+                    localStorage.setItem('mobile_auth', JSON.stringify(saved));
+                    this.renderNavigation();
+                }
+            }
+        } catch (e) {
+            console.warn("Could not refresh live mobile permissions:", e);
+        }
+    },
+
+    hasPermission: function(permKey) {
+        if (!this.currentUser) return false;
+        const role = (this.currentUser.role || '').toLowerCase();
+        if (role.includes('admin') || role.includes('superadmin') || role.includes('direktor')) {
+            return true;
+        }
+        const perms = this.currentUser.mobile_permissions || [];
+        return perms.includes(permKey);
     },
 
     login: async function(e) {
@@ -488,6 +524,21 @@ window.MobileApp = {
         document.getElementById('m-sheet-bonus-val').textContent = `${bonusVal.toLocaleString('uz-UZ')} so'm`;
         this._activeDetailClient = client;
 
+        // Admin tomonidan bonusni o'zgartirish ruxsati tekshiruvi (m_bonus)
+        const canEditBonus = this.hasPermission('m_bonus');
+        const bonusActionsContainer = document.getElementById('m-bonus-actions-container');
+        if (bonusActionsContainer) {
+            bonusActionsContainer.style.display = canEditBonus ? 'grid' : 'none';
+        }
+        const noPermMsg = document.getElementById('m-bonus-no-permission-msg');
+        if (noPermMsg) {
+            noPermMsg.style.display = canEditBonus ? 'none' : 'block';
+        }
+        const bonusBox = document.getElementById('m-bonus-action-box');
+        if (bonusBox) {
+            bonusBox.style.display = 'none';
+        }
+
         // Open sheet
         sheet.classList.add('active');
 
@@ -610,6 +661,10 @@ window.MobileApp = {
 
     // --- BONUS BOSHQARUVI ---
     toggleBonusForm: function(type) {
+        if (type && !this.hasPermission('m_bonus')) {
+            alert("Kechirasiz, sizda bonus balansini o'zgartirish ruxsati mavjud emas! Iltimos, administratorga murojaat qiling.");
+            return;
+        }
         const box = document.getElementById('m-bonus-action-box');
         if (!box) return;
         if (!type) {
@@ -625,6 +680,10 @@ window.MobileApp = {
 
     saveBonusAdjustment: async function(e) {
         if (e) e.preventDefault();
+        if (!this.hasPermission('m_bonus')) {
+            alert("Kechirasiz, sizda bonus balansini o'zgartirish ruxsati mavjud emas!");
+            return;
+        }
         if (!this._activeDetailClient) return;
 
         const type = document.getElementById('m-bonus-type').value;
@@ -1066,7 +1125,7 @@ window.MobileApp = {
             { key: 'm_crm', label: 'Mijozlar bazasi (CRM)' },
             { key: 'm_regos_cards', label: 'REGOS Kartalari' },
             { key: 'm_receipts', label: 'Xarid Cheklari' },
-            { key: 'm_bonus', label: 'Bonus Boshqaruvi' },
+            { key: 'm_bonus', label: 'Bonusni O\'zgartirish (+/-)' },
             { key: 'm_erp', label: 'Omborxona (ERP)' },
             { key: 'm_scanner', label: 'Kamera Skaneri' },
             { key: 'm_kassa', label: 'Kassa & Savdo' },

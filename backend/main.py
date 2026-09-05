@@ -4368,7 +4368,7 @@ def resolve_mobile_permissions(role_str, roles_list):
     perms = (found.get("permissions") if found else []) or []
     m_perms = []
     if "crm" in perms:
-        m_perms.extend(["m_crm", "m_regos_cards", "m_receipts", "m_bonus", "m_scanner"])
+        m_perms.extend(["m_crm", "m_regos_cards", "m_receipts", "m_scanner"])
     if "erp" in perms:
         m_perms.extend(["m_erp", "m_scanner"])
     if "receipts" in perms or "kassa" in perms:
@@ -4464,7 +4464,7 @@ MOBILE_ALL_MODULES = [
     {"key": "m_crm", "label": "Mijozlar bazasi (CRM)", "icon": "fa-users", "desc": "Mijozlar ro'yxati, toifalar va qidiruv"},
     {"key": "m_regos_cards", "label": "REGOS Kartalari", "icon": "fa-id-card", "desc": "Shtrix-kod orqali xaridor kartasini qidirish va biriktirish"},
     {"key": "m_receipts", "label": "Xarid Cheklari", "icon": "fa-receipt", "desc": "Mijozning xarid cheklari va mahsulotlar tafsiloti"},
-    {"key": "m_bonus", "label": "Bonus Boshqaruvi", "icon": "fa-coins", "desc": "Bonuslarni ko'rish, qo'shish va hisobdan chiqarish"},
+    {"key": "m_bonus", "label": "Bonusni O'zgartirish (+/-)", "icon": "fa-coins", "desc": "Mijoz bonus balansiga qo'shish, ayirish yoki belgilash ruxsati"},
     {"key": "m_erp", "label": "Omborxona (ERP)", "icon": "fa-boxes", "desc": "Mahsulotlar qoldig'i, narxlari va SKU bo'yicha qidiruv"},
     {"key": "m_scanner", "label": "Kamera Skaneri", "icon": "fa-qrcode", "desc": "Telefon kamerasi orqali karta yoki tovar shtrix-kodini o'qish"},
     {"key": "m_kassa", "label": "Kassa & Tezkor Savdo", "icon": "fa-cash-register", "desc": "Mobil ilovadan savdo qilish va chek chiqarish"},
@@ -4480,15 +4480,24 @@ def get_mobile_permissions(request: Request, role: str = None, employee_id: str 
     roles_list = settings.get("roles", [])
     
     target_role = role
-    if not target_role and employee_id:
+    my_perms = []
+    if employee_id:
         try:
             emps = supabase_req("GET", f"employees?id=eq.{employee_id}")
             if emps and isinstance(emps, list) and len(emps) > 0:
-                target_role = emps[0].get("role")
-        except Exception:
-            pass
-            
-    my_perms = resolve_mobile_permissions(target_role, roles_list) if target_role else []
+                emp = emps[0]
+                target_role = emp.get("role")
+                clean_r = (target_role or "").split(";")[0].strip().lower()
+                if clean_r in ["admin", "superadmin", "direktor"]:
+                    my_perms = [m["key"] for m in MOBILE_ALL_MODULES]
+                elif emp.get("mobile_permissions") is not None and isinstance(emp.get("mobile_permissions"), list):
+                    my_perms = emp.get("mobile_permissions")
+                else:
+                    my_perms = resolve_mobile_permissions(target_role, roles_list)
+        except Exception as e_emp:
+            print("Error loading employee permissions:", e_emp)
+    elif target_role:
+        my_perms = resolve_mobile_permissions(target_role, roles_list)
     
     # Also fetch active employees to display in management view
     employees_data = []
