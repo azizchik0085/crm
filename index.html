@@ -2128,6 +2128,234 @@
         </div>
     </div>
 
+    <!-- 1.16. MIJOZ 360 PROFILI - BATAFSIL MA'LUMOT, XARID CHEKLARI VA BONUSLAR BOSHQARUVI MODALI -->
+    <div class="modal" id="client-details-modal">
+        <div class="modal-content" style="max-width: 860px; width: 95%; max-height: 90vh; display: flex; flex-direction: column; padding: 0; overflow: hidden; border-radius: 14px;">
+            <!-- Modal Header -->
+            <div class="modal-header" style="padding: 16px 22px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.02);">
+                <div style="display: flex; align-items: center; gap: 14px;">
+                    <div id="cdm-avatar" style="width: 44px; height: 44px; border-radius: 50%; background: linear-gradient(135deg, #38bdf8, #818cf8); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 700; box-shadow: 0 4px 10px rgba(56, 189, 248, 0.25);">
+                        M
+                    </div>
+                    <div>
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <h3 id="cdm-name" style="margin: 0; font-size: 18px; font-weight: 700; color: var(--text-main);">Mijoz Nomi</h3>
+                            <span id="cdm-category-badge" class="badge">Ustalar</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 12px; margin-top: 4px; font-size: 12px; color: var(--text-muted);">
+                            <span id="cdm-barcode-badge" style="font-family: monospace; background: rgba(56, 189, 248, 0.12); color: #38bdf8; padding: 2px 7px; border-radius: 4px; font-weight: 600;">
+                                <i class="fas fa-barcode"></i> -
+                            </span>
+                            <span id="cdm-created-date"><i class="far fa-calendar-alt"></i> -</span>
+                        </div>
+                    </div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <button type="button" class="btn btn-secondary btn-sm" id="cdm-btn-edit" style="padding: 6px 12px; font-size: 12.5px; display: inline-flex; align-items: center; gap: 6px;" title="Tahrirlash">
+                        <i class="fas fa-edit" style="color: var(--accent);"></i> Tahrirlash
+                    </button>
+                    <button class="close-modal-btn" onclick="closeModal('client-details-modal')">&times;</button>
+                </div>
+            </div>
+
+            <!-- Modal Body (Scrollable) -->
+            <div class="modal-body" style="padding: 20px; overflow-y: auto; flex-grow: 1; display: flex; flex-direction: column; gap: 18px;">
+                
+                <!-- Quick KPI Summary Cards -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px;">
+                    <!-- Bonus Balansi Card -->
+                    <div style="background: linear-gradient(145deg, rgba(16, 185, 129, 0.08), rgba(16, 185, 129, 0.02)); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 12px; padding: 14px 16px; position: relative;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                            <span style="font-size: 12px; font-weight: 600; color: #10b981; text-transform: uppercase; letter-spacing: 0.5px;">
+                                <i class="fas fa-coins" style="margin-right: 4px;"></i> Bonus Balansi
+                            </span>
+                            <span style="background: rgba(16, 185, 129, 0.2); color: #10b981; border-radius: 20px; padding: 2px 8px; font-size: 11px; font-weight: 600;">Faol</span>
+                        </div>
+                        <div id="cdm-bonus-display" style="font-size: 22px; font-weight: 800; color: #10b981; margin-bottom: 10px; font-family: 'JetBrains Mono', monospace;">
+                            0 so'm
+                        </div>
+                        <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                            <button type="button" class="btn btn-sm" onclick="CRM.toggleBonusAction('add')" style="background: #10b981; color: #fff; padding: 4px 10px; font-size: 11.5px; border-radius: 6px; border: none; font-weight: 600; cursor: pointer;">
+                                <i class="fas fa-plus-circle"></i> Bonus qo'shish
+                            </button>
+                            <button type="button" class="btn btn-sm" onclick="CRM.toggleBonusAction('deduct')" style="background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); padding: 4px 10px; font-size: 11.5px; border-radius: 6px; font-weight: 600; cursor: pointer;">
+                                <i class="fas fa-minus-circle"></i> Yechish
+                            </button>
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="CRM.toggleBonusAction('set')" style="padding: 4px 8px; font-size: 11px; border-radius: 6px;" title="Balansni to'g'rilash">
+                                <i class="fas fa-sliders-h"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Jami Xaridlar Summasi Card -->
+                    <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px 16px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                            <span style="font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">
+                                <i class="fas fa-shopping-bag" style="color: var(--accent); margin-right: 4px;"></i> Jami Xaridlar
+                            </span>
+                        </div>
+                        <div id="cdm-total-purchases" style="font-size: 22px; font-weight: 800; color: var(--text-main); margin-bottom: 10px; font-family: 'JetBrains Mono', monospace;">
+                            0 so'm
+                        </div>
+                        <div style="font-size: 12px; color: var(--text-muted);" id="cdm-purchases-subtext">
+                            Barcha xarid cheklari summasi
+                        </div>
+                    </div>
+
+                    <!-- Cheklar Soni Card -->
+                    <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px 16px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                            <span style="font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">
+                                <i class="fas fa-receipt" style="color: #38bdf8; margin-right: 4px;"></i> Cheklar Soni
+                            </span>
+                        </div>
+                        <div id="cdm-receipts-count" style="font-size: 22px; font-weight: 800; color: #38bdf8; margin-bottom: 10px; font-family: 'JetBrains Mono', monospace;">
+                            0 ta
+                        </div>
+                        <div style="font-size: 12px; color: var(--text-muted);">
+                            Sinxronlashtirilgan xaridlar
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Interactive Bonus Adjustment Action Box (Collapsed by default) -->
+                <div id="cdm-bonus-action-box" style="display: none; background: rgba(16, 185, 129, 0.05); border: 1px solid rgba(16, 185, 129, 0.35); border-radius: 12px; padding: 16px; animation: fadeIn 0.2s ease;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                        <h4 id="cdm-bonus-action-title" style="margin: 0; font-size: 14.5px; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 8px;">
+                            <i class="fas fa-coins" style="color: #10b981;"></i> Bonusni O'zgartirish
+                        </h4>
+                        <button type="button" onclick="CRM.toggleBonusAction(null)" style="background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 18px; line-height: 1;">&times;</button>
+                    </div>
+                    <form id="cdm-bonus-form" onsubmit="CRM.submitBonusAdjustment(event)">
+                        <input type="hidden" id="cdm-bonus-action-type" value="add">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 10px;">
+                            <div class="form-group" style="margin: 0;">
+                                <label id="cdm-bonus-amount-label" style="font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 4px; display: block;">Summa (so'm) <span style="color:var(--danger)">*</span></label>
+                                <input type="number" id="cdm-bonus-amount" class="form-control" placeholder="Masalan: 50000" min="1" step="any" required style="font-weight: 700; font-family: monospace; font-size: 15px;">
+                            </div>
+                            <div class="form-group" style="margin: 0;">
+                                <label style="font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 4px; display: block;">Sabab / Izoh (ixtiyoriy)</label>
+                                <input type="text" id="cdm-bonus-note" class="form-control" placeholder="Masalan: Xarid bonusi, Aksiya...">
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap;">
+                            <span style="font-size: 11px; color: var(--text-muted); align-self: center; margin-right: 4px;">Tezkor summa:</span>
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="CRM.setBonusQuickAmount(10000)" style="padding: 2px 8px; font-size: 11px;">+10,000</button>
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="CRM.setBonusQuickAmount(50000)" style="padding: 2px 8px; font-size: 11px;">+50,000</button>
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="CRM.setBonusQuickAmount(100000)" style="padding: 2px 8px; font-size: 11px;">+100,000</button>
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="CRM.setBonusQuickAmount(500000)" style="padding: 2px 8px; font-size: 11px;">+500,000</button>
+                        </div>
+                        <div style="display: flex; justify-content: flex-end; gap: 8px;">
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="CRM.toggleBonusAction(null)">Bekor qilish</button>
+                            <button type="submit" class="btn btn-primary btn-sm" id="cdm-btn-save-bonus" style="padding: 6px 16px; font-weight: 600;">
+                                <i class="fas fa-check" style="margin-right: 6px;"></i> Saqlash
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Navigation Tabs -->
+                <div style="border-bottom: 1px solid var(--border-color); display: flex; gap: 8px;">
+                    <button type="button" class="tab-btn active" id="cdm-tab-btn-receipts" onclick="CRM.switchClientDetailTab('receipts')" style="background: transparent; border: none; border-bottom: 2px solid var(--accent); color: var(--accent); padding: 8px 16px; font-size: 13.5px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+                        <i class="fas fa-receipt"></i> Xarid Cheklari (<span id="cdm-tab-receipts-badge">0</span>)
+                    </button>
+                    <button type="button" class="tab-btn" id="cdm-tab-btn-profile" onclick="CRM.switchClientDetailTab('profile')" style="background: transparent; border: none; border-bottom: 2px solid transparent; color: var(--text-muted); padding: 8px 16px; font-size: 13.5px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+                        <i class="fas fa-user-circle"></i> Mijoz Profili
+                    </button>
+                    <button type="button" class="tab-btn" id="cdm-tab-btn-bonushistory" onclick="CRM.switchClientDetailTab('bonushistory')" style="background: transparent; border: none; border-bottom: 2px solid transparent; color: var(--text-muted); padding: 8px 16px; font-size: 13.5px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+                        <i class="fas fa-history"></i> Bonuslar Tarixi
+                    </button>
+                </div>
+
+                <!-- Tab 1: Xarid Cheklari -->
+                <div id="cdm-tab-content-receipts">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                        <div style="font-size: 13px; color: var(--text-muted);">
+                            Mijoz telefon raqami yoki karta shtrix-kodi bo'yicha biriktirilgan cheklar:
+                        </div>
+                        <button type="button" id="cdm-btn-regos-sync" class="btn btn-secondary btn-sm" style="padding: 5px 12px; font-size: 12px; display: inline-flex; align-items: center; gap: 6px; border-radius: 8px;" onclick="CRM.syncCustomerReceiptsFromRegos()">
+                            <i class="fas fa-sync"></i> REGOS-dan yangilash
+                        </button>
+                    </div>
+                    <div id="cdm-receipts-list" style="display: flex; flex-direction: column; gap: 10px; max-height: 380px; overflow-y: auto; padding-right: 4px;">
+                        <!-- Dinamik ravishda cheklar kartalari chiqariladi -->
+                    </div>
+                </div>
+
+                <!-- Tab 2: Mijoz Profili (Full Info) -->
+                <div id="cdm-tab-content-profile" style="display: none;">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px;">
+                        <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px 14px;">
+                            <div style="font-size: 11.5px; color: var(--text-muted); margin-bottom: 4px; text-transform: uppercase;">Asosiy Telefon</div>
+                            <div style="display: flex; align-items: center; justify-content: space-between;">
+                                <span id="cdm-info-phone" style="font-size: 14px; font-weight: 600; font-family: monospace; color: var(--text-main);">-</span>
+                                <button type="button" class="btn btn-secondary btn-sm" id="cdm-call-btn1" style="padding: 4px 8px; font-size: 11px;">
+                                    <i class="fas fa-phone-alt" style="color: var(--success);"></i> Qo'ng'iroq
+                                </button>
+                            </div>
+                        </div>
+
+                        <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px 14px;">
+                            <div style="font-size: 11.5px; color: var(--text-muted); margin-bottom: 4px; text-transform: uppercase;">Qo'shimcha Telefon</div>
+                            <div style="display: flex; align-items: center; justify-content: space-between;">
+                                <span id="cdm-info-phone2" style="font-size: 14px; font-weight: 600; font-family: monospace; color: var(--text-main);">-</span>
+                                <button type="button" class="btn btn-secondary btn-sm" id="cdm-call-btn2" style="padding: 4px 8px; font-size: 11px;">
+                                    <i class="fas fa-phone-alt" style="color: var(--warning);"></i> Qo'ng'iroq
+                                </button>
+                            </div>
+                        </div>
+
+                        <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px 14px;">
+                            <div style="font-size: 11.5px; color: var(--text-muted); margin-bottom: 4px; text-transform: uppercase;">Karta / Shtrix-kod</div>
+                            <div id="cdm-info-barcode" style="font-size: 14px; font-weight: 600; font-family: monospace; color: #38bdf8;">-</div>
+                        </div>
+
+                        <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px 14px;">
+                            <div style="font-size: 11.5px; color: var(--text-muted); margin-bottom: 4px; text-transform: uppercase;">Mijoz Toifasi</div>
+                            <div id="cdm-info-category" style="font-size: 14px; font-weight: 600;">-</div>
+                        </div>
+
+                        <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px 14px;">
+                            <div style="font-size: 11.5px; color: var(--text-muted); margin-bottom: 4px; text-transform: uppercase;">Kompaniya / Obyekt Nomi</div>
+                            <div id="cdm-info-company" style="font-size: 14px; font-weight: 500; color: var(--text-main);">-</div>
+                        </div>
+
+                        <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px 14px;">
+                            <div style="font-size: 11.5px; color: var(--text-muted); margin-bottom: 4px; text-transform: uppercase;">Mas'ul Xodim / Operator</div>
+                            <div id="cdm-info-operator" style="font-size: 14px; font-weight: 500; color: var(--text-main);">-</div>
+                        </div>
+
+                        <div style="grid-column: 1 / -1; background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px 14px;">
+                            <div style="font-size: 11.5px; color: var(--text-muted); margin-bottom: 4px; text-transform: uppercase;">Manzil / Hudud</div>
+                            <div id="cdm-info-address" style="font-size: 13.5px; color: var(--text-main);">-</div>
+                        </div>
+
+                        <div style="grid-column: 1 / -1; background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px 14px;">
+                            <div style="font-size: 11.5px; color: var(--text-muted); margin-bottom: 4px; text-transform: uppercase;">Izoh va Eslatmalar</div>
+                            <div id="cdm-info-notes" style="font-size: 13px; color: var(--text-muted); white-space: pre-wrap;">-</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab 3: Bonuslar Tarixi -->
+                <div id="cdm-tab-content-bonushistory" style="display: none;">
+                    <div id="cdm-bonus-history-list" style="display: flex; flex-direction: column; gap: 8px; max-height: 380px; overflow-y: auto;">
+                        <!-- Dinamik ravishda bonus harakatlari chiqadi -->
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="modal-footer" style="padding: 12px 20px; border-top: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.01);">
+                <span style="font-size: 12px; color: var(--text-muted);">
+                    <i class="fas fa-shield-alt" style="color: #10b981; margin-right: 4px;"></i> Barcha o'zgarishlar avtomatik saqlanadi
+                </span>
+                <button type="button" class="btn btn-secondary" onclick="closeModal('client-details-modal')">Yopish</button>
+            </div>
+        </div>
+    </div>
+
     <!-- 2. ERP Yangi mahsulot qo'shish modal oynasi -->
     <div class="modal" id="product-modal">
         <div class="modal-content">
@@ -2923,7 +3151,7 @@
     <script src="js/storage.js?v=5"></script>
     <script src="js/db.js?v=8"></script>
     <script src="js/telephony.js?v=6"></script>
-    <script src="js/crm.js?v=11"></script>
+    <script src="js/crm.js?v=12"></script>
     <script src="js/chats.js?v=4"></script>
     <script src="js/erp.js?v=10"></script>
     <script src="js/finance.js?v=4"></script>

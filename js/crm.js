@@ -1971,12 +1971,13 @@ window.CRM = {
                 ` : `<span style="color: var(--text-muted); font-size: 12px;">0 so'm</span>`;
 
                 tableHtml += `
-                    <tr>
+                    <tr style="cursor: pointer;" onclick="if (!event.target.closest('button, a, input, select')) CRM.openClientDetailsModal('${c.id}')" title="Mijoz tafsilotlarini ko'rish uchun bosing">
                         <td style="text-align: center; color: var(--text-muted); font-size: 12px;">${rowNum}</td>
                         <td>
                             <strong style="font-size: 13.5px; color: var(--text-main);">
-                                <a href="javascript:void(0)" onclick="CRM.openEditClientModal('${c.id}')" style="color: var(--text-main); text-decoration:none;" title="Mijozni tahrirlash">
-                                    ${clientName}
+                                <a href="javascript:void(0)" onclick="CRM.openClientDetailsModal('${c.id}')" style="color: var(--text-main); text-decoration:none; display: inline-flex; align-items: center; gap: 6px;" title="Mijoz profili va cheklarini ko'rish">
+                                    <span>${clientName}</span>
+                                    <i class="fas fa-external-link-alt" style="font-size: 10px; color: var(--text-muted); opacity: 0.6;"></i>
                                 </a>
                             </strong>
                         </td>
@@ -1987,7 +1988,11 @@ window.CRM = {
                                 <i class="fas fa-phone-alt" style="font-size: 11px;"></i> ${mainPhone}
                             </a>
                         </td>
-                        <td>${bonusDisplay}</td>
+                        <td>
+                            <a href="javascript:void(0)" onclick="CRM.openClientDetailsModal('${c.id}'); setTimeout(() => CRM.toggleBonusAction('add'), 200);" title="Bonusni boshqarish" style="text-decoration:none;">
+                                ${bonusDisplay}
+                            </a>
+                        </td>
                         <td>${companyName}</td>
                         <td>
                             ${extraPhone !== '-' ? `
@@ -2004,11 +2009,14 @@ window.CRM = {
                         </td>
                         <td style="text-align: right;">
                             <div style="display: inline-flex; gap: 6px; justify-content: flex-end;">
+                                <button class="btn btn-secondary btn-sm" onclick="CRM.openClientDetailsModal('${c.id}')" title="Batafsil ma'lumot, cheklar va bonuslar" style="padding: 6px 9px;">
+                                    <i class="fas fa-eye" style="color: var(--accent)"></i>
+                                </button>
                                 <button class="btn btn-secondary btn-sm" onclick="Telephony.dial('${c.phone}')" title="Qo'ng'iroq qilish" style="padding: 6px 9px;">
                                     <i class="fas fa-phone-alt" style="color: var(--success)"></i>
                                 </button>
                                 <button class="btn btn-secondary btn-sm" onclick="CRM.openEditClientModal('${c.id}')" title="Tahrirlash" style="padding: 6px 9px;">
-                                    <i class="fas fa-edit" style="color: var(--accent)"></i>
+                                    <i class="fas fa-edit" style="color: var(--text-muted)"></i>
                                 </button>
                                 <button class="btn btn-secondary btn-sm" onclick="CRM.deleteClient('${c.id}')" title="O'chirish" style="padding: 6px 9px;">
                                     <i class="fas fa-trash-alt" style="color: var(--danger)"></i>
@@ -2113,6 +2121,541 @@ window.CRM = {
             const nameInput = document.getElementById('client-name');
             if (nameInput) nameInput.focus();
         }, 50);
+    },
+
+    _currentDetailClientId: null,
+
+    openClientDetailsModal: async function(id) {
+        let clients = this._clientsCache || [];
+        let client = clients.find(c => c.id === id);
+        if (!client) {
+            try {
+                clients = await DB.getClients();
+                this._clientsCache = clients;
+                client = clients.find(c => c.id === id);
+            } catch(e) {}
+        }
+
+        if (!client) {
+            alert("Mijoz ma'lumotlari topilmadi!");
+            return;
+        }
+
+        this._currentDetailClientId = id;
+
+        // Header ma'lumotlari
+        const name = client.name || "Noma'lum Mijoz";
+        const initial = name.trim().charAt(0).toUpperCase() || 'M';
+        const avatarEl = document.getElementById('cdm-avatar');
+        if (avatarEl) avatarEl.textContent = initial;
+
+        const nameEl = document.getElementById('cdm-name');
+        if (nameEl) nameEl.textContent = name;
+
+        // Toifa badji
+        const cat = (client.category || (client.company && client.company.trim() ? 'qurilish' : 'ustalar')).toLowerCase();
+        const catBadgeEl = document.getElementById('cdm-category-badge');
+        if (catBadgeEl) {
+            if (cat === 'qurilish') {
+                catBadgeEl.className = 'badge';
+                catBadgeEl.style.cssText = 'background: rgba(139, 92, 246, 0.15); color: #a78bfa; border: 1px solid rgba(139, 92, 246, 0.3); font-size: 12px; padding: 3px 8px; border-radius: 6px; font-weight: 600;';
+                catBadgeEl.innerHTML = '<i class="fas fa-building" style="margin-right: 4px;"></i> Qurilish obyekti';
+            } else {
+                catBadgeEl.className = 'badge';
+                catBadgeEl.style.cssText = 'background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); font-size: 12px; padding: 3px 8px; border-radius: 6px; font-weight: 600;';
+                catBadgeEl.innerHTML = '<i class="fas fa-hammer" style="margin-right: 4px;"></i> Ustalar';
+            }
+        }
+
+        // Shtrix-kod badji
+        const barcodeVal = client.barcode || client.phone2 || '';
+        const barcodeBadgeEl = document.getElementById('cdm-barcode-badge');
+        if (barcodeBadgeEl) {
+            if (barcodeVal) {
+                barcodeBadgeEl.innerHTML = `<i class="fas fa-barcode"></i> ${barcodeVal}`;
+                barcodeBadgeEl.style.display = 'inline-flex';
+            } else {
+                barcodeBadgeEl.style.display = 'none';
+            }
+        }
+
+        // Sana
+        const dateEl = document.getElementById('cdm-created-date');
+        if (dateEl) {
+            if (client.created_at) {
+                const d = new Date(client.created_at);
+                dateEl.innerHTML = `<i class="far fa-calendar-alt"></i> ${isNaN(d.getTime()) ? client.created_at : d.toLocaleDateString('uz-UZ')}`;
+            } else {
+                dateEl.innerHTML = '';
+            }
+        }
+
+        // Tahrirlash tugmasi
+        const editBtn = document.getElementById('cdm-btn-edit');
+        if (editBtn) {
+            editBtn.onclick = () => {
+                closeModal('client-details-modal');
+                CRM.openEditClientModal(id);
+            };
+        }
+
+        // Bonus ko'rsatkich
+        const bonus = Number(client.bonus || client.value || 0);
+        const bonusDisp = document.getElementById('cdm-bonus-display');
+        if (bonusDisp) {
+            bonusDisp.textContent = `${bonus.toLocaleString('uz-UZ')} so'm`;
+        }
+
+        // Profil ma'lumotlari (Tab 2)
+        const phone = client.phone || '-';
+        const phone2 = (client.phone2 && client.phone2 !== client.barcode) ? client.phone2 : '-';
+        const address = client.address || client.email || '-';
+        const company = client.company || '-';
+        const operator = client.operator || 'Tanlanmagan';
+        const notes = client.notes || 'Izoh mavjud emas';
+
+        if (document.getElementById('cdm-info-phone')) document.getElementById('cdm-info-phone').textContent = phone;
+        if (document.getElementById('cdm-info-phone2')) document.getElementById('cdm-info-phone2').textContent = phone2;
+        if (document.getElementById('cdm-info-barcode')) document.getElementById('cdm-info-barcode').textContent = barcodeVal || '-';
+        if (document.getElementById('cdm-info-category')) {
+            document.getElementById('cdm-info-category').textContent = cat === 'qurilish' ? 'Qurilish obyekti' : 'Ustalar';
+        }
+        if (document.getElementById('cdm-info-company')) document.getElementById('cdm-info-company').textContent = company;
+        if (document.getElementById('cdm-info-operator')) document.getElementById('cdm-info-operator').textContent = operator;
+        if (document.getElementById('cdm-info-address')) document.getElementById('cdm-info-address').textContent = address;
+        if (document.getElementById('cdm-info-notes')) document.getElementById('cdm-info-notes').textContent = notes;
+
+        // Dial buttons
+        const callBtn1 = document.getElementById('cdm-call-btn1');
+        if (callBtn1) {
+            if (phone !== '-') {
+                callBtn1.style.display = 'inline-flex';
+                callBtn1.onclick = () => Telephony.dial(phone);
+            } else {
+                callBtn1.style.display = 'none';
+            }
+        }
+        const callBtn2 = document.getElementById('cdm-call-btn2');
+        if (callBtn2) {
+            if (phone2 !== '-') {
+                callBtn2.style.display = 'inline-flex';
+                callBtn2.onclick = () => Telephony.dial(phone2);
+            } else {
+                callBtn2.style.display = 'none';
+            }
+        }
+
+        // Reset bonus action form
+        this.toggleBonusAction(null);
+
+        // Boshlang'ich tab
+        this.switchClientDetailTab('receipts');
+
+        // Modalni darhol ochish
+        showModal('client-details-modal');
+
+        // Cheklar va bonus tarixini yuklash
+        this.loadClientReceipts(client);
+        this.renderClientBonusHistory(client);
+    },
+
+    switchClientDetailTab: function(tabName) {
+        const tabs = ['receipts', 'profile', 'bonushistory'];
+        tabs.forEach(t => {
+            const btn = document.getElementById(`cdm-tab-btn-${t}`);
+            const content = document.getElementById(`cdm-tab-content-${t}`);
+            if (btn) {
+                if (t === tabName) {
+                    btn.className = 'tab-btn active';
+                    btn.style.borderBottom = '2px solid var(--accent)';
+                    btn.style.color = 'var(--accent)';
+                } else {
+                    btn.className = 'tab-btn';
+                    btn.style.borderBottom = '2px solid transparent';
+                    btn.style.color = 'var(--text-muted)';
+                }
+            }
+            if (content) {
+                content.style.display = (t === tabName) ? 'block' : 'none';
+            }
+        });
+    },
+
+    toggleBonusAction: function(actionType) {
+        const box = document.getElementById('cdm-bonus-action-box');
+        if (!box) return;
+
+        if (!actionType) {
+            box.style.display = 'none';
+            return;
+        }
+
+        const currentType = document.getElementById('cdm-bonus-action-type')?.value;
+        if (box.style.display === 'block' && currentType === actionType) {
+            box.style.display = 'none';
+            return;
+        }
+
+        box.style.display = 'block';
+        const typeInput = document.getElementById('cdm-bonus-action-type');
+        if (typeInput) typeInput.value = actionType;
+
+        const titleEl = document.getElementById('cdm-bonus-action-title');
+        const labelEl = document.getElementById('cdm-bonus-amount-label');
+        const saveBtn = document.getElementById('cdm-btn-save-bonus');
+        const amountInput = document.getElementById('cdm-bonus-amount');
+        const noteInput = document.getElementById('cdm-bonus-note');
+
+        if (amountInput) amountInput.value = '';
+        if (noteInput) noteInput.value = '';
+
+        if (actionType === 'add') {
+            if (titleEl) titleEl.innerHTML = '<i class="fas fa-plus-circle" style="color: #10b981;"></i> Bonus Qo\'shish';
+            if (labelEl) labelEl.innerHTML = 'Qo\'shiladigan summa (so\'m) <span style="color:var(--danger)">*</span>';
+            if (saveBtn) {
+                saveBtn.className = 'btn btn-sm';
+                saveBtn.style.cssText = 'background: #10b981; color: #fff; padding: 6px 16px; font-weight: 600; border: none; cursor: pointer;';
+                saveBtn.innerHTML = '<i class="fas fa-plus-circle" style="margin-right: 6px;"></i> Bonus qo\'shish';
+            }
+        } else if (actionType === 'deduct') {
+            if (titleEl) titleEl.innerHTML = '<i class="fas fa-minus-circle" style="color: #ef4444;"></i> Bonus Yechish';
+            if (labelEl) labelEl.innerHTML = 'Yechiladigan summa (so\'m) <span style="color:var(--danger)">*</span>';
+            if (saveBtn) {
+                saveBtn.className = 'btn btn-sm';
+                saveBtn.style.cssText = 'background: #ef4444; color: #fff; padding: 6px 16px; font-weight: 600; border: none; cursor: pointer;';
+                saveBtn.innerHTML = '<i class="fas fa-minus-circle" style="margin-right: 6px;"></i> Bonus yechish';
+            }
+        } else {
+            if (titleEl) titleEl.innerHTML = '<i class="fas fa-sliders-h" style="color: var(--accent);"></i> Bonus Balansini To\'g\'rilash';
+            if (labelEl) labelEl.innerHTML = 'Yangi bonus balansi (so\'m) <span style="color:var(--danger)">*</span>';
+            if (saveBtn) {
+                saveBtn.className = 'btn btn-primary btn-sm';
+                saveBtn.style.cssText = 'padding: 6px 16px; font-weight: 600; cursor: pointer;';
+                saveBtn.innerHTML = '<i class="fas fa-save" style="margin-right: 6px;"></i> Balansni saqlash';
+            }
+        }
+
+        setTimeout(() => {
+            if (amountInput) amountInput.focus();
+        }, 50);
+    },
+
+    setBonusQuickAmount: function(amt) {
+        const input = document.getElementById('cdm-bonus-amount');
+        if (!input) return;
+        const current = parseFloat(input.value) || 0;
+        input.value = current + amt;
+    },
+
+    submitBonusAdjustment: async function(event) {
+        if (event) event.preventDefault();
+        const clientId = this._currentDetailClientId;
+        if (!clientId) return;
+
+        let clients = this._clientsCache || [];
+        let client = clients.find(c => c.id === clientId);
+        if (!client) return;
+
+        const actionType = document.getElementById('cdm-bonus-action-type')?.value || 'add';
+        const amount = parseFloat(document.getElementById('cdm-bonus-amount')?.value);
+        const note = document.getElementById('cdm-bonus-note')?.value.trim() || '';
+
+        if (isNaN(amount) || amount <= 0) {
+            alert("Iltimos, musbat summa kiriting!");
+            return;
+        }
+
+        const oldBonus = Number(client.bonus || client.value || 0);
+        let newBonus = oldBonus;
+
+        if (actionType === 'add') {
+            newBonus = oldBonus + amount;
+        } else if (actionType === 'deduct') {
+            if (amount > oldBonus) {
+                if (!confirm(`Yechilayotgan summa (${amount.toLocaleString('uz-UZ')} so'm) mijozning joriy balansidan (${oldBonus.toLocaleString('uz-UZ')} so'm) ko'p! Davom ettirilsinmi?`)) {
+                    return;
+                }
+            }
+            newBonus = Math.max(0, oldBonus - amount);
+        } else if (actionType === 'set') {
+            newBonus = amount;
+        }
+
+        const saveBtn = document.getElementById('cdm-btn-save-bonus');
+        if (saveBtn) {
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saqlanmoqda...';
+        }
+
+        try {
+            // Yangi bonus tarixi yozuvi
+            const record = {
+                id: 'bh_' + Date.now(),
+                date: new Date().toISOString(),
+                type: actionType,
+                amount: amount,
+                prev_bonus: oldBonus,
+                new_bonus: newBonus,
+                note: note || (actionType === 'add' ? "Bonus qo'shildi" : (actionType === 'deduct' ? "Bonus yechildi" : "Balans to'g'rilandi")),
+                user: (window.currentUser && (window.currentUser.name || window.currentUser.username)) || 'Operator'
+            };
+
+            if (!Array.isArray(client.bonus_history)) {
+                client.bonus_history = [];
+            }
+            client.bonus_history.unshift(record);
+
+            client.bonus = newBonus;
+            client.value = newBonus;
+
+            // UI-ni darhol yangilash (0ms)
+            const bonusDisp = document.getElementById('cdm-bonus-display');
+            if (bonusDisp) bonusDisp.textContent = `${newBonus.toLocaleString('uz-UZ')} so'm`;
+
+            this.renderClientBonusHistory(client);
+            this.toggleBonusAction(null);
+            this.renderCustomersTable();
+
+            // Backend va Supabase-ga saqlash
+            await DB.saveClient(client);
+
+        } catch(err) {
+            alert("Bonusni saqlashda xatolik: " + err.message);
+        } finally {
+            if (saveBtn) {
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = '<i class="fas fa-check" style="margin-right: 6px;"></i> Saqlash';
+            }
+        }
+    },
+
+    renderClientBonusHistory: function(client) {
+        const container = document.getElementById('cdm-bonus-history-list');
+        if (!container) return;
+
+        const history = client.bonus_history || [];
+        if (!Array.isArray(history) || history.length === 0) {
+            container.innerHTML = `
+                <div style="text-align: center; padding: 30px; color: var(--text-muted); font-size: 13px;">
+                    <i class="fas fa-coins" style="font-size: 28px; opacity: 0.3; display: block; margin-bottom: 8px;"></i>
+                    Hozircha bonus operatsiyalari tarixi mavjud emas
+                </div>
+            `;
+            return;
+        }
+
+        let html = '';
+        history.forEach(item => {
+            const dateObj = new Date(item.date);
+            const dateStr = isNaN(dateObj.getTime()) ? item.date : dateObj.toLocaleString('uz-UZ', { hour12: false });
+            const amt = Number(item.amount || 0).toLocaleString('uz-UZ');
+            const prev = Number(item.prev_bonus || 0).toLocaleString('uz-UZ');
+            const next = Number(item.new_bonus || 0).toLocaleString('uz-UZ');
+
+            let badgeHtml = '';
+            if (item.type === 'add') {
+                badgeHtml = `<span style="background: rgba(16, 185, 129, 0.15); color: #10b981; font-weight: 700; padding: 3px 8px; border-radius: 6px; font-size: 12px;"><i class="fas fa-plus"></i> ${amt} so'm</span>`;
+            } else if (item.type === 'deduct') {
+                badgeHtml = `<span style="background: rgba(239, 68, 68, 0.15); color: #ef4444; font-weight: 700; padding: 3px 8px; border-radius: 6px; font-size: 12px;"><i class="fas fa-minus"></i> ${amt} so'm</span>`;
+            } else {
+                badgeHtml = `<span style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; font-weight: 700; padding: 3px 8px; border-radius: 6px; font-size: 12px;"><i class="fas fa-sliders-h"></i> = ${amt} so'm</span>`;
+            }
+
+            html += `
+                <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px 14px; display: flex; justify-content: space-between; align-items: center; gap: 12px;">
+                    <div>
+                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                            ${badgeHtml}
+                            <span style="font-size: 12.5px; font-weight: 600; color: var(--text-main);">${item.note || 'Bonus amali'}</span>
+                        </div>
+                        <div style="font-size: 11.5px; color: var(--text-muted); display: flex; gap: 12px;">
+                            <span><i class="far fa-clock"></i> ${dateStr}</span>
+                            <span>Balans: ${prev} &rarr; <strong style="color: var(--text-main);">${next} so'm</strong></span>
+                        </div>
+                    </div>
+                    <div style="font-size: 11px; color: var(--text-muted); text-align: right;">
+                        <i class="fas fa-user-shield" style="margin-right: 3px;"></i> ${item.user || 'Admin'}
+                    </div>
+                </div>
+            `;
+        });
+
+        container.innerHTML = html;
+    },
+
+    loadClientReceipts: async function(client) {
+        const listEl = document.getElementById('cdm-receipts-list');
+        const countEl = document.getElementById('cdm-receipts-count');
+        const badgeEl = document.getElementById('cdm-tab-receipts-badge');
+        const totalPurchasesEl = document.getElementById('cdm-total-purchases');
+
+        if (listEl) {
+            listEl.innerHTML = '<div style="text-align: center; padding: 24px; color: var(--text-muted); font-size: 13px;"><i class="fas fa-spinner fa-spin"></i> Xarid cheklari yuklanmoqda...</div>';
+        }
+
+        try {
+            const receipts = await DB.getReceipts();
+            const settings = AppStorage.load().settings || {};
+            const currency = settings.currency || "so'm";
+
+            // Telefon va shtrix-kodlarni tozalash
+            const cleanPhone = (p) => p ? String(p).replace(/\D/g, '') : '';
+            const p1 = cleanPhone(client.phone);
+            const p2 = cleanPhone(client.phone2);
+            const bc = client.barcode ? String(client.barcode).trim() : '';
+
+            const matches = (rec) => {
+                let items = rec.items || [];
+                if (typeof items === 'string') {
+                    try { items = JSON.parse(items); } catch(e) { items = []; }
+                }
+
+                if (items && typeof items === 'object' && !Array.isArray(items)) {
+                    const recPhone = cleanPhone(items.customer_phone);
+                    if (recPhone) {
+                        if (p1 && recPhone.length >= 9 && p1.length >= 9 && recPhone.slice(-9) === p1.slice(-9)) return true;
+                        if (p2 && recPhone.length >= 9 && p2.length >= 9 && cleanPhone(p2).length >= 9 && recPhone.slice(-9) === cleanPhone(p2).slice(-9)) return true;
+                        if (bc && bc.length >= 9 && recPhone.slice(-9) === cleanPhone(bc).slice(-9)) return true;
+                    }
+                    if (bc && items.card_barcode && String(items.card_barcode).trim() === bc) return true;
+                    if (items.customer_id && (items.customer_id === client.id || items.customer_id === client.phone)) return true;
+                }
+
+                if (rec.customer_phone) {
+                    const recPhone = cleanPhone(rec.customer_phone);
+                    if (p1 && recPhone.length >= 9 && p1.length >= 9 && recPhone.slice(-9) === p1.slice(-9)) return true;
+                    if (p2 && recPhone.length >= 9 && p2.length >= 9 && recPhone.slice(-9) === cleanPhone(p2).slice(-9)) return true;
+                }
+                if (bc && rec.card_barcode && String(rec.card_barcode).trim() === bc) return true;
+
+                return false;
+            };
+
+            const clientReceipts = receipts.filter(matches);
+            clientReceipts.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+            const totalSpend = clientReceipts.reduce((acc, r) => acc + (parseFloat(r.total_amount) || 0), 0);
+
+            if (countEl) countEl.textContent = `${clientReceipts.length} ta`;
+            if (badgeEl) badgeEl.textContent = `${clientReceipts.length}`;
+            if (totalPurchasesEl) totalPurchasesEl.textContent = `${totalSpend.toLocaleString('uz-UZ')} ${currency}`;
+
+            if (!listEl) return;
+
+            if (clientReceipts.length === 0) {
+                listEl.innerHTML = `
+                    <div style="text-align: center; padding: 36px 16px; color: var(--text-muted); font-size: 13.5px; background: rgba(255,255,255,0.01); border: 1px dashed var(--border-color); border-radius: 12px;">
+                        <i class="fas fa-shopping-basket" style="font-size: 32px; opacity: 0.3; display: block; margin-bottom: 10px;"></i>
+                        <span>Ushbu mijoz bo'yicha biriktirilgan cheklar topilmadi.</span>
+                        <div style="margin-top: 8px; font-size: 12px;">
+                            Agar mijoz REGOS orqali xarid qilgan bo'lsa, yuqoridagi <strong>«REGOS-dan yangilash»</strong> tugmasini bosing.
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '';
+            clientReceipts.forEach((rec) => {
+                let items = rec.items || [];
+                if (typeof items === 'string') {
+                    try { items = JSON.parse(items); } catch(e) { items = []; }
+                }
+
+                let products = [];
+                let sellerName = '';
+                if (items && !Array.isArray(items) && typeof items === 'object') {
+                    products = items.products || [];
+                    sellerName = items.seller_name || '';
+                } else if (Array.isArray(items)) {
+                    products = items;
+                }
+
+                const dateObj = new Date(rec.created_at);
+                const dateStr = isNaN(dateObj.getTime()) ? rec.created_at : dateObj.toLocaleString('uz-UZ', { hour12: false });
+                const recCode = rec.code || 'CH-' + String(rec.id).substring(0, 8);
+                const payType = rec.payment_type || 'Naqd';
+                const payBadgeClass = payType === 'Karta' 
+                    ? 'badge-primary' 
+                    : (payType === 'Elektron' ? 'badge-success' : 'badge-secondary');
+
+                let productsRows = '';
+                products.forEach(p => {
+                    const pQty = p.quantity || p.qty || 1;
+                    const pPrice = parseFloat(p.price) || 0;
+                    const pTotal = p.total || (pPrice * pQty);
+                    productsRows += `
+                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+                            <td style="padding: 6px 8px; color: var(--text-main); font-size: 12.5px;">
+                                <strong>${p.name || 'Noma\'lum mahsulot'}</strong>
+                                ${p.sku ? `<span style="font-size: 10.5px; color: var(--text-muted); font-family: monospace; display: block;">SKU: ${p.sku}</span>` : ''}
+                            </td>
+                            <td style="padding: 6px 8px; text-align: center; color: var(--text-muted); font-size: 12px; font-weight: 600;">${pQty}</td>
+                            <td style="padding: 6px 8px; text-align: right; color: var(--text-muted); font-size: 12px;">${pPrice.toLocaleString('uz-UZ')} ${currency}</td>
+                            <td style="padding: 6px 8px; text-align: right; color: var(--text-main); font-weight: 600; font-size: 12.5px;">${pTotal.toLocaleString('uz-UZ')} ${currency}</td>
+                        </tr>
+                    `;
+                });
+
+                html += `
+                    <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 10px; transition: var(--transition);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <span style="font-weight: 700; color: var(--accent); font-family: monospace; font-size: 13.5px;">
+                                    <i class="fas fa-receipt" style="margin-right: 4px;"></i> ${recCode}
+                                </span>
+                                <span class="badge ${payBadgeClass}" style="font-size: 11px; padding: 2px 7px; border-radius: 5px; font-weight: 600;">
+                                    ${payType}
+                                </span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 12px;">
+                                <span style="color: var(--text-muted); font-size: 12px;">
+                                    <i class="far fa-clock" style="margin-right: 4px;"></i> ${dateStr}
+                                </span>
+                                <span style="font-size: 15px; font-weight: 800; color: #10b981; font-family: monospace;">
+                                    ${(parseFloat(rec.total_amount) || 0).toLocaleString('uz-UZ')} ${currency}
+                                </span>
+                            </div>
+                        </div>
+
+                        ${products.length > 0 ? `
+                            <div style="background: rgba(0,0,0,0.15); border-radius: 8px; padding: 6px 10px; overflow-x: auto;">
+                                <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+                                    <thead>
+                                        <tr style="border-bottom: 1px solid var(--border-color); color: var(--text-muted); font-size: 11px; text-transform: uppercase;">
+                                            <th style="text-align: left; padding: 4px 8px;">Mahsulot</th>
+                                            <th style="text-align: center; padding: 4px 8px; width: 60px;">Miqdor</th>
+                                            <th style="text-align: right; padding: 4px 8px; width: 90px;">Narx</th>
+                                            <th style="text-align: right; padding: 4px 8px; width: 110px;">Jami</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${productsRows}
+                                    </tbody>
+                                </table>
+                            </div>
+                        ` : `
+                            <div style="font-size: 12px; color: var(--text-muted); font-style: italic;">
+                                Maxsulotlar ro'yxati biriktirilmagan
+                            </div>
+                        `}
+
+                        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11.5px; color: var(--text-muted); border-top: 1px dashed rgba(255,255,255,0.06); padding-top: 6px;">
+                            <span>${rec.cashier_name ? `<i class="fas fa-user" style="margin-right: 3px;"></i> Kassir: ${rec.cashier_name}` : ''} ${sellerName ? `| Sotuvchi: ${sellerName}` : ''}</span>
+                            <span>Mahsulotlar: <strong>${products.length} ta pozitsiya</strong></span>
+                        </div>
+                    </div>
+                `;
+            });
+
+            listEl.innerHTML = html;
+
+        } catch (err) {
+            console.error("Mijoz cheklarini yuklashda xatolik:", err);
+            if (listEl) {
+                listEl.innerHTML = '<div style="text-align: center; padding: 16px; color: var(--danger); font-size: 13px;">Cheklarni yuklashda xatolik yuz berdi</div>';
+            }
+        }
     },
 
     openEditClientModal: async function(id) {

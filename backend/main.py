@@ -266,22 +266,28 @@ def get_clients(request: Request):
                 c["debt"] = float(meta.get("debt") or 0)
                 c["notes"] = meta.get("notes") or ""
                 c["category"] = meta.get("category") or ("qurilish" if c.get("company") and c.get("company").strip() else "ustalar")
+                c["bonus_history"] = meta.get("bonus_history") or []
             except Exception:
                 c["notes"] = op
                 c["category"] = "qurilish" if c.get("company") and c.get("company").strip() else "ustalar"
+                c["bonus_history"] = []
         elif "__NOTE_SEP__" in op:
             parts = op.split("__NOTE_SEP__", 1)
             c["operator"] = parts[0]
             c["notes"] = parts[1]
             c["category"] = "qurilish" if c.get("company") and c.get("company").strip() else "ustalar"
+            c["bonus_history"] = []
         elif " | " in op:
             parts = op.split(" | ", 1)
             c["operator"] = parts[0]
             c["notes"] = parts[1]
             c["category"] = "qurilish" if c.get("company") and c.get("company").strip() else "ustalar"
+            c["bonus_history"] = []
         else:
             c["operator"] = op
+            c["notes"] = ""
             c["category"] = "qurilish" if c.get("company") and c.get("company").strip() else "ustalar"
+            c["bonus_history"] = []
     return res or []
 
 @app.post("/api/clients")
@@ -301,13 +307,18 @@ def save_client(client_data: dict, request: Request):
     if category not in ["ustalar", "qurilish"]:
         category = "qurilish" if (client_data.get("company") or "").strip() else "ustalar"
     
+    bonus_history = client_data.get("bonus_history")
+    if not isinstance(bonus_history, list):
+        bonus_history = []
+    
     meta = {
         "op": operator,
         "barcode": barcode,
         "bonus": bonus,
         "debt": debt,
         "notes": notes,
-        "category": category
+        "category": category,
+        "bonus_history": bonus_history
     }
     op_val = json.dumps(meta, ensure_ascii=False)
 
@@ -3614,7 +3625,11 @@ def run_sync_in_background(days: int = None, sync_date: str = None, company_id: 
                 card = target_cheque.get("card")
                 cust_name = ""
                 cust_phone = ""
+                card_barcode = ""
+                card_id = None
                 if isinstance(card, dict):
+                    card_id = card.get("id")
+                    card_barcode = str(card.get("barcode_value") or card.get("barcode") or "").strip()
                     customer = card.get("customer")
                     if isinstance(customer, dict):
                         cust_name = (customer.get("full_name") or "").strip()
@@ -3632,6 +3647,8 @@ def run_sync_in_background(days: int = None, sync_date: str = None, company_id: 
                 items_payload = {
                     "customer_name": cust_name,
                     "customer_phone": cust_phone,
+                    "card_barcode": card_barcode,
+                    "card_id": card_id,
                     "seller_name": seller_name,
                     "products": items_list,
                     "status": target_cheque.get("status") or "Closed"
