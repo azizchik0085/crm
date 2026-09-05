@@ -649,7 +649,7 @@ window.App = {
             let allowedViews = ['dashboard'];
             
             if (activeUserId === 'admin') {
-                allowedViews = ['dashboard', 'crm', 'telephony', 'erp', 'finance', 'chats', 'hr', 'settings', 'receipts', 'seniklar', 'kassa', 'procurement', 'tasks', 'marketing', 'service', 'documents', 'audit', 'reports'];
+                allowedViews = ['dashboard', 'crm', 'telephony', 'erp', 'finance', 'chats', 'hr', 'settings', 'receipts', 'seniklar', 'kassa', 'procurement', 'tasks', 'marketing', 'service', 'documents', 'audit', 'reports', 'mobile-app'];
             } else if (foundRole && foundRole.permissions) {
                 allowedViews = ['dashboard', ...foundRole.permissions];
             } else {
@@ -661,7 +661,7 @@ window.App = {
                 const isHR = activeRoleName.includes('hr') || activeRoleName.includes('kadr') || activeRoleName.includes('recruiter');
                 
                 if (isSupervisor) {
-                    allowedViews = ['dashboard', 'crm', 'telephony', 'erp', 'finance', 'chats', 'hr', 'settings', 'receipts', 'seniklar', 'kassa', 'procurement', 'tasks', 'marketing', 'service', 'documents', 'audit', 'reports'];
+                    allowedViews = ['dashboard', 'crm', 'telephony', 'erp', 'finance', 'chats', 'hr', 'settings', 'receipts', 'seniklar', 'kassa', 'procurement', 'tasks', 'marketing', 'service', 'documents', 'audit', 'reports', 'mobile-app'];
                 } else if (isSales) {
                     allowedViews = ['dashboard', 'crm', 'telephony', 'chats', 'erp', 'receipts', 'seniklar', 'kassa', 'reports'];
                 } else if (isWarehouse) {
@@ -1094,6 +1094,8 @@ window.App = {
             if (window.Documents) window.Documents.init();
         } else if (viewName === 'audit') {
             this.loadAuditLogs();
+        } else if (viewName === 'mobile-app') {
+            if (window.MobileManager) window.MobileManager.init();
         }
     },
 

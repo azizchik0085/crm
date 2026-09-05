@@ -4253,7 +4253,11 @@ def auth_login(payload: dict):
         if found:
             c_settings = get_company_settings(company_id, bypass_cache=True)
             roles_list = c_settings.get("roles", [])
-            mobile_perms = resolve_mobile_permissions(found.get("role"), roles_list)
+            emp_mobile_perms = found.get("mobile_permissions")
+            if emp_mobile_perms is not None and isinstance(emp_mobile_perms, list):
+                mobile_perms = emp_mobile_perms
+            else:
+                mobile_perms = resolve_mobile_permissions(found.get("role"), roles_list)
             
             return {
                 "status": "success",
@@ -4304,12 +4308,52 @@ def get_mobile_permissions(request: Request, role: str = None, employee_id: str 
             
     my_perms = resolve_mobile_permissions(target_role, roles_list) if target_role else []
     
+    # Also fetch active employees to display in management view
+    employees_data = []
+    if company_id:
+        try:
+            raw_emps = supabase_req("GET", f"employees?company_id=eq.{company_id}&order=created_at.asc")
+            if isinstance(raw_emps, list):
+                for e in raw_emps:
+                    r_perms = resolve_mobile_permissions(e.get("role"), roles_list)
+                    has_custom = e.get("mobile_permissions") is not None and isinstance(e.get("mobile_permissions"), list)
+                    employees_data.append({
+                        "id": e.get("id"),
+                        "name": e.get("name"),
+                        "role": e.get("role"),
+                        "login": e.get("login"),
+                        "status": e.get("status", "active"),
+                        "has_custom": has_custom,
+                        "mobile_permissions": e.get("mobile_permissions") if has_custom else r_perms
+                    })
+        except Exception as emp_err:
+            print("Error fetching employees for mobile permissions:", emp_err)
+            
     return {
         "ok": True,
         "all_modules": MOBILE_ALL_MODULES,
         "roles": roles_list,
+        "employees": employees_data,
         "my_permissions": my_perms
     }
+
+@app.post("/api/mobile/employee-permissions")
+def save_mobile_employee_permissions(payload: dict, request: Request):
+    company_id = get_company_id(request)
+    if not company_id:
+        raise HTTPException(status_code=400, detail="Company ID talab qilinadi")
+    emp_id = (payload.get("employee_id") or "").strip()
+    mobile_perms = payload.get("mobile_permissions")
+    reset_to_role = payload.get("reset_to_role", False)
+    if not emp_id:
+        raise HTTPException(status_code=400, detail="Xodim ID kiritilishi shart")
+    
+    try:
+        val = None if reset_to_role else mobile_perms
+        supabase_req("PATCH", f"employees?id=eq.{emp_id}&company_id=eq.{company_id}", json_data={"mobile_permissions": val})
+        return {"ok": True, "message": "Xodimning mobil ruxsatnomalari muvaffaqiyatli saqlandi"}
+    except Exception as err:
+        raise HTTPException(status_code=500, detail=str(err))
 
 @app.post("/api/mobile/role-permissions")
 def save_mobile_role_permissions(payload: dict, request: Request):
