@@ -145,20 +145,50 @@ window.DB = {
     },
 
     // --- ALOHIDA HAQIQIY MIJOZLAR (CLIENTS REGISTRY) OPERATSIYALARI ---
-    getClients: async function() {
+    _clientsCache: null,
+    getClients: async function(forceRefresh = false) {
+        if (!forceRefresh && this._clientsCache && this._clientsCache.length > 0) {
+            return this._clientsCache;
+        }
+        const cached = AppStorage.load().clients;
+        if (!forceRefresh && cached && cached.length > 0) {
+            this._clientsCache = cached;
+            // Orqa fonda sokinlik bilan yangilab qo'yamiz
+            fetch('/api/clients')
+                .then(r => r.ok ? r.json() : null)
+                .then(data => {
+                    if (Array.isArray(data)) {
+                        this._clientsCache = data;
+                        AppStorage.updateKey('clients', data);
+                    }
+                }).catch(() => {});
+            return cached;
+        }
         try {
             const response = await fetch('/api/clients');
             if (!response.ok) throw new Error("HTTP error " + response.status);
             const data = await response.json();
+            this._clientsCache = data;
             AppStorage.updateKey('clients', data);
             return data;
         } catch (e) {
             console.warn("Backend-dan mijozlar bazasini yuklab bo'lmadi, keshdan o'qiladi:", e);
-            return AppStorage.load().clients || [];
+            const fallback = AppStorage.load().clients || [];
+            this._clientsCache = fallback;
+            return fallback;
         }
     },
 
     saveClient: async function(client) {
+        // Mahalliy tezkor saqlash (0ms kechikish)
+        const data = AppStorage.load();
+        if (!data.clients) data.clients = [];
+        const index = data.clients.findIndex(c => c.id === client.id);
+        if (index > -1) data.clients[index] = client;
+        else data.clients.unshift(client);
+        AppStorage.save(data);
+        this._clientsCache = data.clients;
+
         try {
             const response = await fetch('/api/clients', {
                 method: 'POST',
@@ -169,15 +199,16 @@ window.DB = {
         } catch (e) {
             console.error("Backend-ga mijozni saqlashda xatolik:", e);
         }
-        const data = AppStorage.load();
-        if (!data.clients) data.clients = [];
-        const index = data.clients.findIndex(c => c.id === client.id);
-        if (index > -1) data.clients[index] = client;
-        else data.clients.unshift(client);
-        AppStorage.save(data);
     },
 
     deleteClient: async function(id) {
+        // Mahalliy tezkor o'chirish
+        const data = AppStorage.load();
+        if (data.clients) {
+            data.clients = data.clients.filter(c => c.id !== id);
+            AppStorage.save(data);
+            this._clientsCache = data.clients;
+        }
         try {
             const response = await fetch(`/api/clients/${id}`, {
                 method: 'DELETE'
@@ -185,11 +216,6 @@ window.DB = {
             if (!response.ok) throw new Error("HTTP error " + response.status);
         } catch (e) {
             console.error("Backend-dan mijozni o'chirishda xatolik:", e);
-        }
-        const data = AppStorage.load();
-        if (data.clients) {
-            data.clients = data.clients.filter(c => c.id !== id);
-            AppStorage.save(data);
         }
     },
 
@@ -287,16 +313,36 @@ window.DB = {
     },
 
     // --- XODIMLAR (HR) OPERATSIYALARI ---
-    getEmployees: async function() {
+    _employeesCache: null,
+    getEmployees: async function(forceRefresh = false) {
+        if (!forceRefresh && this._employeesCache && this._employeesCache.length > 0) {
+            return this._employeesCache;
+        }
+        const cached = AppStorage.load().employees;
+        if (!forceRefresh && cached && cached.length > 0) {
+            this._employeesCache = cached;
+            fetch('/api/employees')
+                .then(r => r.ok ? r.json() : null)
+                .then(data => {
+                    if (Array.isArray(data)) {
+                        this._employeesCache = data;
+                        AppStorage.updateKey('employees', data);
+                    }
+                }).catch(() => {});
+            return cached;
+        }
         try {
             const response = await fetch('/api/employees');
             if (!response.ok) throw new Error("HTTP error " + response.status);
             const data = await response.json();
+            this._employeesCache = data;
             AppStorage.updateKey('employees', data);
             return data;
         } catch (e) {
             console.warn("Backend-dan xodimlarni yuklab bo'lmadi, keshdan o'qiladi:", e);
-            return AppStorage.load().employees;
+            const fallback = AppStorage.load().employees || [];
+            this._employeesCache = fallback;
+            return fallback;
         }
     },
     getWarehouses: async function() {

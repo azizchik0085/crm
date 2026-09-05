@@ -1,3 +1,20 @@
+// Global Modal Boshqaruvi
+window.showModal = window.showModal || function(id) {
+    const modal = document.getElementById(id);
+    if (modal) {
+        modal.style.display = 'flex';
+    }
+};
+window.openModal = window.openModal || window.showModal;
+
+window.closeModal = window.closeModal || function(id) {
+    const modal = document.getElementById(id);
+    if (modal) {
+        modal.style.display = 'none';
+    }
+};
+window.hideModal = window.hideModal || window.closeModal;
+
 const DEFAULT_DATA = {
     settings: {
         currency: 'UZS',

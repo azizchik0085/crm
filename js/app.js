@@ -13,8 +13,11 @@ window.showModal = function(id) {
     const modal = document.getElementById(id);
     if (modal) {
         modal.style.display = 'flex';
+    } else {
+        console.warn("Modal topilmadi:", id);
     }
 };
+window.openModal = window.showModal;
 
 window.closeModal = function(id) {
     const modal = document.getElementById(id);
@@ -22,6 +25,7 @@ window.closeModal = function(id) {
         modal.style.display = 'none';
     }
 };
+window.hideModal = window.closeModal;
 
 window.App = {
     currentView: 'dashboard',

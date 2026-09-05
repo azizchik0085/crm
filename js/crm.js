@@ -1,4 +1,5 @@
-// ERP & CRM Tizimi - CRM Moduli (Mijozlar, Sotuvlar va Qo'ng'iroqlar) - SUPABASE & TELEFONIYA BILAN
+window.openModal = window.openModal || window.showModal;
+window.closeModal = window.closeModal || window.hideModal;
 
 window.CRM = {
     activeTab: 'kanban', // 'kanban', 'list', 'calls' yoki 'products'
@@ -1739,32 +1740,74 @@ window.CRM = {
 
     customerListPage: 1,
     customerListPageSize: 20,
-    _clientsCache: [],
+    _clientsCache: null,
+    _operatorsCache: null,
 
-    initCustomersView: function() {
+    initCustomersView: async function() {
         this.customerListPage = 1;
         this.customerListPageSize = 20;
         this.setupCustomersViewEventListeners();
-        this.renderCustomersView();
 
-        if (!this.pollingInterval) {
-            this.pollingInterval = setInterval(() => {
-                if (window.App && window.App.currentView === 'crm' && !this.isDragging && this.activeTab !== 'calls' && this.activeTab !== 'products') {
-                    this.render();
-                } else if (window.App && window.App.currentView === 'crm-customers') {
-                    this.renderCustomersView();
-                }
-            }, 5000);
+        // 1. Dastlabki tezkor ko'rsatish (0ms)
+        if (!this._clientsCache || this._clientsCache.length === 0) {
+            this._clientsCache = AppStorage.load().clients || [];
         }
+        this.renderCustomersTable();
+
+        // 2. Serverdan yangilash
+        await this.loadCustomersData();
+
+        if (!this.customerPollingInterval) {
+            this.customerPollingInterval = setInterval(() => {
+                if (window.App && window.App.currentView === 'crm-customers') {
+                    const clientModal = document.getElementById('client-modal');
+                    const regosModal = document.getElementById('regos-card-search-modal');
+                    const isModalOpen = (clientModal && clientModal.style.display === 'flex') || (regosModal && regosModal.style.display === 'flex');
+                    const searchInput = document.getElementById('crm-clientlist-search') || document.getElementById('crm-custlist-search');
+                    const isSearching = searchInput && (document.activeElement === searchInput || searchInput.value.trim().length > 0);
+
+                    if (!isModalOpen && !isSearching) {
+                        this.refreshCustomersDataBackground();
+                    }
+                }
+            }, 10000);
+        }
+    },
+
+    loadCustomersData: async function(forceRefresh = false) {
+        try {
+            const clients = await DB.getClients(forceRefresh);
+            this._clientsCache = clients || [];
+        } catch (e) {
+            console.error("Mijozlarni yuklashda xatolik:", e);
+            if (!this._clientsCache || this._clientsCache.length === 0) {
+                this._clientsCache = AppStorage.load().clients || [];
+            }
+        }
+        this.renderCustomersTable();
+    },
+
+    refreshCustomersDataBackground: async function() {
+        try {
+            const clients = await DB.getClients(true);
+            if (Array.isArray(clients)) {
+                this._clientsCache = clients;
+                this.renderCustomersTable();
+            }
+        } catch(e) {}
     },
 
     setupCustomersViewEventListeners: function() {
         const searchInput = document.getElementById('crm-clientlist-search') || document.getElementById('crm-custlist-search');
         if (searchInput && !searchInput._bound) {
             searchInput._bound = true;
+            let timeout = null;
             searchInput.oninput = () => {
-                this.customerListPage = 1;
-                this.renderCustomersView();
+                if (timeout) clearTimeout(timeout);
+                timeout = setTimeout(() => {
+                    this.customerListPage = 1;
+                    this.renderCustomersTable();
+                }, 80);
             };
         }
 
@@ -1773,28 +1816,29 @@ window.CRM = {
             typeFilter._bound = true;
             typeFilter.onchange = () => {
                 this.customerListPage = 1;
-                this.renderCustomersView();
+                this.renderCustomersTable();
             };
         }
     },
 
     onClientSearchInput: function() {
         this.customerListPage = 1;
-        this.renderCustomersView();
+        this.renderCustomersTable();
     },
 
-    renderCustomersView: async function() {
+    renderCustomersView: async function(forceRefresh = false) {
+        if (forceRefresh || !this._clientsCache || this._clientsCache.length === 0) {
+            await this.loadCustomersData(forceRefresh);
+        } else {
+            this.renderCustomersTable();
+        }
+    },
+
+    renderCustomersTable: function() {
         const container = document.getElementById('crm-custlist-content');
         if (!container) return;
 
-        let clients = [];
-        try {
-            clients = await DB.getClients();
-            this._clientsCache = clients;
-        } catch (e) {
-            console.error("Mijozlarni yuklashda xatolik:", e);
-            clients = this._clientsCache || AppStorage.load().clients || [];
-        }
+        const clients = this._clientsCache || [];
 
         // 1. KPI kartochkalarni yangilash
         const totalStat = document.getElementById('clientlist-stat-total') || document.getElementById('custlist-stat-total');
@@ -2032,14 +2076,14 @@ window.CRM = {
 
     changeCustomerListPage: function(page) {
         this.customerListPage = page;
-        this.renderCustomersView();
+        this.renderCustomersTable();
         const sec = document.getElementById('view-crm-customers');
         if (sec) {
             sec.scrollIntoView({ behavior: 'smooth' });
         }
     },
 
-    openAddClientModal: async function() {
+    openAddClientModal: function() {
         const form = document.getElementById('client-form');
         if (form) form.reset();
         const idInput = document.getElementById('client-id');
@@ -2047,8 +2091,13 @@ window.CRM = {
         const title = document.getElementById('client-modal-title');
         if (title) title.innerHTML = '<i class="fas fa-user-plus" style="color: var(--accent); margin-right: 8px;"></i> Yangi Mijoz Qo\'shish';
         
-        await this.populateClientOperators();
-        openModal('client-modal');
+        // Modal darhol (0ms) ochiladi
+        showModal('client-modal');
+        this.populateClientOperators();
+        setTimeout(() => {
+            const nameInput = document.getElementById('client-name');
+            if (nameInput) nameInput.focus();
+        }, 50);
     },
 
     openEditClientModal: async function(id) {
@@ -2089,16 +2138,18 @@ window.CRM = {
         const title = document.getElementById('client-modal-title');
         if (title) title.innerHTML = '<i class="fas fa-user-edit" style="color: var(--accent); margin-right: 8px;"></i> Mijoz Ma\'lumotlarini Tahrirlash';
 
-        await this.populateClientOperators(client.operator);
-        openModal('client-modal');
+        // Modal darhol ochiladi
+        showModal('client-modal');
+        this.populateClientOperators(client.operator);
     },
 
+    _operatorsCache: null,
     populateClientOperators: async function(selectedOperator = '') {
         const select = document.getElementById('client-operator');
         if (!select) return;
-        select.innerHTML = '<option value="">Tanlanmagan</option>';
-        try {
-            const emps = await DB.getEmployees();
+        
+        const renderOpts = (emps) => {
+            select.innerHTML = '<option value="">Tanlanmagan</option>';
             emps.forEach(emp => {
                 if (emp.name) {
                     const opt = document.createElement('option');
@@ -2108,6 +2159,19 @@ window.CRM = {
                     select.appendChild(opt);
                 }
             });
+        };
+
+        if (this._operatorsCache && this._operatorsCache.length > 0) {
+            renderOpts(this._operatorsCache);
+            return;
+        }
+
+        try {
+            const emps = await DB.getEmployees();
+            if (Array.isArray(emps) && emps.length > 0) {
+                this._operatorsCache = emps;
+                renderOpts(emps);
+            }
         } catch(e) {}
     },
 
@@ -2161,9 +2225,20 @@ window.CRM = {
                 clientData.created_at = new Date().toISOString();
             }
 
-            await DB.saveClient(clientData);
             closeModal('client-modal');
-            await this.renderCustomersView();
+
+            // Mahalliy keshni darhol yangilash (0ms kutish)
+            if (!this._clientsCache) this._clientsCache = [];
+            const exIdx = this._clientsCache.findIndex(c => c.id === clientData.id);
+            if (exIdx > -1) {
+                this._clientsCache[exIdx] = { ...this._clientsCache[exIdx], ...clientData };
+            } else {
+                this._clientsCache.unshift(clientData);
+            }
+            this.renderCustomersTable();
+
+            await DB.saveClient(clientData);
+            await this.loadCustomersData(true);
         } catch(e) {
             alert("Mijozni saqlashda xatolik yuz berdi: " + e.message);
         } finally {
@@ -2177,8 +2252,12 @@ window.CRM = {
     deleteClient: async function(id) {
         if (!confirm("Haqiqatan ham ushbu mijozni o'chirmoqchimisiz?")) return;
         try {
+            if (this._clientsCache) {
+                this._clientsCache = this._clientsCache.filter(c => c.id !== id);
+                this.renderCustomersTable();
+            }
             await DB.deleteClient(id);
-            await this.renderCustomersView();
+            await this.loadCustomersData(true);
         } catch(e) {
             alert("Mijozni o'chirishda xatolik: " + e.message);
         }
@@ -2199,10 +2278,10 @@ window.CRM = {
                 </div>
             `;
         }
-        openModal('regos-card-search-modal');
+        showModal('regos-card-search-modal');
         setTimeout(() => {
             if (input) input.focus();
-        }, 200);
+        }, 50);
     },
 
     onRegosSearchKeydown: function(event) {
@@ -2344,8 +2423,19 @@ window.CRM = {
                 operator: 'REGOS',
                 notes: card.group ? `REGOS Guruh: ${card.group}` : 'REGOS Xaridor kartasi',
                 source: 'client_directory',
-                status: 'client'
+                status: 'client',
+                created_at: new Date().toISOString()
             };
+
+            // Mahalliy keshni darhol yangilash (0ms)
+            if (!this._clientsCache) this._clientsCache = [];
+            const exIdx = this._clientsCache.findIndex(c => c.id === clientPayload.id);
+            if (exIdx > -1) {
+                this._clientsCache[exIdx] = { ...this._clientsCache[exIdx], ...clientPayload };
+            } else {
+                this._clientsCache.unshift(clientPayload);
+            }
+            this.renderCustomersTable();
 
             await DB.saveClient(clientPayload);
             card.is_already_added = true;
@@ -2357,8 +2447,6 @@ window.CRM = {
                     </span>
                 `;
             }
-
-            await this.renderCustomersView();
         } catch (err) {
             alert("Mijozni ro'yxatga qo'shishda xatolik: " + err.message);
             if (addBtn) {
