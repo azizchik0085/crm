@@ -324,7 +324,7 @@
                     </div>
 
                     <!-- Bonus Action Buttons (Faqat m_bonus ruxsati bor xodimlarda ko'rinadi) -->
-                    <div id="m-bonus-actions-container" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 10px;">
+                    <div id="m-bonus-actions-container" style="display: none; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 10px;">
                         <button class="btn btn-secondary" style="height: 36px; font-size: 12px; padding: 0;" onclick="MobileApp.toggleBonusForm('add')">
                             <i class="fas fa-plus" style="color: #10b981;"></i> Qo'shish
                         </button>
@@ -449,14 +449,17 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
 
     <!-- Mobile App Main Script -->
-    <script src="/js/mobile-app.js"></script>
+    <script src="/js/mobile-app.js?v=2.5"></script>
 
     <!-- Register Service Worker for PWA Offline / Standalone Installation -->
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw-mobile.js')
-                    .then(reg => console.log('SmartCore Mobile SW registered'))
+                navigator.serviceWorker.register('/sw-mobile.js?v=4')
+                    .then(reg => {
+                        reg.update();
+                        console.log('SmartCore Mobile SW registered');
+                    })
                     .catch(err => console.log('SmartCore Mobile SW registration failed:', err));
             });
         }

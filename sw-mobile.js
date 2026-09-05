@@ -1,8 +1,7 @@
-const CACHE_NAME = 'smartcore-mobile-v1';
+const CACHE_NAME = 'smartcore-mobile-v4';
 const ASSETS_TO_CACHE = [
   '/mobile.html',
   '/css/mobile-app.css',
-  '/js/mobile-app.js',
   '/manifest-mobile.json',
   '/assets/icon-192.png',
   '/assets/icon-512.png',
@@ -11,13 +10,6 @@ const ASSETS_TO_CACHE = [
 ];
 
 self.addEventListener('install', event => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => {
-      return cache.addAll(ASSETS_TO_CACHE).catch(err => {
-        console.warn('Pre-cache error (ignorable):', err);
-      });
-    })
-  );
   self.skipWaiting();
 });
 
@@ -26,7 +18,7 @@ self.addEventListener('activate', event => {
     caches.keys().then(keys => {
       return Promise.all(
         keys.map(key => {
-          if (key !== CACHE_NAME && key.startsWith('smartcore-mobile')) {
+          if (key !== CACHE_NAME) {
             return caches.delete(key);
           }
         })
@@ -41,22 +33,42 @@ self.addEventListener('fetch', event => {
   // Always fetch live data for API requests
   if (event.request.url.includes('/api/')) return;
 
+  const url = event.request.url;
+  const isDynamicAsset = event.request.mode === 'navigate' || url.includes('.html') || url.includes('.js');
+
+  if (isDynamicAsset) {
+    // Network-First for HTML and JS
+    event.respondWith(
+      fetch(event.request)
+        .then(response => {
+          if (response && response.status === 200) {
+            const toCache = response.clone();
+            caches.open(CACHE_NAME).then(cache => cache.put(event.request, toCache));
+          }
+          return response;
+        })
+        .catch(() => {
+          return caches.match(event.request).then(cached => {
+            if (cached) return cached;
+            if (event.request.mode === 'navigate') {
+              return caches.match('/mobile.html');
+            }
+          });
+        })
+    );
+    return;
+  }
+
+  // Cache-First for static assets (images, fonts, css)
   event.respondWith(
     caches.match(event.request).then(cached => {
       if (cached) return cached;
       return fetch(event.request).then(response => {
-        if (!response || response.status !== 200 || response.type !== 'basic') {
-          return response;
+        if (response && response.status === 200 && response.type === 'basic') {
+          const toCache = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, toCache));
         }
-        const toCache = response.clone();
-        caches.open(CACHE_NAME).then(cache => {
-          cache.put(event.request, toCache);
-        });
         return response;
-      }).catch(() => {
-        if (event.request.mode === 'navigate') {
-          return caches.match('/mobile.html');
-        }
       });
     })
   );

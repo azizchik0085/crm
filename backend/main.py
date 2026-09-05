@@ -40,6 +40,8 @@ async def company_id_middleware(request: Request, call_next):
                 company_id = referer.split("company_id=")[1].split("&")[0]
             except Exception:
                 pass
+    if company_id:
+        company_id = str(company_id).split(",")[0].strip()
                 
     if company_id and company_id != "admin":
         path = request.url.path
@@ -86,22 +88,22 @@ headers = {
 
 def get_company_id(request: Request = None, company_id: str = None):
     if company_id:
-        return company_id
+        return str(company_id).split(",")[0].strip()
     if request:
         cid = request.cookies.get("company_id") or request.headers.get("x-company-id") or request.query_params.get("company_id")
         if cid:
-            return cid
+            return str(cid).split(",")[0].strip()
         referer = request.headers.get("referer", "")
         if "company_id=" in referer:
             try:
                 cid = referer.split("company_id=")[1].split("&")[0]
                 if cid:
-                    return cid
+                    return str(cid).split(",")[0].strip()
             except Exception:
                 pass
     cid = active_company_id.get()
     if cid:
-        return cid
+        return str(cid).split(",")[0].strip()
     # Fallback to local settings file ONLY if running locally
     if request:
         try:
@@ -4352,8 +4354,6 @@ async def regos_webhook(request: Request):
 def resolve_mobile_permissions(role_str, roles_list):
     clean_role = (role_str or "").split(";")[0].strip().lower()
     all_mob = ["m_crm", "m_regos_cards", "m_receipts", "m_bonus", "m_erp", "m_scanner", "m_kassa", "m_telephony", "m_chats", "m_finance"]
-    if clean_role in ["admin", "superadmin", "direktor"]:
-        return all_mob
         
     found = None
     if isinstance(roles_list, list):
@@ -4364,6 +4364,9 @@ def resolve_mobile_permissions(role_str, roles_list):
                 
     if found and "mobile_permissions" in found and isinstance(found["mobile_permissions"], list):
         return found["mobile_permissions"]
+        
+    if clean_role in ["admin", "superadmin", "direktor"]:
+        return all_mob
         
     perms = (found.get("permissions") if found else []) or []
     m_perms = []
@@ -4435,9 +4438,13 @@ def auth_login(payload: dict):
         if found:
             c_settings = get_company_settings(company_id, bypass_cache=True)
             roles_list = c_settings.get("roles", [])
-            emp_mobile_perms = found.get("mobile_permissions")
-            if emp_mobile_perms is not None and isinstance(emp_mobile_perms, list):
-                mobile_perms = emp_mobile_perms
+            emp_custom_map = c_settings.get("employee_mobile_permissions", {})
+            emp_id = found.get("id")
+            
+            if emp_id and emp_id in emp_custom_map:
+                mobile_perms = emp_custom_map[emp_id]
+            elif found.get("mobile_permissions") is not None and isinstance(found.get("mobile_permissions"), list):
+                mobile_perms = found.get("mobile_permissions")
             else:
                 mobile_perms = resolve_mobile_permissions(found.get("role"), roles_list)
             
@@ -4478,24 +4485,25 @@ def get_mobile_permissions(request: Request, role: str = None, employee_id: str 
     company_id = get_company_id(request)
     settings = get_company_settings(company_id, bypass_cache=True) if company_id else settings_state
     roles_list = settings.get("roles", [])
+    emp_custom_map = settings.get("employee_mobile_permissions", {})
     
     target_role = role
     my_perms = []
     if employee_id:
-        try:
-            emps = supabase_req("GET", f"employees?id=eq.{employee_id}")
-            if emps and isinstance(emps, list) and len(emps) > 0:
-                emp = emps[0]
-                target_role = emp.get("role")
-                clean_r = (target_role or "").split(";")[0].strip().lower()
-                if clean_r in ["admin", "superadmin", "direktor"]:
-                    my_perms = [m["key"] for m in MOBILE_ALL_MODULES]
-                elif emp.get("mobile_permissions") is not None and isinstance(emp.get("mobile_permissions"), list):
-                    my_perms = emp.get("mobile_permissions")
-                else:
-                    my_perms = resolve_mobile_permissions(target_role, roles_list)
-        except Exception as e_emp:
-            print("Error loading employee permissions:", e_emp)
+        if employee_id in emp_custom_map:
+            my_perms = emp_custom_map[employee_id]
+        else:
+            try:
+                emps = supabase_req("GET", f"employees?id=eq.{employee_id}")
+                if emps and isinstance(emps, list) and len(emps) > 0:
+                    emp = emps[0]
+                    target_role = emp.get("role")
+                    if emp.get("mobile_permissions") is not None and isinstance(emp.get("mobile_permissions"), list):
+                        my_perms = emp.get("mobile_permissions")
+                    else:
+                        my_perms = resolve_mobile_permissions(target_role, roles_list)
+            except Exception as e_emp:
+                print("Error loading employee permissions:", e_emp)
     elif target_role:
         my_perms = resolve_mobile_permissions(target_role, roles_list)
     
@@ -4506,16 +4514,19 @@ def get_mobile_permissions(request: Request, role: str = None, employee_id: str 
             raw_emps = supabase_req("GET", f"employees?company_id=eq.{company_id}&order=created_at.asc")
             if isinstance(raw_emps, list):
                 for e in raw_emps:
-                    r_perms = resolve_mobile_permissions(e.get("role"), roles_list)
-                    has_custom = e.get("mobile_permissions") is not None and isinstance(e.get("mobile_permissions"), list)
+                    emp_id = e.get("id")
+                    e_role = e.get("role")
+                    r_perms = resolve_mobile_permissions(e_role, roles_list)
+                    has_custom = (emp_id in emp_custom_map) or (e.get("mobile_permissions") is not None and isinstance(e.get("mobile_permissions"), list))
+                    custom_perms = emp_custom_map.get(emp_id) if (emp_id in emp_custom_map) else e.get("mobile_permissions")
                     employees_data.append({
-                        "id": e.get("id"),
+                        "id": emp_id,
                         "name": e.get("name"),
-                        "role": e.get("role"),
+                        "role": e_role,
                         "login": e.get("login"),
                         "status": e.get("status", "active"),
                         "has_custom": has_custom,
-                        "mobile_permissions": e.get("mobile_permissions") if has_custom else r_perms
+                        "mobile_permissions": custom_perms if has_custom else r_perms
                     })
         except Exception as emp_err:
             print("Error fetching employees for mobile permissions:", emp_err)
@@ -4540,8 +4551,23 @@ def save_mobile_employee_permissions(payload: dict, request: Request):
         raise HTTPException(status_code=400, detail="Xodim ID kiritilishi shart")
     
     try:
-        val = None if reset_to_role else mobile_perms
-        supabase_req("PATCH", f"employees?id=eq.{emp_id}&company_id=eq.{company_id}", json_data={"mobile_permissions": val})
+        settings = get_company_settings(company_id, bypass_cache=True)
+        if "employee_mobile_permissions" not in settings or not isinstance(settings["employee_mobile_permissions"], dict):
+            settings["employee_mobile_permissions"] = {}
+            
+        if reset_to_role:
+            settings["employee_mobile_permissions"].pop(emp_id, None)
+        else:
+            settings["employee_mobile_permissions"][emp_id] = mobile_perms
+            
+        save_company_settings(company_id, settings)
+
+        try:
+            val = None if reset_to_role else mobile_perms
+            supabase_req("PATCH", f"employees?id=eq.{emp_id}&company_id=eq.{company_id}", json_data={"mobile_permissions": val})
+        except Exception:
+            pass
+
         return {"ok": True, "message": "Xodimning mobil ruxsatnomalari muvaffaqiyatli saqlandi"}
     except Exception as err:
         raise HTTPException(status_code=500, detail=str(err))

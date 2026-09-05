@@ -75,14 +75,11 @@ window.MobileApp = {
 
     refreshUserPermissions: async function() {
         if (!this.currentUser) return;
-        const role = (this.currentUser.role || '').toLowerCase();
-        if (role.includes('admin') || role.includes('superadmin') || role.includes('direktor')) return;
-        
         try {
             const url = this.currentUser.id 
                 ? `/api/mobile/permissions?employee_id=${encodeURIComponent(this.currentUser.id)}`
                 : `/api/mobile/permissions?role=${encodeURIComponent(this.currentUser.role || '')}`;
-            const res = await fetch(url);
+            const res = await fetch(url, { cache: 'no-store' });
             if (res.ok) {
                 const data = await res.json();
                 if (data && data.ok && Array.isArray(data.my_permissions)) {
@@ -100,12 +97,19 @@ window.MobileApp = {
 
     hasPermission: function(permKey) {
         if (!this.currentUser) return false;
+        
+        // 1. Agar foydalanuvchiga ruxsatlar biriktirilgan bo'lsa (serverdan olingan), unga qat'iy amal qilinadi
+        const perms = this.currentUser.mobile_permissions;
+        if (Array.isArray(perms)) {
+            return perms.includes(permKey);
+        }
+
+        // 2. Agar hali ruxsatlar yuklanmagan bo'lsa, faqat admin/superadmin uchun boshlang'ich ruxsat
         const role = (this.currentUser.role || '').toLowerCase();
-        if (role.includes('admin') || role.includes('superadmin') || role.includes('direktor')) {
+        if (role.includes('admin') || role.includes('superadmin')) {
             return true;
         }
-        const perms = this.currentUser.mobile_permissions || [];
-        return perms.includes(permKey);
+        return false;
     },
 
     login: async function(e) {
@@ -528,15 +532,15 @@ window.MobileApp = {
         const canEditBonus = this.hasPermission('m_bonus');
         const bonusActionsContainer = document.getElementById('m-bonus-actions-container');
         if (bonusActionsContainer) {
-            bonusActionsContainer.style.display = canEditBonus ? 'grid' : 'none';
+            bonusActionsContainer.style.setProperty('display', canEditBonus ? 'grid' : 'none', 'important');
         }
         const noPermMsg = document.getElementById('m-bonus-no-permission-msg');
         if (noPermMsg) {
-            noPermMsg.style.display = canEditBonus ? 'none' : 'block';
+            noPermMsg.style.setProperty('display', canEditBonus ? 'none' : 'block', 'important');
         }
         const bonusBox = document.getElementById('m-bonus-action-box');
         if (bonusBox) {
-            bonusBox.style.display = 'none';
+            bonusBox.style.setProperty('display', 'none', 'important');
         }
 
         // Open sheet
