@@ -256,6 +256,7 @@ def get_clients(request: Request):
         c["notes"] = ""
         c["operator"] = ""
         
+        c["category"] = "ustalar"
         if op.startswith("{") and op.endswith("}"):
             try:
                 meta = json.loads(op)
@@ -264,18 +265,23 @@ def get_clients(request: Request):
                 c["bonus"] = float(meta.get("bonus") or c.get("value") or 0)
                 c["debt"] = float(meta.get("debt") or 0)
                 c["notes"] = meta.get("notes") or ""
+                c["category"] = meta.get("category") or ("qurilish" if c.get("company") and c.get("company").strip() else "ustalar")
             except Exception:
                 c["notes"] = op
+                c["category"] = "qurilish" if c.get("company") and c.get("company").strip() else "ustalar"
         elif "__NOTE_SEP__" in op:
             parts = op.split("__NOTE_SEP__", 1)
             c["operator"] = parts[0]
             c["notes"] = parts[1]
+            c["category"] = "qurilish" if c.get("company") and c.get("company").strip() else "ustalar"
         elif " | " in op:
             parts = op.split(" | ", 1)
             c["operator"] = parts[0]
             c["notes"] = parts[1]
+            c["category"] = "qurilish" if c.get("company") and c.get("company").strip() else "ustalar"
         else:
             c["operator"] = op
+            c["category"] = "qurilish" if c.get("company") and c.get("company").strip() else "ustalar"
     return res or []
 
 @app.post("/api/clients")
@@ -291,13 +297,17 @@ def save_client(client_data: dict, request: Request):
     barcode = (client_data.get("barcode") or client_data.get("phone2") or "").strip()
     bonus = float(client_data.get("bonus") or client_data.get("value") or 0)
     debt = float(client_data.get("debt") or 0)
+    category = (client_data.get("category") or "").strip().lower()
+    if category not in ["ustalar", "qurilish"]:
+        category = "qurilish" if (client_data.get("company") or "").strip() else "ustalar"
     
     meta = {
         "op": operator,
         "barcode": barcode,
         "bonus": bonus,
         "debt": debt,
-        "notes": notes
+        "notes": notes,
+        "category": category
     }
     op_val = json.dumps(meta, ensure_ascii=False)
 

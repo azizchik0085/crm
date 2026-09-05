@@ -772,24 +772,24 @@
                     </div>
                     <div class="card stat-card">
                         <div class="stat-info">
-                            <h3>Kompaniyalar (Yuridik)</h3>
-                            <div class="stat-value" id="clientlist-stat-corporate" style="color: #38bdf8;">0</div>
+                            <h3>Ustalar</h3>
+                            <div class="stat-value" id="clientlist-stat-individual" style="color: #f59e0b;">0</div>
                         </div>
-                        <div class="stat-icon-box income"><i class="fas fa-building"></i></div>
+                        <div class="stat-icon-box inventory" style="background: rgba(245, 158, 11, 0.1); color: #f59e0b;"><i class="fas fa-hammer"></i></div>
                     </div>
                     <div class="card stat-card">
                         <div class="stat-info">
-                            <h3>Jismoniy Shaxslar</h3>
-                            <div class="stat-value" id="clientlist-stat-individual" style="color: #10b981;">0</div>
+                            <h3>Qurilish Obyektlari</h3>
+                            <div class="stat-value" id="clientlist-stat-corporate" style="color: #38bdf8;">0</div>
                         </div>
-                        <div class="stat-icon-box inventory"><i class="fas fa-user-check"></i></div>
+                        <div class="stat-icon-box income" style="background: rgba(56, 189, 248, 0.1); color: #38bdf8;"><i class="fas fa-building"></i></div>
                     </div>
                     <div class="card stat-card">
                         <div class="stat-info">
                             <h3>Shu Oyda Qo'shilgan</h3>
-                            <div class="stat-value" id="clientlist-stat-month" style="color: #f59e0b;">0</div>
+                            <div class="stat-value" id="clientlist-stat-month" style="color: #10b981;">0</div>
                         </div>
-                        <div class="stat-icon-box expense" style="background: rgba(245, 158, 11, 0.1); color: #f59e0b;"><i class="fas fa-calendar-check"></i></div>
+                        <div class="stat-icon-box expense" style="background: rgba(16, 185, 129, 0.1); color: #10b981;"><i class="fas fa-calendar-check"></i></div>
                     </div>
                 </div>
 
@@ -803,8 +803,8 @@
                         <div style="min-width: 180px;">
                             <select id="crm-clientlist-type-filter" class="form-control" style="height: 42px; background-color: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); color: var(--text-main); border-radius: 8px;" onchange="CRM.renderCustomersView()">
                                 <option value="">Barcha mijozlar</option>
-                                <option value="corporate">Faqat Kompaniyalar</option>
-                                <option value="individual">Faqat Jismoniy shaxslar</option>
+                                <option value="ustalar">Ustalar</option>
+                                <option value="qurilish">Qurulish obyekti</option>
                             </select>
                         </div>
                     </div>
@@ -2034,9 +2034,18 @@
                         <label for="client-name" style="font-weight: 500;">Mijoz F.I.Sh / Nomi <span style="color:var(--danger)">*</span></label>
                         <input type="text" id="client-name" class="form-control" required placeholder="Masalan: Sardor Komilov">
                     </div>
-                    <div class="form-group">
-                        <label for="client-company" style="font-weight: 500;">Kompaniya / Tashkilot nomi</label>
-                        <input type="text" id="client-company" class="form-control" placeholder="Masalan: Stroy Lyuks MCHJ (ixtiyoriy)">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                        <div class="form-group">
+                            <label for="client-company" style="font-weight: 500;">Kompaniya / Obyekt nomi</label>
+                            <input type="text" id="client-company" class="form-control" placeholder="Masalan: Yangi Hayot Obyekti (ixtiyoriy)">
+                        </div>
+                        <div class="form-group">
+                            <label for="client-category" style="font-weight: 500;"><i class="fas fa-layer-group" style="color: var(--accent); margin-right: 4px;"></i> Mijoz toifasi <span style="color:var(--danger)">*</span></label>
+                            <select id="client-category" class="form-control" style="font-weight: 500;">
+                                <option value="ustalar">Ustalar</option>
+                                <option value="qurilish">Qurilish obyekti</option>
+                            </select>
+                        </div>
                     </div>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
                         <div class="form-group">
@@ -2914,7 +2923,7 @@
     <script src="js/storage.js?v=5"></script>
     <script src="js/db.js?v=8"></script>
     <script src="js/telephony.js?v=6"></script>
-    <script src="js/crm.js?v=10"></script>
+    <script src="js/crm.js?v=11"></script>
     <script src="js/chats.js?v=4"></script>
     <script src="js/erp.js?v=10"></script>
     <script src="js/finance.js?v=4"></script>

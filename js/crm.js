@@ -1840,7 +1840,7 @@ window.CRM = {
 
         const clients = this._clientsCache || [];
 
-        // 1. KPI kartochkalarni yangilash
+        // 1. KPI kartochkalarni yangilash (Ustalar va Qurilish obyektlari)
         const totalStat = document.getElementById('clientlist-stat-total') || document.getElementById('custlist-stat-total');
         const corpStat = document.getElementById('clientlist-stat-corporate') || document.getElementById('custlist-stat-new');
         const indivStat = document.getElementById('clientlist-stat-individual') || document.getElementById('custlist-stat-contacted');
@@ -1848,23 +1848,23 @@ window.CRM = {
 
         const now = new Date();
         const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-        const corpCount = clients.filter(c => c.company && c.company.trim().length > 0).length;
-        const indivCount = clients.filter(c => !c.company || c.company.trim().length === 0).length;
+        const ustalarCount = clients.filter(c => (c.category === 'ustalar') || (!c.category && (!c.company || !c.company.trim()))).length;
+        const qurilishCount = clients.filter(c => (c.category === 'qurilish') || (!c.category && c.company && c.company.trim())).length;
         const monthCount = clients.filter(c => c.created_at && c.created_at.startsWith(currentMonthStr)).length;
 
         if (totalStat) totalStat.textContent = clients.length;
-        if (corpStat) corpStat.textContent = corpCount;
-        if (indivStat) indivStat.textContent = indivCount;
+        if (indivStat) indivStat.textContent = ustalarCount;
+        if (corpStat) corpStat.textContent = qurilishCount;
         if (monthStat) monthStat.textContent = monthCount;
 
-        // 2. Filtrlash
+        // 2. Filtrlash (Ustalar va Qurilish obyekti)
         const searchInput = document.getElementById('crm-clientlist-search') || document.getElementById('crm-custlist-search');
         const searchVal = (searchInput ? searchInput.value : '').toLowerCase().trim();
         const typeFilter = document.getElementById('crm-clientlist-type-filter')?.value || '';
 
         const filtered = clients.filter(c => {
-            if (typeFilter === 'corporate' && (!c.company || !c.company.trim())) return false;
-            if (typeFilter === 'individual' && c.company && c.company.trim()) return false;
+            const cat = c.category || (c.company && c.company.trim() ? 'qurilish' : 'ustalar');
+            if (typeFilter && cat !== typeFilter) return false;
             if (searchVal) {
                 const name = (c.name || '').toLowerCase();
                 const phone = (c.phone || '').toLowerCase();
@@ -1873,7 +1873,8 @@ window.CRM = {
                 const company = (c.company || '').toLowerCase();
                 const address = (c.email || c.address || '').toLowerCase();
                 const notes = (c.notes || '').toLowerCase();
-                if (!name.includes(searchVal) && !phone.includes(searchVal) && !phone2.includes(searchVal) && !barcode.includes(searchVal) && !company.includes(searchVal) && !address.includes(searchVal) && !notes.includes(searchVal)) {
+                const catText = cat === 'qurilish' ? 'qurilish obyekti' : 'ustalar';
+                if (!name.includes(searchVal) && !phone.includes(searchVal) && !phone2.includes(searchVal) && !barcode.includes(searchVal) && !company.includes(searchVal) && !address.includes(searchVal) && !notes.includes(searchVal) && !catText.includes(searchVal)) {
                     return false;
                 }
             }
@@ -1898,10 +1899,11 @@ window.CRM = {
                             <tr>
                                 <th style="width: 45px; text-align: center;">#</th>
                                 <th>Mijoz (F.I.Sh)</th>
+                                <th>Toifasi</th>
                                 <th>Shtrix-kod (Karta)</th>
                                 <th>Asosiy telefon</th>
                                 <th>Bonus balansi</th>
-                                <th>Kompaniya / Korxona</th>
+                                <th>Kompaniya / Obyekt</th>
                                 <th>Qo'shimcha telefon</th>
                                 <th>Manzil / Hudud</th>
                                 <th>Izoh / Eslatma</th>
@@ -1914,7 +1916,7 @@ window.CRM = {
         if (pageItems.length === 0) {
             tableHtml += `
                 <tr>
-                    <td colspan="10" style="text-align: center; color: var(--text-muted); padding: 50px 20px;">
+                    <td colspan="11" style="text-align: center; color: var(--text-muted); padding: 50px 20px;">
                         <div style="max-width: 420px; margin: 0 auto; text-align: center;">
                             <div style="width: 56px; height: 56px; border-radius: 50%; background: rgba(56, 189, 248, 0.1); color: #38bdf8; display: flex; align-items: center; justify-content: center; font-size: 24px; margin: 0 auto 16px;">
                                 <i class="fas fa-barcode"></i>
@@ -1939,7 +1941,17 @@ window.CRM = {
             pageItems.forEach((c, idx) => {
                 const rowNum = startIdx + idx + 1;
                 const clientName = c.name || '-';
-                const companyName = c.company ? `<span style="font-weight: 500; color: var(--accent);"><i class="fas fa-building" style="margin-right: 5px; font-size: 11px;"></i>${c.company}</span>` : '<span style="color: var(--text-muted); font-style: italic;">Jismoniy shaxs</span>';
+                const cat = c.category || (c.company && c.company.trim() ? 'qurilish' : 'ustalar');
+                const categoryBadge = cat === 'qurilish' ? `
+                    <span class="badge" style="background: rgba(56, 189, 248, 0.12); color: #38bdf8; padding: 4px 10px; border-radius: 6px; font-size: 11.5px; font-weight: 600; display: inline-flex; align-items: center; gap: 5px;">
+                        <i class="fas fa-building" style="font-size: 11px;"></i> Qurilish obyekti
+                    </span>
+                ` : `
+                    <span class="badge" style="background: rgba(245, 158, 11, 0.12); color: #f59e0b; padding: 4px 10px; border-radius: 6px; font-size: 11.5px; font-weight: 600; display: inline-flex; align-items: center; gap: 5px;">
+                        <i class="fas fa-hammer" style="font-size: 11px;"></i> Ustalar
+                    </span>
+                `;
+                const companyName = c.company ? `<span style="font-weight: 500; color: var(--accent);"><i class="fas fa-building" style="margin-right: 5px; font-size: 11px;"></i>${c.company}</span>` : '<span style="color: var(--text-muted); font-style: italic;">-</span>';
                 const mainPhone = c.phone || '-';
                 const extraPhone = c.phone2 && c.phone2 !== c.barcode ? c.phone2 : '-';
                 const address = c.email || c.address || '-';
@@ -1968,6 +1980,7 @@ window.CRM = {
                                 </a>
                             </strong>
                         </td>
+                        <td>${categoryBadge}</td>
                         <td>${barcodeBadge}</td>
                         <td>
                             <a href="javascript:void(0)" onclick="Telephony.dial('${c.phone}')" style="color: var(--success); text-decoration: none; font-weight: 500; display:inline-flex; align-items:center; gap:6px;" title="Qo'ng'iroq qilish">
@@ -2088,6 +2101,8 @@ window.CRM = {
         if (form) form.reset();
         const idInput = document.getElementById('client-id');
         if (idInput) idInput.value = '';
+        const catInput = document.getElementById('client-category');
+        if (catInput) catInput.value = 'ustalar';
         const title = document.getElementById('client-modal-title');
         if (title) title.innerHTML = '<i class="fas fa-user-plus" style="color: var(--accent); margin-right: 8px;"></i> Yangi Mijoz Qo\'shish';
         
@@ -2122,6 +2137,8 @@ window.CRM = {
         if (nameInput) nameInput.value = client.name || '';
         const compInput = document.getElementById('client-company');
         if (compInput) compInput.value = client.company || '';
+        const catInput = document.getElementById('client-category');
+        if (catInput) catInput.value = client.category || (client.company && client.company.trim() ? 'qurilish' : 'ustalar');
         const phoneInput = document.getElementById('client-phone');
         if (phoneInput) phoneInput.value = client.phone || '';
         const barcodeInput = document.getElementById('client-barcode');
@@ -2180,6 +2197,7 @@ window.CRM = {
         const id = document.getElementById('client-id')?.value.trim();
         const name = document.getElementById('client-name')?.value.trim();
         const company = document.getElementById('client-company')?.value.trim() || '';
+        const category = document.getElementById('client-category')?.value || (company ? 'qurilish' : 'ustalar');
         const phone = document.getElementById('client-phone')?.value.trim();
         const barcode = document.getElementById('client-barcode')?.value.trim() || '';
         const bonus = parseFloat(document.getElementById('client-bonus')?.value) || 0;
@@ -2203,6 +2221,7 @@ window.CRM = {
             const clientData = {
                 name,
                 company,
+                category,
                 phone,
                 phone2: phone2 || barcode,
                 barcode: barcode || phone2,
@@ -2351,6 +2370,10 @@ window.CRM = {
                     </span>
                 ` : '<span style="color: var(--text-muted);">-</span>';
 
+                const grpLower = ((card.group || '') + ' ' + (card.name || '')).toLowerCase();
+                const isQurilish = grpLower.includes('qurilish') || grpLower.includes('obyekt') || grpLower.includes('stroy') || grpLower.includes('mchj') || grpLower.includes('ooo');
+                const defaultCat = isQurilish ? 'qurilish' : 'ustalar';
+
                 html += `
                     <div class="card" style="padding: 14px 16px; margin: 0; background: rgba(255,255,255,0.03); border: 1px solid ${card.is_already_added ? 'rgba(16, 185, 129, 0.3)' : 'rgba(255,255,255,0.08)'}; border-radius: 10px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
                         <div style="flex-grow: 1; min-width: 220px;">
@@ -2364,15 +2387,21 @@ window.CRM = {
                                 ${card.group ? `<span><i class="fas fa-layer-group" style="font-size: 11px; margin-right: 4px;"></i> ${card.group}</span>` : ''}
                             </div>
                         </div>
-                        <div>
+                        <div id="regos-action-box-${card.regos_card_id}">
                             ${card.is_already_added ? `
                                 <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #10b981; padding: 7px 14px; border-radius: 6px; font-size: 12.5px; font-weight: 500; display: inline-flex; align-items: center; gap: 6px;">
                                     <i class="fas fa-check-circle"></i> Qo'shilgan
                                 </span>
                             ` : `
-                                <button class="btn btn-primary btn-sm" id="btn-add-card-${card.regos_card_id}" onclick="CRM.addRegosCardToClients(${card.regos_card_id})" style="padding: 8px 16px; font-size: 13px; display: inline-flex; align-items: center; gap: 6px;">
-                                    <i class="fas fa-plus"></i> Ro'yxatga Qo'shish
-                                </button>
+                                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                                    <select id="regos-cat-${card.regos_card_id}" class="form-control" style="height: 36px; padding: 4px 8px; font-size: 12px; width: 145px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); color: var(--text-main); border-radius: 6px;">
+                                        <option value="ustalar" ${defaultCat === 'ustalar' ? 'selected' : ''}>Ustalar</option>
+                                        <option value="qurilish" ${defaultCat === 'qurilish' ? 'selected' : ''}>Qurilish obyekti</option>
+                                    </select>
+                                    <button class="btn btn-primary btn-sm" id="btn-add-card-${card.regos_card_id}" onclick="CRM.addRegosCardToClients(${card.regos_card_id})" style="padding: 8px 16px; font-size: 13px; display: inline-flex; align-items: center; gap: 6px;">
+                                        <i class="fas fa-plus"></i> Ro'yxatga Qo'shish
+                                    </button>
+                                </div>
                             `}
                         </div>
                     </div>
@@ -2404,6 +2433,7 @@ window.CRM = {
             return;
         }
 
+        const cat = document.getElementById(`regos-cat-${regosCardId}`)?.value || 'ustalar';
         const addBtn = document.getElementById(`btn-add-card-${regosCardId}`);
         if (addBtn) {
             addBtn.disabled = true;
@@ -2414,6 +2444,7 @@ window.CRM = {
             const clientPayload = {
                 id: card.id || `regos_card_${card.regos_card_id}`,
                 name: card.name,
+                category: cat,
                 phone: card.phone || card.raw_phone || card.barcode,
                 phone2: card.barcode || '',
                 barcode: card.barcode || '',
@@ -2440,8 +2471,9 @@ window.CRM = {
             await DB.saveClient(clientPayload);
             card.is_already_added = true;
 
-            if (addBtn) {
-                addBtn.outerHTML = `
+            const actionBox = document.getElementById(`regos-action-box-${regosCardId}`);
+            if (actionBox) {
+                actionBox.innerHTML = `
                     <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #10b981; padding: 7px 14px; border-radius: 6px; font-size: 12.5px; font-weight: 500; display: inline-flex; align-items: center; gap: 6px;">
                         <i class="fas fa-check-circle"></i> Qo'shildi
                     </span>
@@ -2464,7 +2496,7 @@ window.CRM = {
                 return;
             }
 
-            const headers = ["T/r", "Mijoz (F.I.Sh)", "Shtrix-kod (Karta)", "Asosiy telefon", "Bonus balansi (so'm)", "Kompaniya", "Qo'shimcha telefon", "Manzil", "Izoh", "Qo'shilgan sana"];
+            const headers = ["T/r", "Mijoz (F.I.Sh)", "Toifasi", "Shtrix-kod (Karta)", "Asosiy telefon", "Bonus balansi (so'm)", "Kompaniya / Obyekt", "Qo'shimcha telefon", "Manzil", "Izoh", "Qo'shilgan sana"];
             const rows = clients.map((c, index) => {
                 let dateStr = '';
                 if (c.created_at) {
@@ -2472,9 +2504,12 @@ window.CRM = {
                     catch(e) { dateStr = c.created_at; }
                 }
 
+                const catName = (c.category === 'qurilish' || (!c.category && c.company && c.company.trim())) ? 'Qurilish obyekti' : 'Ustalar';
+
                 return [
                     index + 1,
                     `"${(c.name || '').replace(/"/g, '""')}"`,
+                    `"${catName}"`,
                     `"${(c.barcode || c.phone2 || '').replace(/"/g, '""')}"`,
                     `"${(c.phone || '').replace(/"/g, '""')}"`,
                     c.bonus || c.value || 0,
