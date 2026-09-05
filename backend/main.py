@@ -5,7 +5,7 @@ import asyncio
 from datetime import datetime, timezone, timedelta
 from contextvars import ContextVar
 import requests
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, BackgroundTasks
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -347,6 +347,150 @@ def delete_client(id: str, request: Request):
         path += f"&company_id=eq.{company_id}"
     return supabase_req("DELETE", path, company_id=company_id)
 
+# --- REGOS CARD BONUS SYNCHRONIZATION HELPERS ---
+def sync_regos_card_bonus_helper(client_id: str = None, barcode: str = None, phone: str = None, company_id: str = None) -> float:
+    try:
+        customer_record = None
+        if client_id:
+            c_res = supabase_req("GET", f"customers?id=eq.{client_id}&select=*", company_id=company_id)
+            if c_res and isinstance(c_res, list) and len(c_res) > 0:
+                customer_record = c_res[0]
+                if not company_id:
+                    company_id = customer_record.get("company_id")
+                if not barcode:
+                    barcode = customer_record.get("phone2")
+                if not phone:
+                    phone = customer_record.get("phone")
+                op_raw = customer_record.get("operator") or ""
+                if not barcode and op_raw.startswith("{"):
+                    try:
+                        m = json.loads(op_raw)
+                        barcode = m.get("barcode")
+                    except Exception:
+                        pass
+
+        settings = get_company_settings(company_id, bypass_cache=True) if company_id else settings_state
+        regos_endpoint = settings.get("regos_endpoint", "")
+        regos_token = settings.get("regos_token", "")
+
+        if not regos_endpoint or not regos_token:
+            return None
+
+        endpoint = regos_endpoint.strip().rstrip("/")
+        if not endpoint.startswith(("http://", "https://")):
+            endpoint = "https://" + endpoint
+        if "/v1" not in endpoint:
+            url = f"{endpoint}/v1/retailcard/get"
+        else:
+            url = f"{endpoint}/retailcard/get"
+
+        regos_headers = {
+            "Authorization": f"Bearer {regos_token}",
+            "Content-Type": "application/json"
+        }
+
+        cards = []
+        clean_bc = str(barcode or "").strip()
+        if clean_bc:
+            try:
+                r = requests.post(url, headers=regos_headers, json={"barcode_value": clean_bc, "limit": 1}, timeout=5)
+                if r.status_code == 200:
+                    data = r.json()
+                    if isinstance(data, dict) and data.get("ok"):
+                        cards = data.get("result", [])
+            except Exception as e_bc:
+                print(f"Error querying REGOS with barcode {clean_bc}: {e_bc}")
+
+        if not cards and phone:
+            digits_phone = "".join(ch for ch in str(phone) if ch.isdigit())
+            if len(digits_phone) >= 7:
+                p_search = digits_phone[-9:]
+                try:
+                    r = requests.post(url, headers=regos_headers, json={"search": p_search, "limit": 5}, timeout=5)
+                    if r.status_code == 200:
+                        data = r.json()
+                        if isinstance(data, dict) and data.get("ok"):
+                            cards = data.get("result", [])
+                except Exception as e_ph:
+                    print(f"Error querying REGOS with phone {p_search}: {e_ph}")
+
+        if not cards:
+            return None
+
+        matched_card = cards[0]
+        bonus_amount = float(matched_card.get("bonus_amount") or 0.0)
+        card_id = matched_card.get("id")
+
+        target_client_id = client_id
+        if not target_client_id and card_id:
+            target_client_id = f"regos_card_{card_id}"
+
+        if not customer_record and target_client_id:
+            c_res = supabase_req("GET", f"customers?id=eq.{target_client_id}&select=*", company_id=company_id)
+            if c_res and isinstance(c_res, list) and len(c_res) > 0:
+                customer_record = c_res[0]
+
+        if not customer_record and clean_bc:
+            c_res = supabase_req("GET", f"customers?phone2=eq.{clean_bc}&select=*", company_id=company_id)
+            if c_res and isinstance(c_res, list) and len(c_res) > 0:
+                customer_record = c_res[0]
+                target_client_id = customer_record.get("id")
+
+        if target_client_id and customer_record:
+            patch_payload = {
+                "value": bonus_amount
+            }
+            op_data = {}
+            op_raw = customer_record.get("operator") or ""
+            if op_raw.startswith("{"):
+                try:
+                    op_data = json.loads(op_raw)
+                except Exception:
+                    op_data = {}
+            op_data["bonus"] = bonus_amount
+            cust_info = matched_card.get("customer") or {}
+            if "debt" in cust_info:
+                op_data["debt"] = float(cust_info.get("debt") or 0.0)
+            patch_payload["operator"] = json.dumps(op_data, ensure_ascii=False)
+
+            supabase_req("PATCH", f"customers?id=eq.{target_client_id}", json_data=patch_payload, company_id=company_id)
+            print(f"Synced bonus for client {target_client_id}: {bonus_amount} so'm")
+
+        return bonus_amount
+    except Exception as e:
+        print(f"Error in sync_regos_card_bonus_helper: {e}")
+        return None
+
+def sync_all_regos_cards_bonuses_helper(company_id: str = None):
+    try:
+        path = "customers?select=id,phone,phone2,operator&source=eq.client_directory"
+        if company_id:
+            path += f"&company_id=eq.{company_id}"
+        clients = supabase_get_all(path, company_id=company_id)
+        if not clients:
+            return
+        
+        from concurrent.futures import ThreadPoolExecutor
+        def sync_one(c):
+            try:
+                c_id = c.get("id")
+                bc = c.get("phone2")
+                op_raw = c.get("operator") or ""
+                if not bc and op_raw.startswith("{"):
+                    try:
+                        bc = json.loads(op_raw).get("barcode")
+                    except Exception:
+                        pass
+                sync_regos_card_bonus_helper(client_id=c_id, barcode=bc, phone=c.get("phone"), company_id=company_id)
+            except Exception as e_c:
+                print(f"Error syncing bonus for client {c.get('id')}: {e_c}")
+
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            list(executor.map(sync_one, clients))
+        print(f"Successfully synced bonuses for {len(clients)} clients for company {company_id}")
+    except Exception as e:
+        print(f"Error in sync_all_regos_cards_bonuses_helper: {e}")
+
 # --- CLIENT RECEIPTS ENDPOINT ---
 @app.get("/api/clients/{client_id}/receipts")
 def get_client_receipts(
@@ -422,7 +566,30 @@ def get_client_receipts(
 
     receipts_list = list(collected.values())
     receipts_list.sort(key=lambda x: x.get("created_at", ""), reverse=True)
-    return {"ok": True, "count": len(receipts_list), "receipts": receipts_list}
+
+    # Automatically synchronize live bonus from REGOS
+    company_id = get_company_id(request)
+    live_bonus = None
+    try:
+        live_bonus = sync_regos_card_bonus_helper(client_id=client_id, barcode=bc, phone=phone or phone2, company_id=company_id)
+    except Exception as e_b:
+        print(f"Bonus auto-sync error in get_client_receipts for {client_id}: {e_b}")
+
+    return {"ok": True, "count": len(receipts_list), "receipts": receipts_list, "bonus": live_bonus}
+
+@app.post("/api/clients/{client_id}/sync-bonus")
+def sync_client_bonus(client_id: str, request: Request):
+    company_id = get_company_id(request)
+    live_bonus = sync_regos_card_bonus_helper(client_id=client_id, company_id=company_id)
+    if live_bonus is not None:
+        return {"ok": True, "bonus": live_bonus}
+    return {"ok": False, "detail": "Bonusni yangilab bo'lmadi yoki REGOS API ulanmadi"}
+
+@app.post("/api/integration/regos/sync-all-bonuses")
+def sync_all_bonuses(request: Request, background_tasks: BackgroundTasks):
+    company_id = get_company_id(request)
+    background_tasks.add_task(sync_all_regos_cards_bonuses_helper, company_id)
+    return {"ok": True, "message": "Bonuslarni sinxronlashtirish boshlandi"}
 
 # --- REGOS RETAIL CARD SEARCH ENDPOINT ---
 @app.get("/api/integration/regos/search-cards")
@@ -3375,6 +3542,15 @@ def save_parsed_receipt(cheque: dict, company_id: str = None):
         
         supabase_req("POST", "receipts?on_conflict=id", json_data=receipt_payload)
         print(f"Successfully saved receipt {c_code} (UUID: {c_uuid}) to database (preserved local attributes).")
+
+        # Automatically update REGOS retail card bonus in customer directory
+        if card_barcode or card_id or cust_phone:
+            import threading
+            target_cid = f"regos_card_{card_id}" if card_id else None
+            threading.Thread(
+                target=sync_regos_card_bonus_helper,
+                args=(target_cid, card_barcode, cust_phone, company_id)
+            ).start()
     except Exception as ex:
         print(f"Error parsing/saving receipt data: {ex}")
 
@@ -3835,6 +4011,12 @@ def run_sync_in_background(days: int = None, sync_date: str = None, company_id: 
             except Exception as e_deals:
                 print(f"Background Sync: error triggering amocrm deal creation: {e_deals}")
             
+        # Trigger REGOS retail card bonus sync for all clients in background
+        try:
+            threading.Thread(target=sync_all_regos_cards_bonuses_helper, args=(company_id,)).start()
+        except Exception as e_b:
+            print(f"Background Sync: error triggering card bonuses sync: {e_b}")
+
         sync_progress["running"] = False
         # Force restart trigger comment
         sync_progress["processed"] = len(cheques_list)

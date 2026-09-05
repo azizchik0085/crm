@@ -1001,6 +1001,26 @@ window.CRM = {
             btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Boshlanmoqda...`;
         });
 
+        // Agar mijoz ochilgan bo'lsa, uning bonusini ham darhol REGOS-dan yangilash
+        if (this._currentDetailClientId) {
+            fetch(`/api/clients/${encodeURIComponent(this._currentDetailClientId)}/sync-bonus`, { method: 'POST' })
+                .then(r => r.json())
+                .then(d => {
+                    if (d && d.ok && d.bonus !== undefined) {
+                        const newBonus = Number(d.bonus);
+                        const bonusDisp = document.getElementById('cdm-bonus-display');
+                        if (bonusDisp) bonusDisp.textContent = `${newBonus.toLocaleString('uz-UZ')} so'm`;
+                        if (this._clientsCache) {
+                            const found = this._clientsCache.find(c => c.id === this._currentDetailClientId);
+                            if (found) {
+                                found.bonus = newBonus;
+                                found.value = newBonus;
+                            }
+                        }
+                    }
+                }).catch(() => {});
+        }
+
         try {
             const response = await fetch('/api/integration/regos/sync-receipts?days=360', {
                 method: 'POST'
@@ -1012,6 +1032,70 @@ window.CRM = {
         } catch (err) {
             console.error("Regos-dan yangilashda xatolik:", err);
             this.checkAndTrackRegosSync();
+        }
+    },
+
+    syncCurrentClientBonus: async function(btn) {
+        if (!this._currentDetailClientId) return;
+        const icon = btn ? (btn.querySelector('i') || btn) : null;
+        if (icon) icon.classList.add('fa-spin');
+        if (btn) btn.disabled = true;
+
+        try {
+            const res = await fetch(`/api/clients/${encodeURIComponent(this._currentDetailClientId)}/sync-bonus`, {
+                method: 'POST'
+            });
+            const data = await res.json();
+            if (data && data.ok && data.bonus !== undefined) {
+                const newBonus = Number(data.bonus);
+                const bonusDisp = document.getElementById('cdm-bonus-display');
+                if (bonusDisp) bonusDisp.textContent = `${newBonus.toLocaleString('uz-UZ')} so'm`;
+                
+                if (this._clientsCache) {
+                    const found = this._clientsCache.find(c => c.id === this._currentDetailClientId);
+                    if (found) {
+                        found.bonus = newBonus;
+                        found.value = newBonus;
+                    }
+                    this.renderCustomersTable();
+                }
+            }
+        } catch (e) {
+            console.warn("Bonusni yangilashda xatolik:", e);
+        } finally {
+            if (icon) icon.classList.remove('fa-spin');
+            if (btn) btn.disabled = false;
+        }
+    },
+
+    syncAllClientBonuses: async function(btn) {
+        const icon = btn ? (btn.querySelector('i') || btn) : null;
+        if (icon) icon.classList.add('fa-spin');
+        if (btn) {
+            btn.disabled = true;
+            btn.dataset.origText = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Yangilanmoqda...';
+        }
+
+        try {
+            const res = await fetch('/api/integration/regos/sync-all-bonuses', { method: 'POST' });
+            // 2 soniyadan so'ng mijozlar jadvalini qayta yuklaymiz
+            setTimeout(async () => {
+                await this.loadCustomersData(true);
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-check"></i> Yangilandi!';
+                    setTimeout(() => {
+                        if (btn.dataset.origText) btn.innerHTML = btn.dataset.origText;
+                    }, 2500);
+                }
+            }, 2500);
+        } catch (e) {
+            console.error("Barcha bonuslarni yangilashda xatolik:", e);
+            if (btn) {
+                btn.disabled = false;
+                if (btn.dataset.origText) btn.innerHTML = btn.dataset.origText;
+            }
         }
     },
 
@@ -2641,8 +2725,26 @@ window.CRM = {
                 const resp = await fetch(`/api/clients/${encodeURIComponent(client.id)}/receipts?${params.toString()}`);
                 if (resp.ok) {
                     const data = await resp.json();
-                    if (data && data.ok && Array.isArray(data.receipts)) {
-                        clientReceipts = data.receipts;
+                    if (data && data.ok) {
+                        if (Array.isArray(data.receipts)) {
+                            clientReceipts = data.receipts;
+                        }
+                        if (data.bonus !== undefined && data.bonus !== null) {
+                            const newBonus = Number(data.bonus);
+                            client.bonus = newBonus;
+                            client.value = newBonus;
+                            const bonusDisp = document.getElementById('cdm-bonus-display');
+                            if (bonusDisp) {
+                                bonusDisp.textContent = `${newBonus.toLocaleString('uz-UZ')} so'm`;
+                            }
+                            if (this._clientsCache) {
+                                const found = this._clientsCache.find(c => c.id === client.id);
+                                if (found) {
+                                    found.bonus = newBonus;
+                                    found.value = newBonus;
+                                }
+                            }
+                        }
                     }
                 }
             } catch (e_api) {

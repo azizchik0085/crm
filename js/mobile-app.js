@@ -519,6 +519,21 @@ window.MobileApp = {
             const resp = await fetch(`/api/clients/${encodeURIComponent(client.id)}/receipts?${params.toString()}`);
             const data = await resp.json();
 
+            if (data && data.bonus !== undefined && data.bonus !== null) {
+                const newBonus = Number(data.bonus);
+                client.bonus = newBonus;
+                client.value = newBonus;
+                const bonusEl = document.getElementById('m-sheet-bonus-val');
+                if (bonusEl) {
+                    bonusEl.textContent = `${newBonus.toLocaleString('uz-UZ')} so'm`;
+                }
+                const idx = this.clientsCache.findIndex(c => c.id === client.id);
+                if (idx !== -1) {
+                    this.clientsCache[idx].bonus = newBonus;
+                    this.clientsCache[idx].value = newBonus;
+                }
+            }
+
             const receipts = (data && data.ok && Array.isArray(data.receipts)) ? data.receipts : [];
             const totalSpend = receipts.reduce((acc, r) => acc + (parseFloat(r.total_amount) || 0), 0);
 
@@ -679,6 +694,39 @@ window.MobileApp = {
                 btn.disabled = false;
                 btn.innerHTML = 'Saqlash';
             }
+        }
+    },
+
+    syncActiveClientBonus: async function(btn) {
+        if (!this._activeDetailClient) return;
+        const icon = btn ? (btn.querySelector('i') || btn) : null;
+        if (icon) icon.classList.add('fa-spin');
+        if (btn) btn.disabled = true;
+
+        try {
+            const resp = await fetch(`/api/clients/${encodeURIComponent(this._activeDetailClient.id)}/sync-bonus`, {
+                method: 'POST'
+            });
+            const data = await resp.json();
+            if (data && data.ok && data.bonus !== undefined) {
+                const newBonus = Number(data.bonus);
+                this._activeDetailClient.bonus = newBonus;
+                this._activeDetailClient.value = newBonus;
+                const bonusEl = document.getElementById('m-sheet-bonus-val');
+                if (bonusEl) bonusEl.textContent = `${newBonus.toLocaleString('uz-UZ')} so'm`;
+
+                const idx = this.clientsCache.findIndex(c => c.id === this._activeDetailClient.id);
+                if (idx !== -1) {
+                    this.clientsCache[idx].bonus = newBonus;
+                    this.clientsCache[idx].value = newBonus;
+                    this.renderClientsList(this.clientsCache);
+                }
+            }
+        } catch (e) {
+            console.warn("Mobile bonus sync error:", e);
+        } finally {
+            if (icon) icon.classList.remove('fa-spin');
+            if (btn) btn.disabled = false;
         }
     },
 
