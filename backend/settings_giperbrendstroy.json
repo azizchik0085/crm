@@ -169,8 +169,8 @@
     "enable_kassa": true,
     "groq_api_key": "",
     "sip_password": "",
-    "supabase_key": "",
-    "supabase_url": "",
+    "supabase_key": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp1a2xrbXBwZGVuY2p6ZWdhbWZtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5MzQ2NjAsImV4cCI6MjA5NzUxMDY2MH0.i18GcUTO8v9ilBYMlQMwvnz7RLkrR1q5fJB91do3ypk",
+    "supabase_url": "https://zuklkmppdencjzegamfm.supabase.co",
     "taplink_desc": "BARCHA QURILISH MAHSULOTLARI BIR JOYDA",
     "taplink_logo": "",
     "ai_auto_reply": true,
@@ -198,8 +198,8 @@
         "YULDUZOY": "e_1782205956987",
         "ERGASHOVA FERUZA": "e_1782719372462"
     },
-    "payout_telegram_chat_id": "",
-    "payout_telegram_bot_token": "",
+    "payout_telegram_chat_id": "-5479683507",
+    "payout_telegram_bot_token": "8800689587:AAHxv1VQtefbTvqdpJkzNoyGzkcB2aHDuhA",
     "employee_mobile_permissions": {
         "e_1788600240206": [
             "m_crm",

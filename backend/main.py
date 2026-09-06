@@ -139,8 +139,10 @@ def supabase_req(method, path, json_data=None, params=None, company_id=None, use
         custom_url = settings.get("supabase_url") or settings.get("supabaseUrl")
         custom_key = settings.get("supabase_key") or settings.get("supabaseKey")
         if custom_url and custom_key:
-            target_url = custom_url.strip().rstrip("/")
-            target_key = custom_key.strip()
+            ck = custom_key.strip()
+            if ck.startswith("eyJ") or len(ck) > 50:
+                target_url = custom_url.strip().rstrip("/")
+                target_key = ck
             
     url = f"{target_url}/rest/v1/{path}"
     
@@ -184,8 +186,10 @@ def supabase_get_all(path, params=None, company_id=None, use_central=False):
         custom_url = settings.get("supabase_url") or settings.get("supabaseUrl")
         custom_key = settings.get("supabase_key") or settings.get("supabaseKey")
         if custom_url and custom_key:
-            target_url = custom_url.strip().rstrip("/")
-            target_key = custom_key.strip()
+            ck = custom_key.strip()
+            if ck.startswith("eyJ") or len(ck) > 50:
+                target_url = custom_url.strip().rstrip("/")
+                target_key = ck
             
     while True:
         url = f"{target_url}/rest/v1/{base_path}"
