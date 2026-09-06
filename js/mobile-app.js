@@ -1,4 +1,4 @@
-// SmartCore Mobile Application Logic (PWA / Touch-First App)
+// Webzone Mobile Application Logic (PWA / Touch-First App)
 
 window.MobileApp = {
     currentUser: null,

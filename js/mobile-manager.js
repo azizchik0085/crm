@@ -1,4 +1,4 @@
-// SmartCore CRM & ERP - Mobil Ilova Boshqaruvi va Xodimlar Ruxsatnomalari Moduli
+// Webzone CRM & ERP - Mobil Ilova Boshqaruvi va Xodimlar Ruxsatnomalari Moduli
 
 window.MobileManager = {
     activeTab: 'roles', // 'roles' or 'employees'

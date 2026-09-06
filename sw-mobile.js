@@ -1,4 +1,4 @@
-const CACHE_NAME = 'smartcore-mobile-v8';
+const CACHE_NAME = 'webzone-mobile-v9';
 const ASSETS_TO_CACHE = [
   '/mobile.html',
   '/css/mobile-app.css',

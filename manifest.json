@@ -1,7 +1,7 @@
 {
-  "name": "SmartCore Kuryer Ilovasi",
+  "name": "Webzone Kuryer Ilovasi",
   "short_name": "Kuryer",
-  "description": "SmartCore ERP kuryerlari uchun mobil ilova",
+  "description": "Webzone ERP kuryerlari uchun mobil ilova",
   "start_url": "/courier.html",
   "display": "standalone",
   "background_color": "#09090b",

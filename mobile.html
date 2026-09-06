@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>SmartCore Mobile</title>
+    <title>Webzone Mobile</title>
 
     <!-- PWA & Mobile Web App Meta -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="SmartCore">
+    <meta name="apple-mobile-web-app-title" content="Webzone">
     <meta name="theme-color" content="#090d16">
     <meta name="mobile-web-app-capable" content="yes">
     <link rel="manifest" href="/manifest-mobile.json">
@@ -33,7 +33,7 @@
             <div style="width: 72px; height: 72px; border-radius: 20px; background: linear-gradient(135deg, #0ea5e9, #6366f1); display: inline-flex; align-items: center; justify-content: center; color: #fff; font-size: 32px; box-shadow: 0 10px 25px rgba(14, 165, 233, 0.4); margin-bottom: 20px;">
                 <i class="fas fa-cubes"></i>
             </div>
-            <h1 style="font-size: 24px; font-weight: 800; color: #fff; margin-bottom: 6px;">SmartCore Mobile</h1>
+            <h1 style="font-size: 24px; font-weight: 800; color: #fff; margin-bottom: 6px;">Webzone Mobile</h1>
             <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 20px;">Usta kabineti va xodimlar mobil ilovasi</p>
 
             <!-- Login Type Tabs (Usta kabineti vs Xodimlar) -->
@@ -105,7 +105,7 @@
             </form>
 
             <div style="margin-top: 24px; font-size: 11.5px; color: var(--text-muted);">
-                SmartCore ERP & CRM • Versiya 2.5
+                Webzone ERP & CRM • Versiya 2.5
             </div>
         </div>
     </div>
@@ -119,7 +119,7 @@
                 <i class="fas fa-cubes"></i>
             </div>
             <div class="header-title-box">
-                <h1>SmartCore</h1>
+                <h1>Webzone</h1>
                 <div class="header-company-badge">
                     <i class="fas fa-circle" style="font-size: 7px; color: #10b981;"></i>
                     <span id="m-header-company">Giper Brend Stroy</span>
@@ -697,18 +697,18 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
 
     <!-- Mobile App Main Script -->
-    <script src="/js/mobile-app.js?v=2.9"></script>
+    <script src="/js/mobile-app.js?v=3.0"></script>
 
     <!-- Register Service Worker for PWA Offline / Standalone Installation -->
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw-mobile.js?v=8')
+                navigator.serviceWorker.register('/sw-mobile.js?v=9')
                     .then(reg => {
                         reg.update();
-                        console.log('SmartCore Mobile SW registered');
+                        console.log('Webzone Mobile SW registered');
                     })
-                    .catch(err => console.log('SmartCore Mobile SW registration failed:', err));
+                    .catch(err => console.log('Webzone Mobile SW registration failed:', err));
             });
         }
     </script>

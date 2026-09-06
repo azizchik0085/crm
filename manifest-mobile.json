@@ -1,7 +1,7 @@
 {
-  "name": "SmartCore Mobile CRM",
-  "short_name": "SmartCore",
-  "description": "SmartCore ERP va CRM mobil ilovasi",
+  "name": "Webzone Mobile CRM",
+  "short_name": "Webzone",
+  "description": "Webzone ERP va CRM mobil ilovasi",
   "start_url": "/mobile.html",
   "scope": "/",
   "display": "standalone",

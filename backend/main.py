@@ -2755,7 +2755,7 @@ def ai_analyze(payload: AIAnalyzePayload, request: Request):
             inv_list.append(f"- {p.get('name')} (SKU: {p.get('sku')}), Narxi: {p.get('price')} so'm, Qoldiq: {status}, Kategoriya: {p.get('category')}")
         inv_context = "\n".join(inv_list)
         
-        system_instruction = f"""Siz SmartCore CRM & ERP tizimining aqlli tahlilchisi va yordamchisisiz.
+        system_instruction = f"""Siz Webzone CRM & ERP tizimining aqlli tahlilchisi va yordamchisisiz.
 Sizda quyidagi real-vaqtdagi kompaniya ma'lumotlari mavjud:
 
 Moliyaviy Holat:
@@ -6476,7 +6476,7 @@ def update_payout_telegram_settings(payload: dict, request: Request):
         try:
             r = requests.post(f"https://api.telegram.org/bot{bot_token}/sendMessage", json={
                 "chat_id": chat_id,
-                "text": "✅ <b>SmartCore ERP Test Xabari:</b>\nBonus yechish boti muvaffaqiyatli ulandi! Barcha so'rovlar shu yerga keladi.",
+                "text": "✅ <b>Webzone ERP Test Xabari:</b>\nBonus yechish boti muvaffaqiyatli ulandi! Barcha so'rovlar shu yerga keladi.",
                 "parse_mode": "HTML"
             }, timeout=5)
             test_sent = r.ok
