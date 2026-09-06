@@ -4385,6 +4385,106 @@ def resolve_mobile_permissions(role_str, roles_list):
     if not m_perms:
         m_perms = ["m_crm", "m_scanner"]
     return list(dict.fromkeys(m_perms))
+# --- USTA (MASTER) AUTHENTICATION HELPER ---
+def authenticate_usta_helper(barcode: str, phone: str, company_id: str = None):
+    import re
+    if not barcode or not phone:
+        raise HTTPException(status_code=400, detail="Shtrix-kod va telefon raqami kiritilishi shart.")
+
+    barcode_clean = str(barcode).strip()
+    phone_digits = re.sub(r'\D', '', str(phone).strip())
+    if not phone_digits:
+        raise HTTPException(status_code=400, detail="Yaroqli telefon raqamini kiriting.")
+
+    target_company = company_id or "giperbrendstroy"
+    query = f"customers?select=*&company_id=eq.{target_company}&source=eq.client_directory"
+    customers = supabase_get_all(query)
+    if not customers:
+        customers = supabase_get_all(f"customers?select=*&source=eq.client_directory")
+
+    matched_customer = None
+    barcode_matched_but_phone_diff = False
+
+    for c in customers:
+        c_barcode = (c.get("phone2") or "").strip()
+        c_op = c.get("operator") or ""
+        if not c_barcode and c_op.startswith("{"):
+            try:
+                m = json.loads(c_op)
+                c_barcode = (m.get("barcode") or "").strip()
+            except Exception:
+                pass
+        
+        c_id = str(c.get("id") or "")
+        is_bc_match = (
+            c_barcode == barcode_clean or 
+            c_id == barcode_clean or 
+            c_id == f"regos_card_{barcode_clean}" or
+            (barcode_clean and barcode_clean in c_barcode)
+        )
+
+        if is_bc_match:
+            c_phone = c.get("phone") or ""
+            c_phone_digits = re.sub(r'\D', '', str(c_phone))
+            
+            phone_match = False
+            if phone_digits == c_phone_digits:
+                phone_match = True
+            elif len(phone_digits) >= 9 and len(c_phone_digits) >= 9 and phone_digits[-9:] == c_phone_digits[-9:]:
+                phone_match = True
+            elif phone_digits in c_phone_digits or c_phone_digits in phone_digits:
+                phone_match = True
+                
+            if phone_match:
+                matched_customer = c
+                break
+            else:
+                barcode_matched_but_phone_diff = True
+
+    if not matched_customer:
+        if barcode_matched_but_phone_diff:
+            raise HTTPException(status_code=401, detail="Telefon raqami (parol) noto'g'ri kiritildi.")
+        else:
+            raise HTTPException(status_code=404, detail="Ushbu shtrix-kodga ega usta topilmadi.")
+
+    # Try syncing live bonus from REGOS
+    cid = matched_customer.get("id")
+    c_bc = matched_customer.get("phone2") or barcode_clean
+    live_bonus = None
+    try:
+        live_bonus = sync_regos_card_bonus_helper(
+            client_id=cid, 
+            barcode=c_bc, 
+            phone=matched_customer.get("phone"), 
+            company_id=matched_customer.get("company_id") or target_company
+        )
+    except Exception as e_b:
+        print(f"Bonus sync during usta login error: {e_b}")
+
+    bonus_val = float(live_bonus if live_bonus is not None else (matched_customer.get("value") or 0))
+
+    return {
+        "status": "success",
+        "user_type": "usta",
+        "user": {
+            "id": matched_customer.get("id"),
+            "name": matched_customer.get("name") or "Usta",
+            "phone": matched_customer.get("phone") or "",
+            "barcode": c_bc,
+            "bonus": bonus_val,
+            "role": "usta",
+            "category": "ustalar",
+            "company_id": matched_customer.get("company_id") or target_company,
+            "mobile_permissions": ["m_usta_cabinet", "m_receipts"]
+        }
+    }
+
+@app.post("/api/auth/usta-login")
+def auth_usta_login(payload: dict):
+    barcode = payload.get("barcode") or payload.get("login")
+    phone = payload.get("phone") or payload.get("password")
+    company_id = payload.get("company_id")
+    return authenticate_usta_helper(barcode, phone, company_id)
 
 @app.post("/api/auth/login")
 def auth_login(payload: dict):
@@ -4392,7 +4492,12 @@ def auth_login(payload: dict):
     password = payload.get("password")
     company_id = payload.get("company_id")
     is_superadmin_portal = payload.get("is_superadmin_portal", False)
+    user_type = payload.get("user_type") or payload.get("login_type")
     
+    # 0. If explicit usta login
+    if user_type == "usta":
+        return authenticate_usta_helper(barcode=login, phone=password, company_id=company_id)
+
     # 1. Super Admin check
     if login == "admin" and password == "admin":
         if not is_superadmin_portal:
@@ -4411,8 +4516,11 @@ def auth_login(payload: dict):
     if is_superadmin_portal:
         raise HTTPException(status_code=403, detail="Faqat Super Admin ushbu portaldan kira oladi.")
         
-    if not login or not password or not company_id:
-        raise HTTPException(status_code=400, detail="Kompaniya kodi, login va parol kiritilishi shart.")
+    if not login or not password:
+        raise HTTPException(status_code=400, detail="Login va parol kiritilishi shart.")
+        
+    if not company_id:
+        company_id = "giperbrendstroy"
         
     company_id = "".join(c for c in company_id if c.isalnum()).lower()
     
@@ -4459,6 +4567,13 @@ def auth_login(payload: dict):
                 }
             }
         else:
+            # Fallback: Check if credentials belong to an Usta (login=barcode, password=phone)
+            try:
+                usta_res = authenticate_usta_helper(barcode=login, phone=password, company_id=company_id)
+                if usta_res and usta_res.get("status") == "success":
+                    return usta_res
+            except Exception:
+                pass
             raise HTTPException(status_code=401, detail="Noto'g'ri login yoki parol.")
     except HTTPException as he:
         raise he

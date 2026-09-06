@@ -59,8 +59,13 @@ window.MobileApp = {
                 
                 this.updateHeaderUserInfo();
                 this.renderNavigation();
-                this.switchView('home');
-                this.refreshUserPermissions();
+
+                if (this.currentUser.role === 'usta') {
+                    this.switchView('usta-cabinet');
+                } else {
+                    this.switchView('home');
+                    this.refreshUserPermissions();
+                }
                 return;
             } catch(e) {
                 localStorage.removeItem('mobile_auth');
@@ -111,6 +116,132 @@ window.MobileApp = {
         }
         return false;
     },
+    loginType: 'usta',
+
+    setLoginType: function(type) {
+        this.loginType = type;
+        const tabUsta = document.getElementById('tab-login-usta');
+        const tabStaff = document.getElementById('tab-login-staff');
+        const formUsta = document.getElementById('m-form-usta-login');
+        const formStaff = document.getElementById('m-form-staff-login');
+        const errorEl = document.getElementById('m-login-error');
+
+        if (errorEl) errorEl.style.display = 'none';
+
+        if (type === 'usta') {
+            if (tabUsta) tabUsta.classList.add('active');
+            if (tabStaff) tabStaff.classList.remove('active');
+            if (formUsta) formUsta.style.display = 'block';
+            if (formStaff) formStaff.style.display = 'none';
+        } else {
+            if (tabStaff) tabStaff.classList.add('active');
+            if (tabUsta) tabUsta.classList.remove('active');
+            if (formStaff) formStaff.style.display = 'block';
+            if (formUsta) formUsta.style.display = 'none';
+        }
+    },
+
+    openLoginScanner: function() {
+        const modal = document.getElementById('m-scanner-modal');
+        if (!modal) return;
+        modal.classList.add('active');
+
+        const resultEl = document.getElementById('m-scanner-result');
+        if (resultEl) resultEl.textContent = "Kamerani kartangizdagi shtrix-kodga qarating";
+
+        if (typeof Html5Qrcode === 'undefined') {
+            if (resultEl) resultEl.textContent = "Kamera skaneri kutubxonasi yuklanmadi. Shtrix-kodni qo'lda kiriting.";
+            return;
+        }
+
+        try {
+            this.html5QrScanner = new Html5Qrcode("scanner-reader");
+            const config = { fps: 10, qrbox: { width: 250, height: 180 } };
+            this.html5QrScanner.start(
+                { facingMode: "environment" },
+                config,
+                (decodedText) => {
+                    const cleanCode = (decodedText || '').trim();
+                    const barcodeInput = document.getElementById('m-login-usta-barcode');
+                    if (barcodeInput) {
+                        barcodeInput.value = cleanCode;
+                    }
+                    this.closeScanner();
+                },
+                () => {}
+            ).catch(err => {
+                if (resultEl) resultEl.textContent = "Kameraga ulanib bo'lmadi: " + (err.message || err);
+            });
+        } catch(e) {
+            if (resultEl) resultEl.textContent = "Kamera ishga tushmadi: " + e.message;
+        }
+    },
+
+    loginUsta: async function(e) {
+        if (e) e.preventDefault();
+        const barcodeInput = document.getElementById('m-login-usta-barcode');
+        const phoneInput = document.getElementById('m-login-usta-phone');
+        const errorEl = document.getElementById('m-login-error');
+        const btn = document.getElementById('m-btn-usta-login');
+
+        const barcode = (barcodeInput ? barcodeInput.value : '').trim();
+        const phone = (phoneInput ? phoneInput.value : '').trim();
+
+        if (!barcode || !phone) {
+            if (errorEl) {
+                errorEl.textContent = "Shtrix-kod va telefon raqamingizni kiriting!";
+                errorEl.style.display = 'block';
+            }
+            return;
+        }
+
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Tekshirilmoqda...';
+        }
+        if (errorEl) errorEl.style.display = 'none';
+
+        try {
+            const resp = await fetch('/api/auth/usta-login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    barcode: barcode,
+                    phone: phone,
+                    company_id: 'giperbrendstroy'
+                })
+            });
+
+            const data = await resp.json();
+            if (!resp.ok || data.status !== 'success') {
+                throw new Error(data.detail || "Shtrix-kod yoki telefon raqami noto'g'ri");
+            }
+
+            this.currentUser = data.user;
+            this.currentCompany = data.user.company_id || 'giperbrendstroy';
+            localStorage.setItem('mobile_auth', JSON.stringify({ user: data.user }));
+            document.cookie = `company_id=${this.currentCompany}; path=/`;
+
+            document.getElementById('mobile-login-view').style.display = 'none';
+            document.getElementById('mobile-app-header').style.display = 'flex';
+            document.getElementById('mobile-app-nav').style.display = 'flex';
+
+            this.updateHeaderUserInfo();
+            this.renderNavigation();
+            this.switchView('usta-cabinet');
+
+        } catch (err) {
+            if (errorEl) {
+                errorEl.textContent = err.message || "Tizimga kirishda xatolik yuz berdi";
+                errorEl.style.display = 'block';
+            }
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Shaxsiy Kabinetga Kirish';
+            }
+        }
+    },
 
     login: async function(e) {
         if (e) e.preventDefault();
@@ -155,7 +286,7 @@ window.MobileApp = {
             }
 
             this.currentUser = data.user;
-            this.currentCompany = data.user.company_id;
+            this.currentCompany = data.user.company_id || 'giperbrendstroy';
             localStorage.setItem('mobile_auth', JSON.stringify({ user: data.user }));
             document.cookie = `company_id=${this.currentCompany}; path=/`;
 
@@ -165,7 +296,12 @@ window.MobileApp = {
 
             this.updateHeaderUserInfo();
             this.renderNavigation();
-            this.switchView('home');
+            
+            if (this.currentUser.role === 'usta') {
+                this.switchView('usta-cabinet');
+            } else {
+                this.switchView('home');
+            }
 
         } catch (err) {
             if (errorEl) {
@@ -200,6 +336,13 @@ window.MobileApp = {
         if (compName === 'giperbrendstroy') compName = 'Giper Brend Stroy';
         else if (compName === 'protechctiy') compName = 'Protech City';
 
+        if (this.currentUser.role === 'usta') {
+            if (compEl) compEl.textContent = 'Usta Kabineti';
+            if (userEl) userEl.textContent = this.currentUser.name || 'Usta';
+            if (roleEl) roleEl.textContent = 'VIP Usta';
+            return;
+        }
+
         if (compEl) compEl.textContent = compName;
         if (userEl) userEl.textContent = this.currentUser.name || this.currentUser.id;
         if (roleEl) roleEl.textContent = (this.currentUser.role || 'Xodim').split(';')[0];
@@ -218,6 +361,24 @@ window.MobileApp = {
     renderNavigation: function() {
         const navContainer = document.getElementById('mobile-app-nav');
         if (!navContainer) return;
+
+        if (this.currentUser && this.currentUser.role === 'usta') {
+            navContainer.innerHTML = `
+                <a href="javascript:void(0)" class="nav-item active" id="nav-tab-usta-cabinet" onclick="MobileApp.switchView('usta-cabinet')">
+                    <i class="fas fa-hammer"></i>
+                    <span>Kabinet</span>
+                </a>
+                <a href="javascript:void(0)" class="nav-item" id="nav-tab-usta-receipts" onclick="MobileApp.switchView('usta-receipts')">
+                    <i class="fas fa-receipt"></i>
+                    <span>Xaridlarim</span>
+                </a>
+                <a href="javascript:void(0)" class="nav-item" onclick="MobileApp.logout()">
+                    <i class="fas fa-sign-out-alt"></i>
+                    <span>Chiqish</span>
+                </a>
+            `;
+            return;
+        }
 
         let itemsHtml = `
             <a href="javascript:void(0)" class="nav-item active" id="nav-tab-home" onclick="MobileApp.switchView('home')">
@@ -295,6 +456,172 @@ window.MobileApp = {
             this.loadRecentReceipts();
         } else if (viewName === 'profile') {
             this.renderProfilePermissions();
+        } else if (viewName === 'usta-cabinet') {
+            this.loadUstaCabinet();
+        } else if (viewName === 'usta-receipts') {
+            this.loadUstaAllReceipts();
+        }
+    },
+
+    ustaReceiptsCache: [],
+
+    loadUstaCabinet: async function() {
+        if (!this.currentUser || this.currentUser.role !== 'usta') return;
+
+        // 1. Populate VIP Card Info
+        const nameEl = document.getElementById('m-usta-card-name');
+        const phoneEl = document.getElementById('m-usta-card-phone');
+        const barcodeEl = document.getElementById('m-usta-card-barcode');
+        const bonusEl = document.getElementById('m-usta-bonus-val');
+
+        if (nameEl) nameEl.textContent = this.currentUser.name || 'Usta';
+        if (phoneEl) phoneEl.textContent = this.currentUser.phone || '';
+        if (barcodeEl) barcodeEl.textContent = this.currentUser.barcode || '';
+        if (bonusEl) bonusEl.textContent = `${Number(this.currentUser.bonus || 0).toLocaleString('uz-UZ')} so'm`;
+
+        // 2. Fetch live receipts and updated bonus
+        const recentList = document.getElementById('m-usta-recent-receipts-list');
+        const countBadge = document.getElementById('m-usta-receipts-count');
+        if (recentList) {
+            recentList.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--text-muted);"><i class="fas fa-spinner fa-spin"></i> Cheklar yuklanmoqda...</div>';
+        }
+
+        try {
+            const cid = this.currentUser.id;
+            const bc = encodeURIComponent(this.currentUser.barcode || '');
+            const ph = encodeURIComponent(this.currentUser.phone || '');
+            const url = `/api/clients/${cid}/receipts?barcode=${bc}&phone=${ph}`;
+            const res = await fetch(url);
+            if (res.ok) {
+                const data = await res.json();
+                if (data && data.ok) {
+                    if (data.bonus !== undefined && data.bonus !== null) {
+                        this.currentUser.bonus = Number(data.bonus);
+                        if (bonusEl) bonusEl.textContent = `${this.currentUser.bonus.toLocaleString('uz-UZ')} so'm`;
+                        const saved = JSON.parse(localStorage.getItem('mobile_auth') || '{}');
+                        if (saved.user) {
+                            saved.user.bonus = this.currentUser.bonus;
+                            localStorage.setItem('mobile_auth', JSON.stringify(saved));
+                        }
+                    }
+
+                    this.ustaReceiptsCache = data.receipts || [];
+                    if (countBadge) countBadge.textContent = `${this.ustaReceiptsCache.length} ta`;
+                    this.renderUstaReceipts(this.ustaReceiptsCache.slice(0, 5), recentList);
+                    return;
+                }
+            }
+            if (recentList) recentList.innerHTML = '<div style="text-align: center; padding: 15px; color: var(--text-muted); font-size: 12px;">Cheklar topilmadi</div>';
+        } catch (e) {
+            console.warn("Could not load usta receipts:", e);
+            if (recentList) recentList.innerHTML = '<div style="text-align: center; padding: 15px; color: var(--text-muted); font-size: 12px;">Cheklarni yuklashda xatolik</div>';
+        }
+    },
+
+    loadUstaAllReceipts: function() {
+        const allList = document.getElementById('m-usta-all-receipts-list');
+        if (!allList) return;
+        if (!this.ustaReceiptsCache || this.ustaReceiptsCache.length === 0) {
+            allList.innerHTML = '<div style="text-align: center; padding: 40px 16px; color: var(--text-muted);"><i class="fas fa-receipt" style="font-size: 32px; opacity: 0.3; margin-bottom: 12px; display: block;"></i>Hozircha xarid cheklari mavjud emas</div>';
+            return;
+        }
+        this.renderUstaReceipts(this.ustaReceiptsCache, allList);
+    },
+
+    renderUstaReceipts: function(receipts, container) {
+        if (!container) return;
+        if (!receipts || receipts.length === 0) {
+            container.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--text-muted); font-size: 12.5px;">Hozircha xarid cheklari mavjud emas</div>';
+            return;
+        }
+
+        let html = '';
+        receipts.forEach((r, idx) => {
+            const rid = r.id || `rec_${idx}`;
+            const total = Number(r.total_amount || 0);
+            const dateStr = r.created_at ? new Date(r.created_at).toLocaleString('uz-UZ', { dateStyle: 'medium', timeStyle: 'short' }) : '-';
+            const code = r.code || r.id?.substring(0, 8) || `№ ${idx + 1}`;
+            
+            let items = [];
+            if (Array.isArray(r.items)) {
+                items = r.items;
+            } else if (r.items && typeof r.items === 'object') {
+                if (Array.isArray(r.items.rows)) items = r.items.rows;
+                else if (Array.isArray(r.items.items)) items = r.items.items;
+            }
+
+            const itemsCount = items.length;
+
+            html += `
+                <div class="usta-receipt-card" onclick="MobileApp.toggleReceiptDetails('${rid}')">
+                    <div class="usta-receipt-top">
+                        <div>
+                            <div class="usta-receipt-code"><i class="fas fa-receipt" style="color: #38bdf8; margin-right: 5px;"></i> Chek: ${code}</div>
+                            <div class="usta-receipt-date"><i class="far fa-clock"></i> ${dateStr}</div>
+                        </div>
+                        <div style="text-align: right;">
+                            <div class="usta-receipt-sum">${total.toLocaleString('uz-UZ')} so'm</div>
+                            <div style="font-size: 11px; color: var(--text-muted);">${itemsCount > 0 ? `${itemsCount} xil tovar` : 'Xarid'} &bull; <i class="fas fa-chevron-down" style="font-size: 9px;"></i></div>
+                        </div>
+                    </div>
+                    
+                    <div id="details-${rid}" class="usta-receipt-details">
+                        ${itemsCount > 0 ? items.map(it => {
+                            const itName = it.name || it.product_name || 'Tovar';
+                            const itQty = it.quantity || it.qty || 1;
+                            const itPrice = Number(it.price || 0);
+                            const itTotal = Number(it.total || (itQty * itPrice) || 0);
+                            return `
+                                <div class="usta-receipt-item-row">
+                                    <div class="usta-receipt-item-name">${itName}</div>
+                                    <div class="usta-receipt-item-qty">${itQty} dona</div>
+                                    <div class="usta-receipt-item-price">${itTotal.toLocaleString('uz-UZ')} so'm</div>
+                                </div>
+                            `;
+                        }).join('') : `
+                            <div style="font-size: 11.5px; color: var(--text-muted); padding: 4px 0;">
+                                To'lov turi: ${r.payment_type || 'Naqd / Karta'}
+                            </div>
+                        `}
+                    </div>
+                </div>
+            `;
+        });
+
+        container.innerHTML = html;
+    },
+
+    toggleReceiptDetails: function(rid) {
+        const el = document.getElementById(`details-${rid}`);
+        if (el) {
+            el.classList.toggle('open');
+        }
+    },
+
+    syncUstaBonus: async function(btn) {
+        if (!this.currentUser || !this.currentUser.id) return;
+        const icon = btn ? btn.querySelector('i') : null;
+        if (icon) icon.classList.add('fa-spin');
+
+        try {
+            const resp = await fetch(`/api/clients/${this.currentUser.id}/sync-bonus`, { method: 'POST' });
+            if (resp.ok) {
+                const data = await resp.json();
+                if (data && data.bonus !== undefined) {
+                    this.currentUser.bonus = Number(data.bonus);
+                    const bonusEl = document.getElementById('m-usta-bonus-val');
+                    if (bonusEl) bonusEl.textContent = `${this.currentUser.bonus.toLocaleString('uz-UZ')} so'm`;
+                    const saved = JSON.parse(localStorage.getItem('mobile_auth') || '{}');
+                    if (saved.user) {
+                        saved.user.bonus = this.currentUser.bonus;
+                        localStorage.setItem('mobile_auth', JSON.stringify(saved));
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn("Could not sync live bonus:", e);
+        } finally {
+            if (icon) icon.classList.remove('fa-spin');
         }
     },
 
