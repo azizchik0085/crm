@@ -1335,6 +1335,30 @@
                         </div>
                         <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 24px 0;">
                         <h4 style="margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+                            <i class="fas fa-hand-holding-usd" style="color: #10b981"></i> Ustalar Bonusi & Buxgalter Telegram Sozlamalari
+                        </h4>
+                        <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 14px;">
+                            Ustalar mobil ilovada bonusni kartaga yechish so'rovi yuborganda, Buxgalterga Telegram orqali xabar boradi va botdagi tugma orqali 1-marta bosishda bonus avtomatik yechiladi.
+                        </p>
+                        <div class="form-group">
+                            <label for="settings-payout-tg-bot-token">Telegram Bot Token (Ustalar to'lov boti)</label>
+                            <input type="password" id="settings-payout-tg-bot-token" class="form-control" placeholder="Masalan: 8652170204:AAEX1-1Bs5Y_72lTkrq6XMhjyJDAczkVhBI">
+                            <small style="color: var(--text-muted); font-size: 11px;">Agar alohida bot kiritilmasa, yuqoridagi asosiy Telegram bot ishlatiladi.</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="settings-payout-tg-chat-id">Buxgalter Telegram Chat ID</label>
+                            <div style="display: flex; gap: 8px;">
+                                <input type="text" id="settings-payout-tg-chat-id" class="form-control" placeholder="Masalan: 123456789">
+                                <button type="button" class="btn btn-secondary btn-sm" onclick="App.testPayoutTelegram()" style="white-space: nowrap; padding: 0 14px; background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3);">
+                                    <i class="fas fa-paper-plane"></i> Test xabar
+                                </button>
+                            </div>
+                            <small style="color: var(--text-muted); font-size: 11px;">
+                                💡 <b>Qanday bilish mumkin:</b> Telegram botingizga kiring va <code>/start</code> yuboring, bot sizga Chat ID raqamingizni ko'rsatadi. Yoki to'g'ridan-to'g'ri botga <code>/set_accountant</code> deb yozing.
+                            </small>
+                        </div>
+                        <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 24px 0;">
+                        <h4 style="margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
                             <i class="fas fa-brain" style="color: #6366f1"></i> Sun'iy Intellekt (AI Copilot & Auto-Pilot) Sozlamalari
                         </h4>
                         <div class="form-group">

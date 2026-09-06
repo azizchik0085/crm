@@ -351,6 +351,22 @@
                 <div style="font-size: 11.5px; color: var(--text-muted); line-height: 1.4; margin-top: 4px;">
                     <i class="fas fa-check-circle" style="color: #10b981; margin-right: 4px;"></i> Har bir xaridingizdan bonus to'planadi va to'lov uchun qabul qilinadi
                 </div>
+                <button type="button" class="btn btn-primary btn-block" style="margin-top: 14px; height: 44px; font-size: 14px; font-weight: 700; background: linear-gradient(135deg, #10b981, #059669); border: none; border-radius: 12px; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.35); display: flex; align-items: center; justify-content: center; gap: 8px;" onclick="MobileApp.openPayoutModal()">
+                    <i class="fas fa-credit-card"></i> Kartaga Yechib Olish
+                </button>
+            </div>
+
+            <!-- 2.5 MENING YECHISH SO'ROVLARIM -->
+            <div id="m-usta-payouts-box" style="margin-top: 16px; display: none;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <h3 style="font-size: 13.5px; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 6px;">
+                        <i class="fas fa-money-bill-transfer" style="color: #10b981;"></i> Yechish So'rovlarim
+                    </h3>
+                    <span id="m-usta-payouts-count" class="badge" style="background: rgba(16, 185, 129, 0.15); color: #10b981; font-weight: 700; font-size: 11px; padding: 2px 8px; border-radius: 10px;">0 ta</span>
+                </div>
+                <div id="m-usta-payouts-list">
+                    <!-- Populated dynamically -->
+                </div>
             </div>
 
             <!-- 3. MENING XARIDLARIM (QISQA RO'YXAT) -->
@@ -584,19 +600,108 @@
                 </div>
             </div>
         </div>
+    <!-- ========================================== -->
+    <!-- 8. BONUS PAYOUT (KARTAGA YECHISH) MODAL    -->
+    <!-- ========================================== -->
+    <div id="m-payout-modal" class="m-modal">
+        <div class="m-sheet">
+            <div class="m-sheet-header">
+                <div class="m-sheet-drag-handle"></div>
+                <div class="m-sheet-title"><i class="fas fa-credit-card" style="color: #10b981; margin-right: 6px;"></i> Bonusni Kartaga Yechish</div>
+                <button class="m-sheet-close" onclick="MobileApp.closePayoutModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="m-sheet-content">
+                <!-- Form View -->
+                <div id="m-payout-form-container">
+                    <!-- Available Balance Box -->
+                    <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 14px; padding: 14px; margin-bottom: 16px; text-align: center;">
+                        <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 2px;">Mavjud bonus balansingiz:</div>
+                        <div id="m-payout-modal-balance" style="font-size: 26px; font-weight: 800; color: #10b981;">0 so'm</div>
+                    </div>
+
+                    <div id="m-payout-error" style="display: none; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #f87171; font-size: 12.5px; padding: 10px 12px; border-radius: 10px; margin-bottom: 12px;"></div>
+
+                    <form onsubmit="MobileApp.submitPayoutRequest(event)">
+                        <!-- Amount Input & Quick Chips -->
+                        <div class="form-group" style="margin-bottom: 12px;">
+                            <label style="display: flex; justify-content: space-between;">
+                                <span>Yechiladigan summa (so'm)</span>
+                                <span style="font-size: 11.5px; color: var(--text-muted);">Min: 10 000 so'm</span>
+                            </label>
+                            <input type="number" id="m-payout-amount" class="form-control" placeholder="Masalan: 200000" required inputmode="numeric" style="font-size: 16px; font-weight: 700;">
+                            
+                            <!-- Quick Amount Chips -->
+                            <div style="display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap;">
+                                <button type="button" class="btn btn-secondary" style="height: 30px; font-size: 11px; padding: 0 8px; border-radius: 8px;" onclick="MobileApp.setPayoutQuickAmount(50000)">50 000</button>
+                                <button type="button" class="btn btn-secondary" style="height: 30px; font-size: 11px; padding: 0 8px; border-radius: 8px;" onclick="MobileApp.setPayoutQuickAmount(100000)">100 000</button>
+                                <button type="button" class="btn btn-secondary" style="height: 30px; font-size: 11px; padding: 0 8px; border-radius: 8px;" onclick="MobileApp.setPayoutQuickAmount(200000)">200 000</button>
+                                <button type="button" class="btn btn-secondary" style="height: 30px; font-size: 11px; padding: 0 8px; border-radius: 8px; color: #10b981; border-color: rgba(16, 185, 129, 0.4);" onclick="MobileApp.setPayoutQuickAmount('all')">Barchasini</button>
+                            </div>
+                        </div>
+
+                        <!-- Card Number Input -->
+                        <div class="form-group" style="margin-bottom: 12px;">
+                            <label style="display: flex; justify-content: space-between; align-items: center;">
+                                <span>Karta raqami (Uzcard / Humo)</span>
+                                <span id="m-payout-card-badge" style="font-size: 11px; font-weight: 700; color: #38bdf8;">16 xonali</span>
+                            </label>
+                            <input type="tel" id="m-payout-card-number" class="form-control" placeholder="8600 0000 0000 0000" maxlength="19" required oninput="MobileApp.formatCardNumber(this)" style="font-size: 16px; font-family: monospace; letter-spacing: 1px; font-weight: 600;">
+                        </div>
+
+                        <!-- Cardholder Name -->
+                        <div class="form-group" style="margin-bottom: 12px;">
+                            <label>Karta egasining F.I.SH</label>
+                            <input type="text" id="m-payout-card-holder" class="form-control" placeholder="Masalan: Azamat Karimov" required autocomplete="name">
+                        </div>
+
+                        <!-- Phone Number -->
+                        <div class="form-group" style="margin-bottom: 16px;">
+                            <label>Bog'lanish uchun telefon</label>
+                            <input type="tel" id="m-payout-phone" class="form-control" placeholder="+998 -- --- -- --" required>
+                        </div>
+
+                        <button type="submit" id="m-btn-payout-submit" class="btn btn-primary btn-block" style="height: 48px; font-size: 14.5px; background: linear-gradient(135deg, #10b981, #059669); border: none; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.35);">
+                            <i class="fas fa-paper-plane"></i> Buxgalteriyaga So'rov Yuborish
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Success Result View (Initially hidden) -->
+                <div id="m-payout-success-container" style="display: none; text-align: center; padding: 20px 10px;">
+                    <div style="width: 64px; height: 64px; border-radius: 50%; background: rgba(16, 185, 129, 0.15); border: 2px solid #10b981; color: #10b981; display: inline-flex; align-items: center; justify-content: center; font-size: 28px; margin-bottom: 14px;">
+                        <i class="fas fa-check"></i>
+                    </div>
+                    <h3 style="font-size: 18px; font-weight: 800; color: #fff; margin-bottom: 6px;">So'rovingiz Yuborildi!</h3>
+                    <p style="font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 18px;">
+                        Buxgalteriya so'rovni ko'rib chiqib, pulni kartangizga o'tkazib beradi. Holatni profilingizda kuzatib borishingiz mumkin.
+                    </p>
+
+                    <a id="m-payout-direct-tg-btn" href="#" target="_blank" class="btn btn-primary btn-block" style="height: 44px; font-size: 13.5px; background: #0088cc; border: none; margin-bottom: 10px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; text-decoration: none;">
+                        <i class="fab fa-telegram-plane"></i> Chekni Buxgalterga Telegramda Yuborish
+                    </a>
+
+                    <button type="button" class="btn btn-secondary btn-block" style="height: 40px; font-size: 13px;" onclick="MobileApp.closePayoutModal()">
+                        Yopish
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Html5Qrcode Library for Camera Barcode Scanning -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
 
     <!-- Mobile App Main Script -->
-    <script src="/js/mobile-app.js?v=2.6"></script>
+    <script src="/js/mobile-app.js?v=2.7"></script>
 
     <!-- Register Service Worker for PWA Offline / Standalone Installation -->
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw-mobile.js?v=5')
+                navigator.serviceWorker.register('/sw-mobile.js?v=6')
                     .then(reg => {
                         reg.update();
                         console.log('SmartCore Mobile SW registered');

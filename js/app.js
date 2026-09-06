@@ -107,6 +107,8 @@ window.App = {
                     if (backendSettings.taplink_phone !== undefined) data.settings.taplinkPhone = backendSettings.taplink_phone;
                     if (backendSettings.taplink_slogan !== undefined) data.settings.taplinkSlogan = backendSettings.taplink_slogan;
                     if (backendSettings.taplink_logo !== undefined) data.settings.taplinkLogo = backendSettings.taplink_logo;
+                    if (backendSettings.payout_telegram_chat_id !== undefined) data.settings.payoutTelegramChatId = backendSettings.payout_telegram_chat_id;
+                    if (backendSettings.payout_telegram_bot_token !== undefined) data.settings.payoutTelegramBotToken = backendSettings.payout_telegram_bot_token;
                     
                     // Subscription settings
                     data.settings.maxEmployees = backendSettings.max_employees !== undefined ? backendSettings.max_employees : (data.settings.maxEmployees || 100);
@@ -156,7 +158,9 @@ window.App = {
                     taplink_whatsapp: data.settings.taplinkWhatsapp || '',
                     taplink_phone: data.settings.taplinkPhone || '',
                     taplink_slogan: data.settings.taplinkSlogan || '',
-                    taplink_logo: data.settings.taplinkLogo || ''
+                    taplink_logo: data.settings.taplinkLogo || '',
+                    payout_telegram_chat_id: data.settings.payoutTelegramChatId || '',
+                    payout_telegram_bot_token: data.settings.payoutTelegramBotToken || ''
                 })
             }).catch(err => console.error("Initial settings sync failed:", err));
         }
@@ -256,6 +260,12 @@ window.App = {
 
         const amocrmLeadCreationInput = document.getElementById('settings-amocrm-lead-creation');
         if (amocrmLeadCreationInput) amocrmLeadCreationInput.checked = !!data.settings.amocrmLeadCreation;
+
+        const payoutChatIdInput = document.getElementById('settings-payout-tg-chat-id');
+        if (payoutChatIdInput) payoutChatIdInput.value = data.settings.payoutTelegramChatId || '';
+
+        const payoutBotTokenInput = document.getElementById('settings-payout-tg-bot-token');
+        if (payoutBotTokenInput) payoutBotTokenInput.value = data.settings.payoutTelegramBotToken || '';
 
         // Webhook manzillarini joriy domen bo'yicha dinamik to'ldirish
         const companyId = localStorage.getItem('activeCompanyId') || '';
@@ -835,6 +845,8 @@ window.App = {
                  const taplinkPhone = document.getElementById('settings-taplink-phone')?.value.trim() || '';
                  const taplinkSlogan = document.getElementById('settings-taplink-slogan')?.value.trim() || '';
                  const taplinkLogo = document.getElementById('settings-taplink-logo')?.value.trim() || '';
+                 const payoutTelegramChatId = document.getElementById('settings-payout-tg-chat-id')?.value.trim() || '';
+                 const payoutTelegramBotToken = document.getElementById('settings-payout-tg-bot-token')?.value.trim() || '';
                 
                 // Sozlamalar o'zgarganligini aniqlash
                 const sbChanged = data.settings.supabaseUrl !== sbUrl || data.settings.supabaseKey !== sbKey;
@@ -911,6 +923,8 @@ window.App = {
                  data.settings.taplinkPhone = taplinkPhone;
                  data.settings.taplinkSlogan = taplinkSlogan;
                  data.settings.taplinkLogo = taplinkLogo;
+                 data.settings.payoutTelegramChatId = payoutTelegramChatId;
+                 data.settings.payoutTelegramBotToken = payoutTelegramBotToken;
                 
                 AppStorage.save(data);
 
@@ -951,7 +965,9 @@ window.App = {
                             taplink_whatsapp: taplinkWhatsapp,
                             taplink_phone: taplinkPhone,
                             taplink_slogan: taplinkSlogan,
-                            taplink_logo: taplinkLogo
+                            taplink_logo: taplinkLogo,
+                            payout_telegram_chat_id: payoutTelegramChatId,
+                            payout_telegram_bot_token: payoutTelegramBotToken
                         })
                     });
                 } catch(err) {
@@ -1685,6 +1701,34 @@ window.App = {
             } else {
                 advDiv.style.display = 'none';
             }
+        }
+    },
+
+    testPayoutTelegram: async function() {
+        const chatId = document.getElementById('settings-payout-tg-chat-id')?.value.trim();
+        const botToken = document.getElementById('settings-payout-tg-bot-token')?.value.trim() || document.getElementById('settings-telegram-token')?.value.trim();
+        if (!chatId) {
+            alert("Iltimos, avval Buxgalter Telegram Chat ID raqamini kiriting!");
+            return;
+        }
+        try {
+            const res = await fetch('/api/settings/payout-telegram', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    bot_token: botToken,
+                    chat_id: chatId,
+                    send_test: true
+                })
+            });
+            const d = await res.json();
+            if (d.test_sent) {
+                alert("✅ Test xabari Telegramingizga muvaffaqiyatli yuborildi! Telegramni tekshiring.");
+            } else {
+                alert("⚠️ Sozlamalar saqlandi, lekin Telegramga xabar bormadi. Bot token yoki Chat ID to'g'riligini tekshiring.");
+            }
+        } catch (e) {
+            alert("Xatolik yuz berdi: " + e.message);
         }
     },
 

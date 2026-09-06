@@ -508,6 +508,7 @@ window.MobileApp = {
                     this.ustaReceiptsCache = data.receipts || [];
                     if (countBadge) countBadge.textContent = `${this.ustaReceiptsCache.length} ta`;
                     this.renderUstaReceipts(this.ustaReceiptsCache.slice(0, 5), recentList);
+                    this.loadUstaPayouts();
                     return;
                 }
             }
@@ -515,6 +516,8 @@ window.MobileApp = {
         } catch (e) {
             console.warn("Could not load usta receipts:", e);
             if (recentList) recentList.innerHTML = '<div style="text-align: center; padding: 15px; color: var(--text-muted); font-size: 12px;">Cheklarni yuklashda xatolik</div>';
+        } finally {
+            this.loadUstaPayouts();
         }
     },
 
@@ -622,6 +625,220 @@ window.MobileApp = {
             console.warn("Could not sync live bonus:", e);
         } finally {
             if (icon) icon.classList.remove('fa-spin');
+        }
+    },
+
+    // --- PAYOUT (BONUSNI KARTAGA YECHISH) MANTIQI ---
+    openPayoutModal: function() {
+        if (!this.currentUser) return;
+        const modal = document.getElementById('m-payout-modal');
+        if (!modal) return;
+
+        const currentBonus = Number(this.currentUser.bonus || 0);
+        const balEl = document.getElementById('m-payout-modal-balance');
+        if (balEl) balEl.textContent = `${currentBonus.toLocaleString('uz-UZ')} so'm`;
+
+        const phoneInput = document.getElementById('m-payout-phone');
+        if (phoneInput && !phoneInput.value) phoneInput.value = this.currentUser.phone || '';
+
+        const nameInput = document.getElementById('m-payout-card-holder');
+        if (nameInput && !nameInput.value) nameInput.value = this.currentUser.name || '';
+
+        const amtInput = document.getElementById('m-payout-amount');
+        if (amtInput) amtInput.value = '';
+
+        const cardInput = document.getElementById('m-payout-card-number');
+        if (cardInput) cardInput.value = '';
+
+        const errEl = document.getElementById('m-payout-error');
+        if (errEl) errEl.style.display = 'none';
+
+        const formCont = document.getElementById('m-payout-form-container');
+        if (formCont) formCont.style.display = 'block';
+
+        const succCont = document.getElementById('m-payout-success-container');
+        if (succCont) succCont.style.display = 'none';
+
+        modal.classList.add('active');
+    },
+
+    closePayoutModal: function() {
+        const modal = document.getElementById('m-payout-modal');
+        if (modal) modal.classList.remove('active');
+    },
+
+    setPayoutQuickAmount: function(val) {
+        const amtInput = document.getElementById('m-payout-amount');
+        if (!amtInput) return;
+        if (val === 'all') {
+            amtInput.value = Math.floor(Number(this.currentUser.bonus || 0));
+        } else {
+            amtInput.value = val;
+        }
+    },
+
+    formatCardNumber: function(input) {
+        let val = (input.value || '').replace(/\D/g, '').substring(0, 16);
+        let formatted = val.replace(/(\d{4})(?=\d)/g, '$1 ');
+        input.value = formatted;
+
+        const badge = document.getElementById('m-payout-card-badge');
+        if (badge) {
+            if (val.startsWith('8600') || val.startsWith('5614')) {
+                badge.textContent = 'Uzcard';
+                badge.style.color = '#10b981';
+            } else if (val.startsWith('9860')) {
+                badge.textContent = 'Humo';
+                badge.style.color = '#f59e0b';
+            } else if (val.startsWith('4')) {
+                badge.textContent = 'Visa';
+                badge.style.color = '#38bdf8';
+            } else {
+                badge.textContent = '16 xonali';
+                badge.style.color = '#9ca3af';
+            }
+        }
+    },
+
+    submitPayoutRequest: async function(e) {
+        if (e) e.preventDefault();
+        const amtInput = document.getElementById('m-payout-amount');
+        const cardInput = document.getElementById('m-payout-card-number');
+        const holderInput = document.getElementById('m-payout-card-holder');
+        const phoneInput = document.getElementById('m-payout-phone');
+        const errEl = document.getElementById('m-payout-error');
+        const btn = document.getElementById('m-btn-payout-submit');
+
+        const amount = parseFloat(amtInput ? amtInput.value : 0);
+        const card_number = (cardInput ? cardInput.value : '').replace(/\s+/g, '');
+        const card_holder = (holderInput ? holderInput.value : '').trim();
+        const phone = (phoneInput ? phoneInput.value : '').trim();
+        const currentBonus = Number(this.currentUser.bonus || 0);
+
+        if (isNaN(amount) || amount <= 0) {
+            if (errEl) {
+                errEl.textContent = "Iltimos, to'g'ri summa kiriting!";
+                errEl.style.display = 'block';
+            }
+            return;
+        }
+
+        if (amount > currentBonus) {
+            if (errEl) {
+                errEl.textContent = `Yechiladigan summa mavjud bonusdan (${currentBonus.toLocaleString('uz-UZ')} so'm) ko'p bo'lishi mumkin emas!`;
+                errEl.style.display = 'block';
+            }
+            return;
+        }
+
+        if (card_number.length < 16) {
+            if (errEl) {
+                errEl.textContent = "Karta raqami kamida 16 xonali bo'lishi kerak!";
+                errEl.style.display = 'block';
+            }
+            return;
+        }
+
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Yuborilmoqda...';
+        }
+        if (errEl) errEl.style.display = 'none';
+
+        try {
+            const resp = await fetch('/api/payout/request', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    client_id: this.currentUser.id,
+                    amount: amount,
+                    card_number: card_number,
+                    card_holder: card_holder,
+                    phone: phone,
+                    company_id: this.currentCompany || 'giperbrendstroy'
+                })
+            });
+
+            const data = await resp.json();
+            if (!resp.ok || !data.ok) {
+                throw new Error(data.detail || "So'rovni yuborib bo'lmadi");
+            }
+
+            // Show success container
+            document.getElementById('m-payout-form-container').style.display = 'none';
+            const succCont = document.getElementById('m-payout-success-container');
+            succCont.style.display = 'block';
+
+            const tgBtn = document.getElementById('m-payout-direct-tg-btn');
+            if (tgBtn && data.direct_tg_url) {
+                tgBtn.href = data.direct_tg_url;
+            }
+
+            this.loadUstaPayouts();
+
+        } catch (err) {
+            if (errEl) {
+                errEl.textContent = err.message || "Xatolik yuz berdi";
+                errEl.style.display = 'block';
+            }
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-paper-plane"></i> Buxgalteriyaga So\'rov Yuborish';
+            }
+        }
+    },
+
+    loadUstaPayouts: async function() {
+        if (!this.currentUser || !this.currentUser.id) return;
+        const box = document.getElementById('m-usta-payouts-box');
+        const listEl = document.getElementById('m-usta-payouts-list');
+        const countBadge = document.getElementById('m-usta-payouts-count');
+        if (!box || !listEl) return;
+
+        try {
+            const res = await fetch(`/api/payout/requests?client_id=${encodeURIComponent(this.currentUser.id)}`);
+            if (res.ok) {
+                const data = await res.json();
+                const reqs = data.requests || [];
+                if (reqs.length > 0) {
+                    box.style.display = 'block';
+                    if (countBadge) countBadge.textContent = `${reqs.length} ta`;
+
+                    let html = '';
+                    reqs.forEach(r => {
+                        const amt = Number(r.amount || 0);
+                        const isPending = r.status === 'pending';
+                        const isDone = r.status === 'completed';
+                        const statusBadge = isDone 
+                            ? '<span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #10b981; font-size: 11px; padding: 2px 8px; border-radius: 6px;"><i class="fas fa-check-circle"></i> To\'landi</span>'
+                            : (isPending 
+                                ? '<span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #f59e0b; font-size: 11px; padding: 2px 8px; border-radius: 6px;"><i class="fas fa-clock"></i> Kutilmoqda</span>'
+                                : '<span class="badge" style="background: rgba(239, 68, 68, 0.15); color: #ef4444; font-size: 11px; padding: 2px 8px; border-radius: 6px;"><i class="fas fa-times-circle"></i> Rad etildi</span>');
+                        
+                        const dateStr = r.created_at ? new Date(r.created_at).toLocaleDateString('uz-UZ', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
+                        const cardMasked = r.card_number ? `${r.card_number.substring(0, 4)} **** **** ${r.card_number.slice(-4)}` : '';
+
+                        html += `
+                            <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 12px; margin-bottom: 8px;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                                    <span style="font-size: 14.5px; font-weight: 700; color: #fff;">${amt.toLocaleString('uz-UZ')} so'm</span>
+                                    ${statusBadge}
+                                </div>
+                                <div style="display: flex; justify-content: space-between; font-size: 11.5px; color: var(--text-muted);">
+                                    <span><i class="far fa-credit-card"></i> ${cardMasked}</span>
+                                    <span>${dateStr}</span>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    listEl.innerHTML = html;
+                } else {
+                    box.style.display = 'none';
+                }
+            }
+        } catch (e) {
+            console.warn("Could not load usta payouts:", e);
         }
     },
 

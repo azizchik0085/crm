@@ -1,5 +1,6 @@
 import os
 import time
+import uuid
 import json
 import asyncio
 from datetime import datetime, timezone, timedelta
@@ -2146,8 +2147,25 @@ def update_settings(settings: dict, request: Request):
     company_settings["taplink_phone"] = settings.get("taplink_phone", "")
     company_settings["taplink_slogan"] = settings.get("taplink_slogan", "")
     company_settings["taplink_logo"] = settings.get("taplink_logo", "/assets/logo.png")
-    
+    if "payout_telegram_chat_id" in settings:
+        company_settings["payout_telegram_chat_id"] = str(settings.get("payout_telegram_chat_id", "")).strip()
+    if "payout_telegram_bot_token" in settings:
+        company_settings["payout_telegram_bot_token"] = str(settings.get("payout_telegram_bot_token", "")).strip()
+        
     save_company_settings(company_id, company_settings)
+    
+    # Auto-register webhook for Telegram bot if token exists
+    tg_token = company_settings.get("payout_telegram_bot_token") or company_settings.get("telegram_token")
+    if tg_token:
+        try:
+            requests.post(
+                f"https://api.telegram.org/bot{tg_token}/setWebhook",
+                json={"url": "https://protech.up.railway.app/api/telegram/webhook"},
+                timeout=5
+            )
+        except Exception:
+            pass
+
     print(f"Settings for company {company_id} updated.")
     return {"status": "success", "settings": company_settings}
 
@@ -5964,7 +5982,386 @@ async def push_deal_to_amocrm(payload: dict, request: Request):
         print(f"amoCRM Push Deal Error: {e}")
         if isinstance(e, HTTPException):
             raise e
-        raise HTTPException(status_code=500, detail=f"Tizim xatoligi yuz berdi: {str(e)}")
+# ===================================================
+# --- BONUS PAYOUT & TELEGRAM ACCOUNTANT ROUTING ---
+# ===================================================
+
+PAYOUT_FILE = os.path.join(os.path.dirname(__file__), "payout_requests.json")
+
+def load_payout_requests():
+    if not os.path.exists(PAYOUT_FILE):
+        return []
+    try:
+        with open(PAYOUT_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return []
+
+def save_payout_requests(requests_list):
+    try:
+        with open(PAYOUT_FILE, "w", encoding="utf-8") as f:
+            json.dump(requests_list, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"Error saving payout requests: {e}")
+
+def notify_accountant_payout(payout_item, company_id="giperbrendstroy"):
+    settings = get_company_settings(company_id)
+    token = settings.get("payout_telegram_bot_token") or settings.get("telegram_token")
+    chat_id = settings.get("payout_telegram_chat_id")
+    
+    if not token or not chat_id:
+        print("Notice: Telegram bot token or accountant chat_id not configured in settings.")
+        return False
+        
+    p_id = payout_item["id"]
+    amt = f"{int(payout_item['amount']):,} so'm"
+    name = payout_item.get("client_name", "Noma'lum usta")
+    phone = payout_item.get("client_phone", "-")
+    bc = payout_item.get("client_barcode", "-")
+    card = payout_item.get("card_number", "-")
+    holder = payout_item.get("card_holder", "-")
+    date_str = datetime.now().strftime("%d.%m.%Y %H:%M")
+    
+    text = (
+        f"🔔 <b>YANGI BONUS YECHISH SO'ROVI!</b>\n\n"
+        f"👷 <b>Usta:</b> {name}\n"
+        f"📱 <b>Telefon:</b> {phone}\n"
+        f"🏷 <b>Shtrix-kod:</b> <code>{bc}</code>\n"
+        f"💰 <b>Yechiladigan summa:</b> <b>{amt}</b>\n"
+        f"💳 <b>Karta:</b> <code>{card}</code>\n"
+        f"👤 <b>Karta egasi:</b> {holder}\n"
+        f"🕒 <b>Sana:</b> {date_str}\n\n"
+        f"<i>Pulni usta kartasiga o'tkazganingizdan so'ng, tasdiqlash tugmasini bosing:</i>"
+    )
+    
+    payload = {
+        "chat_id": chat_id,
+        "text": text,
+        "parse_mode": "HTML",
+        "reply_markup": {
+            "inline_keyboard": [
+                [
+                    {"text": "✅ To'landi va Bonusdan Yechilsin", "callback_data": f"payout_approve:{p_id}"}
+                ],
+                [
+                    {"text": "❌ Rad etish", "callback_data": f"payout_reject:{p_id}"}
+                ]
+            ]
+        }
+    }
+    
+    try:
+        r = requests.post(f"https://api.telegram.org/bot{token}/sendMessage", json=payload, timeout=10)
+        return r.ok
+    except Exception as e:
+        print(f"Failed to send Telegram payout alert: {e}")
+        return False
+
+def execute_payout_approval(payout_id, company_id="giperbrendstroy", approver_info="Buxgalter"):
+    reqs = load_payout_requests()
+    target = None
+    for r in reqs:
+        if r.get("id") == payout_id:
+            target = r
+            break
+            
+    if not target:
+        raise HTTPException(status_code=404, detail="So'rov topilmadi")
+        
+    if target.get("status") == "completed":
+        return {"ok": True, "message": "Allaqachon tasdiqlangan va to'langan", "request": target}
+        
+    client_id = target.get("client_id")
+    deduct_amount = float(target.get("amount") or 0)
+    
+    # 1. Fetch current customer data from DB
+    c_res = supabase_req("GET", f"customers?id=eq.{client_id}")
+    if not c_res or not isinstance(c_res, list) or len(c_res) == 0:
+        raise HTTPException(status_code=404, detail="Usta mijozlar bazasidan topilmadi")
+        
+    c = c_res[0]
+    current_bonus = float(c.get("value") or 0)
+    op = c.get("operator") or ""
+    meta = {}
+    if op.startswith("{") and op.endswith("}"):
+        try:
+            meta = json.loads(op)
+        except Exception:
+            pass
+            
+    new_bonus = max(0.0, current_bonus - deduct_amount)
+    
+    # 2. Update bonus history
+    history = meta.get("bonus_history") or []
+    history.append({
+        "type": "subtract",
+        "amount": deduct_amount,
+        "note": f"Kartaga yechildi ({target.get('card_number')}) - {approver_info}",
+        "date": datetime.now().isoformat()
+    })
+    meta["bonus"] = new_bonus
+    meta["bonus_history"] = history
+    new_op = json.dumps(meta, ensure_ascii=False)
+    
+    # 3. Patch customer in DB
+    supabase_req("PATCH", f"customers?id=eq.{client_id}", {
+        "value": new_bonus,
+        "operator": new_op
+    })
+    
+    # 4. Mark request completed
+    target["status"] = "completed"
+    target["completed_at"] = datetime.now().isoformat()
+    target["completed_by"] = approver_info
+    save_payout_requests(reqs)
+    
+    return {
+        "ok": True, 
+        "message": "Bonus muvaffaqiyatli yechildi", 
+        "new_bonus": new_bonus,
+        "request": target
+    }
+
+def execute_payout_rejection(payout_id, reason="Buxgalteriya tomonidan rad etildi"):
+    reqs = load_payout_requests()
+    target = None
+    for r in reqs:
+        if r.get("id") == payout_id:
+            target = r
+            break
+    if not target:
+        raise HTTPException(status_code=404, detail="So'rov topilmadi")
+        
+    target["status"] = "rejected"
+    target["rejection_reason"] = reason
+    target["completed_at"] = datetime.now().isoformat()
+    save_payout_requests(reqs)
+    return {"ok": True, "request": target}
+
+@app.post("/api/payout/request")
+def create_payout_request(payload: dict, request: Request):
+    client_id = payload.get("client_id")
+    amount = float(payload.get("amount") or 0)
+    card_number = str(payload.get("card_number") or "").replace(" ", "").strip()
+    card_holder = str(payload.get("card_holder") or "").strip()
+    phone = payload.get("phone") or ""
+    note = payload.get("note") or ""
+    company_id = payload.get("company_id") or get_company_id(request) or "giperbrendstroy"
+
+    if not client_id:
+        raise HTTPException(status_code=400, detail="Mijoz ID si talab qilinadi")
+    if amount <= 0:
+        raise HTTPException(status_code=400, detail="Summa 0 dan katta bo'lishi kerak")
+    if len(card_number) < 16:
+        raise HTTPException(status_code=400, detail="Karta raqami kamida 16 xonali bo'lishi kerak")
+
+    # Fetch customer
+    c_res = supabase_req("GET", f"customers?id=eq.{client_id}")
+    if not c_res:
+        raise HTTPException(status_code=404, detail="Mijoz topilmadi")
+    c = c_res[0]
+    current_bonus = float(c.get("value") or 0)
+    if amount > current_bonus:
+        raise HTTPException(status_code=400, detail=f"Yechiladigan summa ({amount:,.0f} so'm) mavjud bonusdan ({current_bonus:,.0f} so'm) ko'p bo'lishi mumkin emas")
+
+    p_id = f"payout_{int(time.time())}_{uuid.uuid4().hex[:4]}"
+    req_item = {
+        "id": p_id,
+        "client_id": client_id,
+        "client_name": c.get("name") or "Usta",
+        "client_phone": phone or c.get("phone") or "",
+        "client_barcode": c.get("phone2") or "",
+        "amount": amount,
+        "card_number": card_number,
+        "card_holder": card_holder or c.get("name"),
+        "note": note,
+        "status": "pending",
+        "created_at": datetime.now().isoformat(),
+        "company_id": company_id
+    }
+
+    reqs = load_payout_requests()
+    reqs.insert(0, req_item)
+    save_payout_requests(reqs)
+
+    # Send telegram alert to accountant if configured
+    tg_sent = notify_accountant_payout(req_item, company_id=company_id)
+
+    # Prepare share text for usta to forward if needed
+    share_text = f"Assalomu alaykum! Bonus yechish so'rovi:\nUsta: {req_item['client_name']}\nSumma: {int(amount):,} so'm\nKarta: {card_number} ({card_holder})"
+    direct_tg_url = f"https://t.me/share/url?url=&text={requests.utils.quote(share_text)}"
+
+    return {
+        "ok": True,
+        "request": req_item,
+        "telegram_sent": tg_sent,
+        "direct_tg_url": direct_tg_url
+    }
+
+@app.get("/api/payout/requests")
+def get_payout_requests(request: Request, client_id: str = None):
+    reqs = load_payout_requests()
+    if client_id:
+        reqs = [r for r in reqs if r.get("client_id") == client_id]
+    return {"ok": True, "requests": reqs}
+
+@app.post("/api/payout/approve")
+def api_approve_payout(payload: dict, request: Request):
+    p_id = payload.get("payout_id")
+    company_id = payload.get("company_id") or get_company_id(request) or "giperbrendstroy"
+    return execute_payout_approval(p_id, company_id=company_id, approver_info="Admin/Kassa")
+
+@app.post("/api/payout/reject")
+def api_reject_payout(payload: dict):
+    p_id = payload.get("payout_id")
+    reason = payload.get("reason", "Admin tomonidan rad etildi")
+    return execute_payout_rejection(p_id, reason)
+
+@app.post("/api/telegram/webhook")
+async def telegram_webhook(request: Request):
+    try:
+        data = await request.json()
+        cb = data.get("callback_query")
+        if cb:
+            cb_id = cb.get("id")
+            cb_data = cb.get("data", "")
+            msg = cb.get("message", {})
+            chat_id = msg.get("chat", {}).get("id")
+            msg_id = msg.get("message_id")
+            user = cb.get("from", {})
+            user_name = user.get("first_name", "Buxgalter")
+            
+            settings = get_company_settings("giperbrendstroy")
+            token = settings.get("payout_telegram_bot_token") or settings.get("telegram_token")
+            
+            if cb_data.startswith("payout_approve:"):
+                p_id = cb_data.split(":", 1)[1]
+                try:
+                    res = execute_payout_approval(p_id, approver_info=f"TG: {user_name}")
+                    req_obj = res.get("request", {})
+                    requests.post(f"https://api.telegram.org/bot{token}/answerCallbackQuery", json={
+                        "callback_query_id": cb_id,
+                        "text": "Muvaffaqiyatli! Bonus hisobdan yechildi.",
+                        "show_alert": True
+                    }, timeout=5)
+                    edited_text = (
+                        f"✅ <b>TO'LANDI VA BONUSDAN YECHILDI!</b>\n\n"
+                        f"👷 <b>Usta:</b> {req_obj.get('client_name')}\n"
+                        f"💰 <b>Summa:</b> {int(req_obj.get('amount', 0)):,} so'm\n"
+                        f"💳 <b>Karta:</b> <code>{req_obj.get('card_number')}</code>\n"
+                        f"👤 <b>Tasdiqladi:</b> {user_name}\n"
+                        f"🕒 <b>Vaqt:</b> {datetime.now().strftime('%d.%m.%Y %H:%M')}"
+                    )
+                    requests.post(f"https://api.telegram.org/bot{token}/editMessageText", json={
+                        "chat_id": chat_id,
+                        "message_id": msg_id,
+                        "text": edited_text,
+                        "parse_mode": "HTML"
+                    }, timeout=5)
+                except Exception as e_app:
+                    requests.post(f"https://api.telegram.org/bot{token}/answerCallbackQuery", json={
+                        "callback_query_id": cb_id,
+                        "text": f"Xatolik: {e_app}",
+                        "show_alert": True
+                    }, timeout=5)
+                    
+            elif cb_data.startswith("payout_reject:"):
+                p_id = cb_data.split(":", 1)[1]
+                try:
+                    execute_payout_rejection(p_id)
+                    requests.post(f"https://api.telegram.org/bot{token}/answerCallbackQuery", json={
+                        "callback_query_id": cb_id,
+                        "text": "So'rov rad etildi.",
+                        "show_alert": True
+                    }, timeout=5)
+                    requests.post(f"https://api.telegram.org/bot{token}/editMessageText", json={
+                        "chat_id": chat_id,
+                        "message_id": msg_id,
+                        "text": f"❌ <b>SO'ROV RAD ETILDI!</b>\nTasdiqladi: {user_name}",
+                        "parse_mode": "HTML"
+                    }, timeout=5)
+                except Exception as e_rej:
+                    pass
+        msg_obj = data.get("message")
+        if msg_obj:
+            chat = msg_obj.get("chat", {})
+            c_id = chat.get("id")
+            from_u = msg_obj.get("from", {})
+            u_name = from_u.get("first_name", "Foydalanuvchi")
+            u_text = (msg_obj.get("text") or "").strip()
+            
+            settings = get_company_settings("giperbrendstroy")
+            token = settings.get("payout_telegram_bot_token") or settings.get("telegram_token")
+            
+            if token and c_id:
+                if u_text.startswith("/start") or u_text.startswith("/id"):
+                    welcome_reply = (
+                        f"👋 Assalomu alaykum, <b>{u_name}</b>!\n\n"
+                        f"🔑 Sizning Telegram <b>Chat ID</b> raqamingiz: <code>{c_id}</code>\n\n"
+                        f"Ustalar bonusi to'lov so'rovlarini qabul qilish uchun ushbu ID raqamni CRM tizimidagi "
+                        f"<b>Sozlamalar -> Ustalar Bonusi & Buxgalter Telegram</b> bo'limiga kiriting va saqlang.\n\n"
+                        f"💡 Yoki to'g'ridan-to'g'ri /set_accountant buyrug'ini yuboring."
+                    )
+                    try:
+                        requests.post(f"https://api.telegram.org/bot{token}/sendMessage", json={
+                            "chat_id": c_id,
+                            "text": welcome_reply,
+                            "parse_mode": "HTML"
+                        }, timeout=5)
+                    except Exception:
+                        pass
+                elif u_text.startswith("/set_accountant"):
+                    settings["payout_telegram_chat_id"] = str(c_id)
+                    save_company_settings("giperbrendstroy", settings)
+                    try:
+                        requests.post(f"https://api.telegram.org/bot{token}/sendMessage", json={
+                            "chat_id": c_id,
+                            "text": (
+                                f"✅ <b>Tabriklaymiz!</b>\n"
+                                f"Siz muvaffaqiyatli Buxgalter qilib biriktirildingiz.\n"
+                                f"Chat ID: <code>{c_id}</code>\n\n"
+                                f"Endi ustalar mobil ilovadan bonus yechish so'rovi yuborganda, bildirishnoma va tasdiqlash tugmalari shu yerga keladi."
+                            ),
+                            "parse_mode": "HTML"
+                        }, timeout=5)
+                    except Exception:
+                        pass
+    except Exception as e:
+        print(f"Telegram webhook error: {e}")
+    return {"ok": True}
+
+@app.get("/api/settings/payout-telegram")
+def get_payout_telegram_settings(request: Request):
+    company_id = get_company_id(request) or "giperbrendstroy"
+    s = get_company_settings(company_id)
+    return {
+        "bot_token": s.get("payout_telegram_bot_token") or "",
+        "chat_id": s.get("payout_telegram_chat_id") or ""
+    }
+
+@app.post("/api/settings/payout-telegram")
+def update_payout_telegram_settings(payload: dict, request: Request):
+    company_id = get_company_id(request) or "giperbrendstroy"
+    s = get_company_settings(company_id)
+    bot_token = (payload.get("bot_token") or "").strip()
+    chat_id = (payload.get("chat_id") or "").strip()
+    s["payout_telegram_bot_token"] = bot_token
+    s["payout_telegram_chat_id"] = chat_id
+    save_company_settings(company_id, s)
+
+    test_sent = False
+    if payload.get("send_test") and bot_token and chat_id:
+        try:
+            r = requests.post(f"https://api.telegram.org/bot{bot_token}/sendMessage", json={
+                "chat_id": chat_id,
+                "text": "✅ <b>SmartCore ERP Test Xabari:</b>\nBonus yechish boti muvaffaqiyatli ulandi! Barcha so'rovlar shu yerga keladi.",
+                "parse_mode": "HTML"
+            }, timeout=5)
+            test_sent = r.ok
+        except Exception:
+            pass
+
+    return {"ok": True, "saved": True, "test_sent": test_sent}
 
 @app.get("/tv")
 def tv_redirect(company: str = "giperbrendstroy"):

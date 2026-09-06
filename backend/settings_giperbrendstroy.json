@@ -143,6 +143,17 @@
                 "m_receipts",
                 "m_scanner"
             ]
+        },
+        {
+            "name": "ilova",
+            "permissions": [],
+            "mobile_permissions": [
+                "m_crm",
+                "m_regos_cards",
+                "m_scanner",
+                "m_telephony",
+                "m_chats"
+            ]
         }
     ],
     "sip_wss": "",
@@ -186,5 +197,16 @@
         "GULSHODA": "e_1782204705905",
         "YULDUZOY": "e_1782205956987",
         "ERGASHOVA FERUZA": "e_1782719372462"
+    },
+    "payout_telegram_chat_id": "",
+    "payout_telegram_bot_token": "",
+    "employee_mobile_permissions": {
+        "e_1788600240206": [
+            "m_crm",
+            "m_regos_cards",
+            "m_scanner",
+            "m_telephony",
+            "m_chats"
+        ]
     }
 }
