@@ -443,9 +443,37 @@ def sync_regos_card_bonus_helper(client_id: str = None, barcode: str = None, pho
                 customer_record = c_res[0]
                 target_client_id = customer_record.get("id")
 
+        # Deduct completed payouts from REGOS reported bonus
+        total_payouts = 0.0
+        try:
+            all_payouts = load_payout_requests()
+            for p in all_payouts:
+                p_match = (
+                    p.get("client_id") == target_client_id or 
+                    (card_id and p.get("client_id") == f"regos_card_{card_id}") or
+                    (clean_bc and p.get("client_barcode") == clean_bc)
+                )
+                if p_match and p.get("status") == "completed":
+                    total_payouts += float(p.get("amount") or 0.0)
+        except Exception as e_p:
+            print(f"Error summing completed payouts: {e_p}")
+
+        # Also sum payouts from customer_record.operator.bonus_history in DB
+        try:
+            op_raw = (customer_record.get("operator") or "") if customer_record else ""
+            if op_raw.startswith("{"):
+                op_obj = json.loads(op_raw)
+                b_hist = op_obj.get("bonus_history") or []
+                hist_payouts = sum(float(h.get("amount") or 0.0) for h in b_hist if h.get("type") == "subtract")
+                total_payouts = max(total_payouts, hist_payouts)
+        except Exception as e_h:
+            print(f"Error reading bonus_history payouts: {e_h}")
+
+        actual_bonus = max(0.0, bonus_amount - total_payouts)
+
         if target_client_id and customer_record:
             patch_payload = {
-                "value": bonus_amount
+                "value": actual_bonus
             }
             op_data = {}
             op_raw = customer_record.get("operator") or ""
@@ -454,16 +482,16 @@ def sync_regos_card_bonus_helper(client_id: str = None, barcode: str = None, pho
                     op_data = json.loads(op_raw)
                 except Exception:
                     op_data = {}
-            op_data["bonus"] = bonus_amount
+            op_data["bonus"] = actual_bonus
             cust_info = matched_card.get("customer") or {}
             if "debt" in cust_info:
                 op_data["debt"] = float(cust_info.get("debt") or 0.0)
             patch_payload["operator"] = json.dumps(op_data, ensure_ascii=False)
 
             supabase_req("PATCH", f"customers?id=eq.{target_client_id}", json_data=patch_payload, company_id=company_id)
-            print(f"Synced bonus for client {target_client_id}: {bonus_amount} so'm")
+            print(f"Synced bonus for client {target_client_id}: {actual_bonus} so'm (REGOS: {bonus_amount}, paid out: {total_payouts})")
 
-        return bonus_amount
+        return actual_bonus
     except Exception as e:
         print(f"Error in sync_regos_card_bonus_helper: {e}")
         return None
@@ -582,12 +610,27 @@ def get_client_receipts(
     except Exception as e_b:
         print(f"Bonus auto-sync error in get_client_receipts for {client_id}: {e_b}")
 
+    if live_bonus is None and client_id:
+        try:
+            c_db = supabase_req("GET", f"customers?id=eq.{client_id}&select=value", company_id=company_id)
+            if c_db and isinstance(c_db, list) and len(c_db) > 0:
+                live_bonus = float(c_db[0].get("value") or 0.0)
+        except Exception:
+            pass
+
     return {"ok": True, "count": len(receipts_list), "receipts": receipts_list, "bonus": live_bonus}
 
 @app.post("/api/clients/{client_id}/sync-bonus")
 def sync_client_bonus(client_id: str, request: Request):
     company_id = get_company_id(request)
     live_bonus = sync_regos_card_bonus_helper(client_id=client_id, company_id=company_id)
+    if live_bonus is None:
+        try:
+            c_db = supabase_req("GET", f"customers?id=eq.{client_id}&select=value", company_id=company_id)
+            if c_db and isinstance(c_db, list) and len(c_db) > 0:
+                live_bonus = float(c_db[0].get("value") or 0.0)
+        except Exception:
+            pass
     if live_bonus is not None:
         return {"ok": True, "bonus": live_bonus}
     return {"ok": False, "detail": "Bonusni yangilab bo'lmadi yoki REGOS API ulanmadi"}
