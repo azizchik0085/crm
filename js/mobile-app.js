@@ -630,19 +630,23 @@ window.MobileApp = {
 
     // --- PAYOUT (BONUSNI KARTAGA YECHISH) MANTIQI ---
     openPayoutModal: function() {
-        if (!this.currentUser) return;
+        const user = this.currentUser || JSON.parse(localStorage.getItem('mobile_auth') || '{}').user || {};
+        this.currentUser = user;
         const modal = document.getElementById('m-payout-modal');
-        if (!modal) return;
+        if (!modal) {
+            console.error("m-payout-modal topilmadi!");
+            return;
+        }
 
-        const currentBonus = Number(this.currentUser.bonus || 0);
+        const currentBonus = Number(user.bonus || 0);
         const balEl = document.getElementById('m-payout-modal-balance');
         if (balEl) balEl.textContent = `${currentBonus.toLocaleString('uz-UZ')} so'm`;
 
         const phoneInput = document.getElementById('m-payout-phone');
-        if (phoneInput && !phoneInput.value) phoneInput.value = this.currentUser.phone || '';
+        if (phoneInput && !phoneInput.value) phoneInput.value = user.phone || '';
 
         const nameInput = document.getElementById('m-payout-card-holder');
-        if (nameInput && !nameInput.value) nameInput.value = this.currentUser.name || '';
+        if (nameInput && !nameInput.value) nameInput.value = user.name || '';
 
         const amtInput = document.getElementById('m-payout-amount');
         if (amtInput) amtInput.value = '';
@@ -660,18 +664,21 @@ window.MobileApp = {
         if (succCont) succCont.style.display = 'none';
 
         modal.classList.add('active');
+        document.body.style.overflow = 'hidden';
     },
 
     closePayoutModal: function() {
         const modal = document.getElementById('m-payout-modal');
         if (modal) modal.classList.remove('active');
+        document.body.style.overflow = '';
     },
 
     setPayoutQuickAmount: function(val) {
         const amtInput = document.getElementById('m-payout-amount');
         if (!amtInput) return;
+        const user = this.currentUser || JSON.parse(localStorage.getItem('mobile_auth') || '{}').user || {};
         if (val === 'all') {
-            amtInput.value = Math.floor(Number(this.currentUser.bonus || 0));
+            amtInput.value = Math.floor(Number(user.bonus || 0));
         } else {
             amtInput.value = val;
         }
@@ -713,7 +720,9 @@ window.MobileApp = {
         const card_number = (cardInput ? cardInput.value : '').replace(/\s+/g, '');
         const card_holder = (holderInput ? holderInput.value : '').trim();
         const phone = (phoneInput ? phoneInput.value : '').trim();
-        const currentBonus = Number(this.currentUser.bonus || 0);
+        const user = this.currentUser || JSON.parse(localStorage.getItem('mobile_auth') || '{}').user || {};
+        this.currentUser = user;
+        const currentBonus = Number(user.bonus || 0);
 
         if (isNaN(amount) || amount <= 0) {
             if (errEl) {
@@ -790,14 +799,16 @@ window.MobileApp = {
     },
 
     loadUstaPayouts: async function() {
-        if (!this.currentUser || !this.currentUser.id) return;
+        const user = this.currentUser || JSON.parse(localStorage.getItem('mobile_auth') || '{}').user || {};
+        const uid = user.id || user.client_id;
+        if (!uid) return;
         const box = document.getElementById('m-usta-payouts-box');
         const listEl = document.getElementById('m-usta-payouts-list');
         const countBadge = document.getElementById('m-usta-payouts-count');
         if (!box || !listEl) return;
 
         try {
-            const res = await fetch(`/api/payout/requests?client_id=${encodeURIComponent(this.currentUser.id)}`);
+            const res = await fetch(`/api/payout/requests?client_id=${encodeURIComponent(uid)}`);
             if (res.ok) {
                 const data = await res.json();
                 const reqs = data.requests || [];

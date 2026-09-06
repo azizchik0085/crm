@@ -600,10 +600,12 @@
                 </div>
             </div>
         </div>
+    </div>
+
     <!-- ========================================== -->
     <!-- 8. BONUS PAYOUT (KARTAGA YECHISH) MODAL    -->
     <!-- ========================================== -->
-    <div id="m-payout-modal" class="m-modal">
+    <div id="m-payout-modal" class="m-modal" onclick="if(event.target === this) MobileApp.closePayoutModal()">
         <div class="m-sheet">
             <div class="m-sheet-header">
                 <div class="m-sheet-drag-handle"></div>
@@ -695,13 +697,13 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
 
     <!-- Mobile App Main Script -->
-    <script src="/js/mobile-app.js?v=2.7"></script>
+    <script src="/js/mobile-app.js?v=2.8"></script>
 
     <!-- Register Service Worker for PWA Offline / Standalone Installation -->
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw-mobile.js?v=6')
+                navigator.serviceWorker.register('/sw-mobile.js?v=7')
                     .then(reg => {
                         reg.update();
                         console.log('SmartCore Mobile SW registered');
