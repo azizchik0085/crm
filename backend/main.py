@@ -446,7 +446,7 @@ def sync_regos_card_bonus_helper(client_id: str = None, barcode: str = None, pho
         # Deduct completed payouts from REGOS reported bonus
         total_payouts = 0.0
         try:
-            all_payouts = load_payout_requests()
+            all_payouts = load_payout_requests(company_id=company_id or "giperbrendstroy")
             for p in all_payouts:
                 p_match = (
                     p.get("client_id") == target_client_id or 
@@ -6035,21 +6035,94 @@ async def push_deal_to_amocrm(payload: dict, request: Request):
 
 PAYOUT_FILE = os.path.join(os.path.dirname(__file__), "payout_requests.json")
 
-def load_payout_requests():
-    if not os.path.exists(PAYOUT_FILE):
-        return []
+def load_payout_requests(company_id: str = "giperbrendstroy"):
+    # 1. Try Supabase receipts table first (persistent across redeploys)
     try:
-        with open(PAYOUT_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception:
-        return []
+        res = supabase_req("GET", f"receipts?id=eq.payout_requests_{company_id}&select=items", company_id=company_id)
+        if res and isinstance(res, list) and len(res) > 0:
+            items = res[0].get("items")
+            if isinstance(items, list) and len(items) > 0:
+                return items
+            if isinstance(items, dict) and "requests" in items:
+                return items["requests"]
+    except Exception as e:
+        print(f"Error loading payout requests from Supabase: {e}")
 
-def save_payout_requests(requests_list):
+    # 2. Try local file fallback
+    if os.path.exists(PAYOUT_FILE):
+        try:
+            with open(PAYOUT_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if data and isinstance(data, list) and len(data) > 0:
+                    return data
+        except Exception:
+            pass
+
+    # 3. Fallback: reconstruct from customers bonus_history if DB record not present
+    try:
+        custs = supabase_req("GET", "customers?select=id,name,phone,phone2,operator", company_id=company_id)
+        reconstructed = []
+        if custs and isinstance(custs, list):
+            for c in custs:
+                op_raw = c.get("operator") or ""
+                if op_raw.startswith("{"):
+                    try:
+                        op = json.loads(op_raw)
+                        b_hist = op.get("bonus_history") or []
+                        for h in b_hist:
+                            if h.get("type") == "subtract":
+                                note = h.get("note") or ""
+                                card_num = ""
+                                if "(" in note and ")" in note:
+                                    card_num = note.split("(")[1].split(")")[0].strip()
+                                reconstructed.append({
+                                    "id": f"payout_{c.get('id')}_{int(time.time())}",
+                                    "client_id": c.get("id"),
+                                    "client_name": c.get("name") or "Usta",
+                                    "client_phone": c.get("phone") or "",
+                                    "client_barcode": c.get("phone2") or "",
+                                    "amount": float(h.get("amount") or 0.0),
+                                    "card_number": card_num,
+                                    "card_holder": c.get("name") or "",
+                                    "note": note,
+                                    "status": "completed",
+                                    "created_at": h.get("date") or datetime.now().isoformat(),
+                                    "completed_at": h.get("date") or datetime.now().isoformat(),
+                                    "completed_by": "Buxgalter",
+                                    "company_id": company_id
+                                })
+                    except Exception:
+                        pass
+        if reconstructed:
+            save_payout_requests(reconstructed, company_id=company_id)
+            return reconstructed
+    except Exception as e_recon:
+        print(f"Error reconstructing payout requests: {e_recon}")
+
+    return []
+
+def save_payout_requests(requests_list, company_id: str = "giperbrendstroy"):
+    # 1. Save locally
     try:
         with open(PAYOUT_FILE, "w", encoding="utf-8") as f:
             json.dump(requests_list, f, ensure_ascii=False, indent=2)
     except Exception as e:
-        print(f"Error saving payout requests: {e}")
+        print(f"Error saving payout requests locally: {e}")
+
+    # 2. Save to Supabase (persistent across redeploys!)
+    try:
+        payload = {
+            "id": f"payout_requests_{company_id}",
+            "company_id": company_id,
+            "items": requests_list,
+            "total_amount": sum(float(r.get("amount") or 0) for r in requests_list if r.get("status") == "completed"),
+            "discount": 0,
+            "cashier_name": "PayoutSystem",
+            "code": "PAYOUTS"
+        }
+        supabase_req("POST", "receipts?on_conflict=id", json_data=payload, company_id=company_id)
+    except Exception as e:
+        print(f"Error saving payout requests to Supabase: {e}")
 
 def notify_accountant_payout(payout_item, company_id="giperbrendstroy"):
     settings = get_company_settings(company_id)
@@ -6105,7 +6178,7 @@ def notify_accountant_payout(payout_item, company_id="giperbrendstroy"):
         return False
 
 def execute_payout_approval(payout_id, company_id="giperbrendstroy", approver_info="Buxgalter"):
-    reqs = load_payout_requests()
+    reqs = load_payout_requests(company_id=company_id)
     target = None
     for r in reqs:
         if r.get("id") == payout_id:
@@ -6122,7 +6195,7 @@ def execute_payout_approval(payout_id, company_id="giperbrendstroy", approver_in
     deduct_amount = float(target.get("amount") or 0)
     
     # 1. Fetch current customer data from DB
-    c_res = supabase_req("GET", f"customers?id=eq.{client_id}")
+    c_res = supabase_req("GET", f"customers?id=eq.{client_id}", company_id=company_id)
     if not c_res or not isinstance(c_res, list) or len(c_res) == 0:
         raise HTTPException(status_code=404, detail="Usta mijozlar bazasidan topilmadi")
         
@@ -6154,13 +6227,13 @@ def execute_payout_approval(payout_id, company_id="giperbrendstroy", approver_in
     supabase_req("PATCH", f"customers?id=eq.{client_id}", {
         "value": new_bonus,
         "operator": new_op
-    })
+    }, company_id=company_id)
     
     # 4. Mark request completed
     target["status"] = "completed"
     target["completed_at"] = datetime.now().isoformat()
     target["completed_by"] = approver_info
-    save_payout_requests(reqs)
+    save_payout_requests(reqs, company_id=company_id)
     
     return {
         "ok": True, 
@@ -6169,8 +6242,8 @@ def execute_payout_approval(payout_id, company_id="giperbrendstroy", approver_in
         "request": target
     }
 
-def execute_payout_rejection(payout_id, reason="Buxgalteriya tomonidan rad etildi"):
-    reqs = load_payout_requests()
+def execute_payout_rejection(payout_id, company_id="giperbrendstroy", reason="Buxgalteriya tomonidan rad etildi"):
+    reqs = load_payout_requests(company_id=company_id)
     target = None
     for r in reqs:
         if r.get("id") == payout_id:
@@ -6182,7 +6255,7 @@ def execute_payout_rejection(payout_id, reason="Buxgalteriya tomonidan rad etild
     target["status"] = "rejected"
     target["rejection_reason"] = reason
     target["completed_at"] = datetime.now().isoformat()
-    save_payout_requests(reqs)
+    save_payout_requests(reqs, company_id=company_id)
     return {"ok": True, "request": target}
 
 @app.post("/api/payout/request")
@@ -6203,7 +6276,7 @@ def create_payout_request(payload: dict, request: Request):
         raise HTTPException(status_code=400, detail="Karta raqami kamida 16 xonali bo'lishi kerak")
 
     # Fetch customer
-    c_res = supabase_req("GET", f"customers?id=eq.{client_id}")
+    c_res = supabase_req("GET", f"customers?id=eq.{client_id}", company_id=company_id)
     if not c_res:
         raise HTTPException(status_code=404, detail="Mijoz topilmadi")
     c = c_res[0]
@@ -6227,9 +6300,9 @@ def create_payout_request(payload: dict, request: Request):
         "company_id": company_id
     }
 
-    reqs = load_payout_requests()
+    reqs = load_payout_requests(company_id=company_id)
     reqs.insert(0, req_item)
-    save_payout_requests(reqs)
+    save_payout_requests(reqs, company_id=company_id)
 
     # Send telegram alert to accountant if configured
     tg_sent = notify_accountant_payout(req_item, company_id=company_id)
@@ -6247,7 +6320,8 @@ def create_payout_request(payload: dict, request: Request):
 
 @app.get("/api/payout/requests")
 def get_payout_requests(request: Request, client_id: str = None):
-    reqs = load_payout_requests()
+    company_id = get_company_id(request) or "giperbrendstroy"
+    reqs = load_payout_requests(company_id=company_id)
     if client_id:
         reqs = [r for r in reqs if r.get("client_id") == client_id]
     return {"ok": True, "requests": reqs}
@@ -6259,10 +6333,11 @@ def api_approve_payout(payload: dict, request: Request):
     return execute_payout_approval(p_id, company_id=company_id, approver_info="Admin/Kassa")
 
 @app.post("/api/payout/reject")
-def api_reject_payout(payload: dict):
+def api_reject_payout(payload: dict, request: Request):
     p_id = payload.get("payout_id")
+    company_id = payload.get("company_id") or get_company_id(request) or "giperbrendstroy"
     reason = payload.get("reason", "Admin tomonidan rad etildi")
-    return execute_payout_rejection(p_id, reason)
+    return execute_payout_rejection(p_id, company_id=company_id, reason=reason)
 
 @app.post("/api/telegram/webhook")
 async def telegram_webhook(request: Request):
