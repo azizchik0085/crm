@@ -364,7 +364,52 @@ window.MobileApp = {
         return perms.includes(permKey);
     },
 
+    isAdmin: function() {
+        if (!this.currentUser) {
+            try {
+                const saved = JSON.parse(localStorage.getItem('mobile_auth') || '{}');
+                this.currentUser = saved.user || null;
+            } catch(e) {}
+        }
+        if (!this.currentUser) return false;
+        const role = (this.currentUser.role || '').toLowerCase();
+        const username = (this.currentUser.username || this.currentUser.id || '').toLowerCase();
+        return username === 'admin' || username === 'superadmin' || role.includes('admin') || role.includes('superadmin') || role.includes('direktor') || role.includes('rahbar') || role.includes('boshliq');
+    },
+
+    updateRegosCardOnHome: function() {
+        const box = document.getElementById('m-card-regos-box');
+        if (!box) return;
+        const isAdmin = this.isAdmin();
+        if (isAdmin) {
+            box.innerHTML = `
+                <div>
+                    <h4 style="font-size: 14px; font-weight: 700; color: #fff; margin-bottom: 2px;">
+                        <i class="fas fa-users-cog" style="color: #38bdf8; margin-right: 6px;"></i> REGOS Mijoz / Hamkorlar
+                    </h4>
+                    <p style="font-size: 11.5px; color: var(--text-muted); margin: 0;">REGOS-dan kontragent yoki kartalarni qo'shish</p>
+                </div>
+                <button class="btn btn-secondary" style="height: 38px; padding: 0 12px; font-size: 12px;" onclick="MobileApp.openAddCardModal()">
+                    Qo'shish
+                </button>
+            `;
+        } else {
+            box.innerHTML = `
+                <div>
+                    <h4 style="font-size: 14px; font-weight: 700; color: #fff; margin-bottom: 2px;">
+                        <i class="fas fa-id-card" style="color: #38bdf8; margin-right: 6px;"></i> REGOS Kartalari
+                    </h4>
+                    <p style="font-size: 11.5px; color: var(--text-muted); margin: 0;">REGOS xaridor kartalarini qidirish</p>
+                </div>
+                <button class="btn btn-secondary" style="height: 38px; padding: 0 12px; font-size: 12px;" onclick="MobileApp.openAddCardModal(null, 'cards')">
+                    Qidirish
+                </button>
+            `;
+        }
+    },
+
     renderNavigation: function() {
+        this.updateRegosCardOnHome();
         const navContainer = document.getElementById('mobile-app-nav');
         if (!navContainer) return;
 
@@ -1476,10 +1521,27 @@ window.MobileApp = {
     _regosPartnerGroups: null,
     _activeRegosTab: 'partners',
 
-    openAddCardModal: function(presetQuery, defaultTab = 'partners') {
+    openAddCardModal: function(presetQuery, defaultTab) {
         const modal = document.getElementById('m-add-card-modal');
         if (!modal) return;
         modal.classList.add('active');
+
+        const isAdminUser = this.isAdmin();
+        const btnPartners = document.getElementById('m-tab-btn-partners');
+        const tabsBar = document.getElementById('m-regos-tabs-bar');
+        const titleEl = document.getElementById('m-regos-modal-title');
+
+        if (btnPartners) {
+            btnPartners.style.display = isAdminUser ? 'block' : 'none';
+        }
+        if (tabsBar) {
+            tabsBar.style.display = isAdminUser ? 'flex' : 'none';
+        }
+        if (titleEl) {
+            titleEl.innerText = isAdminUser ? 'REGOS Mijoz / Hamkorlar' : 'REGOS Xaridor Kartalari';
+        }
+
+        const tabToOpen = isAdminUser ? (defaultTab || 'partners') : 'cards';
 
         if (presetQuery) {
             this.switchRegosTab('cards');
@@ -1489,7 +1551,7 @@ window.MobileApp = {
                 this.searchRegosCards();
             }
         } else {
-            this.switchRegosTab(defaultTab);
+            this.switchRegosTab(tabToOpen);
         }
     },
 
@@ -1499,6 +1561,10 @@ window.MobileApp = {
     },
 
     switchRegosTab: function(tab) {
+        if (tab === 'partners' && !this.isAdmin()) {
+            alert("Kechirasiz, «Kontragentlar» bo'limi faqat administrator uchun ruxsat etilgan!");
+            tab = 'cards';
+        }
         this._activeRegosTab = tab;
         const btnPartners = document.getElementById('m-tab-btn-partners');
         const btnCards = document.getElementById('m-tab-btn-cards');
@@ -1622,6 +1688,10 @@ window.MobileApp = {
     },
 
     searchRegosPartners: async function() {
+        if (!this.isAdmin()) {
+            alert("Kechirasiz, «Kontragentlar» bo'limi faqat administrator uchun ruxsat etilgan!");
+            return;
+        }
         const input = document.getElementById('m-regos-partner-search-input');
         const groupSelect = document.getElementById('m-regos-group-filter');
         const query = (input ? input.value : '').trim();
@@ -1743,6 +1813,10 @@ window.MobileApp = {
     },
 
     addSinglePartner: async function(partnerId) {
+        if (!this.isAdmin()) {
+            alert("Kechirasiz, ushbu amal faqat administrator uchun ruxsat etilgan!");
+            return;
+        }
         const partner = (this._regosPartnersCache || []).find(p => String(p.regos_partner_id) === String(partnerId));
         if (!partner) return;
 
@@ -1786,6 +1860,10 @@ window.MobileApp = {
     },
 
     addSelectedPartners: async function() {
+        if (!this.isAdmin()) {
+            alert("Kechirasiz, ushbu amal faqat administrator uchun ruxsat etilgan!");
+            return;
+        }
         const checkedBoxes = Array.from(document.querySelectorAll('.m-partner-checkbox:checked:not(:disabled)'));
         if (checkedBoxes.length === 0) {
             alert("Iltimos, avval kontragentlarni belgilang!");

@@ -3215,12 +3215,43 @@ window.CRM = {
     _regosPartnerGroups: null,
     _activeRegosTab: 'partners',
 
-    openRegosCardSearchModal: function(defaultTab = 'partners') {
+    isAdmin: function() {
+        const activeUserId = (localStorage.getItem('activeUserId') || '').toLowerCase();
+        const activeUserRole = (localStorage.getItem('activeUserRole') || '').toLowerCase();
+        if (window.location.pathname.includes('admin123')) return true;
+        if (activeUserId === 'admin' || activeUserId === 'superadmin') return true;
+        if (activeUserRole.includes('admin') || activeUserRole.includes('superadmin') || activeUserRole.includes('direktor') || activeUserRole.includes('rahbar') || activeUserRole.includes('boshliq')) {
+            return true;
+        }
+        return false;
+    },
+
+    openRegosCardSearchModal: function(defaultTab) {
         showModal('regos-card-search-modal');
-        this.switchRegosModalTab(defaultTab);
+        const isAdminUser = this.isAdmin();
+        const btnPartners = document.getElementById('btn-regos-tab-partners');
+        const tabsBar = document.getElementById('regos-modal-tabs-bar');
+
+        if (btnPartners) {
+            btnPartners.style.display = isAdminUser ? 'inline-flex' : 'none';
+        }
+        if (tabsBar) {
+            tabsBar.style.display = isAdminUser ? 'flex' : 'none';
+        }
+
+        const tabToOpen = isAdminUser ? (defaultTab || 'partners') : 'cards';
+        const titleEl = document.getElementById('regos-modal-header-title');
+        if (titleEl) {
+            titleEl.innerText = isAdminUser ? "REGOS-dan Mijoz / Kontragent Qo'shish" : "REGOS Xaridor Kartalari";
+        }
+        this.switchRegosModalTab(tabToOpen);
     },
 
     switchRegosModalTab: function(tab) {
+        if (tab === 'partners' && !this.isAdmin()) {
+            alert("Kechirasiz, «Kontragentlar» bo'limi faqat administrator uchun ruxsat etilgan!");
+            tab = 'cards';
+        }
         this._activeRegosTab = tab;
         const btnPartners = document.getElementById('btn-regos-tab-partners');
         const btnCards = document.getElementById('btn-regos-tab-cards');
@@ -3347,6 +3378,10 @@ window.CRM = {
     },
 
     searchRegosPartners: async function() {
+        if (!this.isAdmin()) {
+            alert("Kechirasiz, «Kontragentlar» bo'limi faqat administrator uchun ruxsat etilgan!");
+            return;
+        }
         const input = document.getElementById('regos-partner-search-input');
         const groupSelect = document.getElementById('regos-partner-group-filter');
         const query = input ? input.value.trim() : '';
@@ -3494,6 +3529,10 @@ window.CRM = {
     },
 
     addSinglePartnerToClients: async function(partnerId) {
+        if (!this.isAdmin()) {
+            alert("Kechirasiz, ushbu amal faqat administrator uchun ruxsat etilgan!");
+            return;
+        }
         const partner = (this._regosPartnersCache || []).find(p => String(p.regos_partner_id) === String(partnerId));
         if (!partner) {
             alert("Kontragent ma'lumotlari topilmadi!");
@@ -3539,6 +3578,10 @@ window.CRM = {
     },
 
     addSelectedPartnersToClients: async function() {
+        if (!this.isAdmin()) {
+            alert("Kechirasiz, ushbu amal faqat administrator uchun ruxsat etilgan!");
+            return;
+        }
         const checkedBoxes = Array.from(document.querySelectorAll('.regos-partner-checkbox:checked:not(:disabled)'));
         if (checkedBoxes.length === 0) {
             alert("Iltimos, avval ro'yxatdan kontragentlarni belgilang!");
