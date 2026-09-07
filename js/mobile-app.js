@@ -1470,23 +1470,353 @@ window.MobileApp = {
         this.onBarcodeScanned(code);
     },
 
-    // --- REGOS KARTA QIDIRISH & QO'SHISH ---
-    openAddCardModal: function(presetQuery) {
+    // --- REGOS PARTNER & CARD MANAGEMENT ---
+    _regosCardsCache: [],
+    _regosPartnersCache: [],
+    _regosPartnerGroups: null,
+    _activeRegosTab: 'partners',
+
+    openAddCardModal: function(presetQuery, defaultTab = 'partners') {
         const modal = document.getElementById('m-add-card-modal');
         if (!modal) return;
         modal.classList.add('active');
 
-        const input = document.getElementById('m-regos-search-input');
-        if (input) {
-            input.value = presetQuery || '';
-            if (presetQuery) this.searchRegosCards();
-            else setTimeout(() => input.focus(), 150);
+        if (presetQuery) {
+            this.switchRegosTab('cards');
+            const input = document.getElementById('m-regos-search-input');
+            if (input) {
+                input.value = presetQuery;
+                this.searchRegosCards();
+            }
+        } else {
+            this.switchRegosTab(defaultTab);
         }
     },
 
     closeAddCardModal: function() {
         const modal = document.getElementById('m-add-card-modal');
         if (modal) modal.classList.remove('active');
+    },
+
+    switchRegosTab: function(tab) {
+        this._activeRegosTab = tab;
+        const btnPartners = document.getElementById('m-tab-btn-partners');
+        const btnCards = document.getElementById('m-tab-btn-cards');
+        const viewPartners = document.getElementById('m-regos-view-partners');
+        const viewCards = document.getElementById('m-regos-view-cards');
+
+        if (tab === 'partners') {
+            if (btnPartners) {
+                btnPartners.style.color = '#38bdf8';
+                btnPartners.style.borderBottom = '2px solid #38bdf8';
+                btnPartners.style.fontWeight = '700';
+            }
+            if (btnCards) {
+                btnCards.style.color = 'var(--text-muted)';
+                btnCards.style.borderBottom = '2px solid transparent';
+                btnCards.style.fontWeight = '500';
+            }
+            if (viewPartners) viewPartners.style.display = 'block';
+            if (viewCards) viewCards.style.display = 'none';
+
+            this.loadRegosPartnerGroups();
+            const input = document.getElementById('m-regos-partner-search-input');
+            setTimeout(() => { if (input) input.focus(); }, 120);
+        } else {
+            if (btnCards) {
+                btnCards.style.color = '#38bdf8';
+                btnCards.style.borderBottom = '2px solid #38bdf8';
+                btnCards.style.fontWeight = '700';
+            }
+            if (btnPartners) {
+                btnPartners.style.color = 'var(--text-muted)';
+                btnPartners.style.borderBottom = '2px solid transparent';
+                btnPartners.style.fontWeight = '500';
+            }
+            if (viewCards) viewCards.style.display = 'block';
+            if (viewPartners) viewPartners.style.display = 'none';
+
+            const input = document.getElementById('m-regos-search-input');
+            setTimeout(() => { if (input) input.focus(); }, 120);
+        }
+    },
+
+    loadRegosPartnerGroups: async function() {
+        const select = document.getElementById('m-regos-group-filter');
+        if (!select) return;
+        if (this._regosPartnerGroups && this._regosPartnerGroups.length > 0) return;
+
+        try {
+            const resp = await fetch('/api/integration/regos/partner-groups');
+            const data = await resp.json();
+            if (data.ok && Array.isArray(data.groups)) {
+                this._regosPartnerGroups = data.groups;
+                let html = '<option value="">📁 Barcha guruhlar</option>';
+                data.groups.forEach(g => {
+                    html += `<option value="${g.id}">${g.name}</option>`;
+                });
+                select.innerHTML = html;
+            }
+        } catch (e) {
+            console.error("Mobile partner guruhlarini yuklashda xatolik:", e);
+        }
+    },
+
+    onPartnerGroupChange: function() {
+        this.searchRegosPartners();
+    },
+
+    searchRegosPartners: async function() {
+        const input = document.getElementById('m-regos-partner-search-input');
+        const groupSelect = document.getElementById('m-regos-group-filter');
+        const query = (input ? input.value : '').trim();
+        const groupId = groupSelect ? groupSelect.value : '';
+        const resultsEl = document.getElementById('m-regos-partners-results');
+        const btn = document.getElementById('m-btn-regos-partner-search');
+        const bulkBar = document.getElementById('m-partner-bulk-bar');
+
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        }
+        if (resultsEl) {
+            resultsEl.innerHTML = '<div style="text-align: center; padding: 25px; color: var(--text-muted); font-size: 13px;"><i class="fas fa-spinner fa-spin fa-2x" style="color: #38bdf8; margin-bottom: 8px; display: block;"></i> REGOS-dan kontragentlar qidirilmoqda...</div>';
+        }
+        if (bulkBar) bulkBar.style.display = 'none';
+
+        try {
+            let url = `/api/integration/regos/search-partners?limit=60`;
+            if (query) url += `&query=${encodeURIComponent(query)}`;
+            if (groupId) url += `&group_id=${encodeURIComponent(groupId)}`;
+
+            const resp = await fetch(url);
+            const data = await resp.json();
+            const partners = (data && data.ok) ? (data.result || []) : [];
+            this._regosPartnersCache = partners;
+
+            if (partners.length === 0) {
+                resultsEl.innerHTML = `<div style="text-align: center; padding: 25px 15px; color: var(--text-muted); font-size: 13px;"><i class="fas fa-search-minus" style="font-size: 28px; color: var(--warning); margin-bottom: 6px; display: block;"></i> Hech qanday kontragent topilmadi</div>`;
+                return;
+            }
+
+            if (bulkBar) {
+                bulkBar.style.display = 'flex';
+                const selectAll = document.getElementById('m-partner-select-all');
+                if (selectAll) selectAll.checked = false;
+                this.updatePartnerSelectionCount();
+            }
+
+            let html = `
+                <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 8px;">
+                    Topildi: <strong style="color: var(--text-main);">${partners.length} ta</strong>
+                </div>
+            `;
+
+            partners.forEach(partner => {
+                const isAdded = partner.is_already_added;
+                const defaultCat = partner.default_category || 'ustalar';
+
+                html += `
+                    <div style="background: rgba(255,255,255,0.03); border: 1px solid ${isAdded ? 'rgba(16, 185, 129, 0.3)' : 'var(--border-color)'}; border-radius: 12px; padding: 12px; margin-bottom: 10px;">
+                        <div style="display: flex; align-items: flex-start; gap: 10px;">
+                            <input type="checkbox" class="m-partner-checkbox" data-id="${partner.regos_partner_id}" ${isAdded ? 'disabled' : ''} onchange="MobileApp.onPartnerCheckboxChange()" style="width: 18px; height: 18px; margin-top: 2px;">
+                            <div style="flex: 1;">
+                                <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 6px; margin-bottom: 3px;">
+                                    <strong style="font-size: 14px; color: var(--text-main);">${partner.name}</strong>
+                                    ${isAdded ? '<span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #10b981; font-size: 11px; padding: 2px 6px; border-radius: 4px; white-space: nowrap;">Qo\'shilgan</span>' : ''}
+                                </div>
+                                <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 8px;">
+                                    <span><i class="fas fa-phone-alt" style="color: var(--success);"></i> ${partner.phone || partner.phones || '-'}</span>
+                                    ${partner.group_name ? ` | <span class="badge" style="background: rgba(56, 189, 248, 0.12); color: #38bdf8; font-size: 10.5px; padding: 1px 6px; border-radius: 4px;">${partner.group_name}</span>` : ''}
+                                    ${partner.address ? `<div style="margin-top: 3px;"><i class="fas fa-map-marker-alt" style="color: #f59e0b;"></i> ${partner.address}</div>` : ''}
+                                </div>
+
+                                <div id="m-partner-action-box-${partner.regos_partner_id}">
+                                    ${isAdded ? '' : `
+                                        <div style="display: flex; gap: 8px;">
+                                            <select id="m-partner-cat-${partner.regos_partner_id}" class="form-control" style="height: 36px; font-size: 12px; border-radius: 8px; background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); color: var(--text-main); flex: 1;">
+                                                <option value="ustalar" ${defaultCat === 'ustalar' ? 'selected' : ''}>🔨 Ustalar</option>
+                                                <option value="qurilish" ${defaultCat === 'qurilish' ? 'selected' : ''}>🏢 Qurilish Obyekti</option>
+                                            </select>
+                                            <button class="btn btn-primary" id="m-btn-add-partner-${partner.regos_partner_id}" style="height: 36px; padding: 0 14px; font-size: 12px; font-weight: 600;" onclick="MobileApp.addSinglePartner('${partner.regos_partner_id}')">
+                                                <i class="fas fa-plus"></i> Qo'shish
+                                            </button>
+                                        </div>
+                                    `}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            resultsEl.innerHTML = html;
+        } catch (err) {
+            resultsEl.innerHTML = `<div style="color: var(--danger); text-align: center; padding: 20px; font-size: 13px;">${err.message}</div>`;
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-search"></i>';
+            }
+        }
+    },
+
+    toggleSelectAllPartners: function(masterChecked) {
+        const checkboxes = document.querySelectorAll('.m-partner-checkbox:not(:disabled)');
+        checkboxes.forEach(cb => {
+            cb.checked = masterChecked;
+        });
+        this.updatePartnerSelectionCount();
+    },
+
+    onPartnerCheckboxChange: function() {
+        this.updatePartnerSelectionCount();
+    },
+
+    updatePartnerSelectionCount: function() {
+        const checked = document.querySelectorAll('.m-partner-checkbox:checked:not(:disabled)');
+        const count = checked.length;
+        const countEl = document.getElementById('m-partner-selected-count');
+        const addBtn = document.getElementById('m-btn-add-selected');
+
+        if (countEl) countEl.innerText = `(${count})`;
+        if (addBtn) {
+            addBtn.disabled = count === 0;
+            addBtn.innerHTML = `<i class="fas fa-user-plus"></i> Tanlanganlarni qo'shish (${count})`;
+        }
+    },
+
+    addSinglePartner: async function(partnerId) {
+        const partner = (this._regosPartnersCache || []).find(p => String(p.regos_partner_id) === String(partnerId));
+        if (!partner) return;
+
+        const catSelect = document.getElementById(`m-partner-cat-${partnerId}`);
+        const selectedCat = catSelect ? catSelect.value : (partner.default_category || 'ustalar');
+        const addBtn = document.getElementById(`m-btn-add-partner-${partnerId}`);
+
+        if (addBtn) {
+            addBtn.disabled = true;
+            addBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        }
+
+        try {
+            await this._savePartnerToCRM(partner, selectedCat);
+            partner.is_already_added = true;
+
+            const actionBox = document.getElementById(`m-partner-action-box-${partnerId}`);
+            if (actionBox) {
+                actionBox.innerHTML = `
+                    <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #10b981; font-size: 11px; padding: 4px 8px; border-radius: 4px;">
+                        <i class="fas fa-check-circle"></i> Qo'shildi
+                    </span>
+                `;
+            }
+
+            const cb = document.querySelector(`.m-partner-checkbox[data-id="${partnerId}"]`);
+            if (cb) {
+                cb.checked = false;
+                cb.disabled = true;
+            }
+            this.updatePartnerSelectionCount();
+
+            await this.loadClients();
+        } catch (err) {
+            alert("Xatolik: " + err.message);
+            if (addBtn) {
+                addBtn.disabled = false;
+                addBtn.innerHTML = '<i class="fas fa-plus"></i> Qo\'shish';
+            }
+        }
+    },
+
+    addSelectedPartners: async function() {
+        const checkedBoxes = Array.from(document.querySelectorAll('.m-partner-checkbox:checked:not(:disabled)'));
+        if (checkedBoxes.length === 0) {
+            alert("Iltimos, avval kontragentlarni belgilang!");
+            return;
+        }
+
+        const addBtn = document.getElementById('m-btn-add-selected');
+        if (addBtn) {
+            addBtn.disabled = true;
+            addBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Qo\'shilmoqda...';
+        }
+
+        let addedCount = 0;
+        for (const cb of checkedBoxes) {
+            const partnerId = cb.getAttribute('data-id');
+            const partner = (this._regosPartnersCache || []).find(p => String(p.regos_partner_id) === String(partnerId));
+            if (!partner) continue;
+
+            const catSelect = document.getElementById(`m-partner-cat-${partnerId}`);
+            const selectedCat = catSelect ? catSelect.value : (partner.default_category || 'ustalar');
+
+            try {
+                await this._savePartnerToCRM(partner, selectedCat);
+                partner.is_already_added = true;
+
+                const actionBox = document.getElementById(`m-partner-action-box-${partnerId}`);
+                if (actionBox) {
+                    actionBox.innerHTML = `
+                        <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #10b981; font-size: 11px; padding: 4px 8px; border-radius: 4px;">
+                            <i class="fas fa-check-circle"></i> Qo'shildi
+                        </span>
+                    `;
+                }
+                cb.checked = false;
+                cb.disabled = true;
+                addedCount++;
+            } catch (err) {
+                console.error(`Partner ${partnerId} qo'shishda xatolik:`, err);
+            }
+        }
+
+        this.updatePartnerSelectionCount();
+        const masterCb = document.getElementById('m-partner-select-all');
+        if (masterCb) masterCb.checked = false;
+
+        if (addBtn) {
+            addBtn.disabled = true;
+            addBtn.innerHTML = `<i class="fas fa-user-plus"></i> Tanlanganlarni qo'shish (0)`;
+        }
+
+        await this.loadClients();
+        alert(`${addedCount} ta kontragent muvaffaqiyatli CRM mijozlariga qo'shildi!`);
+    },
+
+    _savePartnerToCRM: async function(partner, category) {
+        const companyId = this.currentCompany || localStorage.getItem('company_id') || 'giperbrendstroy';
+        const payload = {
+            id: partner.id || `regos_partner_${partner.regos_partner_id}`,
+            name: partner.name,
+            phone: partner.phone || partner.raw_phone || partner.phones || '',
+            phone2: partner.phones || '',
+            barcode: partner.inn || partner.regos_partner_id || '',
+            bonus: 0,
+            value: 0,
+            debt: 0,
+            address: partner.address || '',
+            category: category || partner.default_category || 'ustalar',
+            operator: 'REGOS Kontragent',
+            notes: partner.group_name ? `REGOS Guruh: ${partner.group_name}` : 'REGOS Kontragent',
+            source: 'client_directory',
+            status: 'client',
+            created_at: new Date().toISOString()
+        };
+
+        const resp = await fetch('/api/clients', {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'x-company-id': companyId
+            },
+            body: JSON.stringify(payload)
+        });
+        if (!resp.ok) {
+            const errData = await resp.json().catch(() => ({}));
+            throw new Error(errData.detail || "Mijozni saqlashda xatolik");
+        }
+        return payload;
     },
 
     searchRegosCards: async function() {

@@ -757,6 +757,144 @@ def search_regos_cards(query: str, request: Request):
         
     return {"ok": True, "count": len(formatted_results), "result": formatted_results}
 
+# --- REGOS PARTNERS (KONTRAGENTLAR) SEARCH & GROUPS ENDPOINTS ---
+@app.get("/api/integration/regos/partner-groups")
+def get_regos_partner_groups(request: Request):
+    company_id = get_company_id(request)
+    settings = get_company_settings(company_id, bypass_cache=True) if company_id else settings_state
+    regos_endpoint = settings.get("regos_endpoint", "")
+    regos_token = settings.get("regos_token", "")
+    if not regos_endpoint or not regos_token:
+        return {"ok": False, "groups": []}
+    
+    endpoint = regos_endpoint.strip().rstrip("/")
+    if not endpoint.startswith(("http://", "https://")):
+        endpoint = "https://" + endpoint
+        
+    url = f"{endpoint}/v1/partnergroup/get" if "/v1" not in endpoint else f"{endpoint}/partnergroup/get"
+    headers = {
+        "Authorization": f"Bearer {regos_token}",
+        "Content-Type": "application/json"
+    }
+    try:
+        r = requests.post(url, headers=headers, json={}, timeout=8)
+        if r.status_code == 200:
+            data = r.json()
+            if isinstance(data, dict) and data.get("ok"):
+                raw_groups = data.get("result", [])
+                groups = [{"id": g.get("id"), "name": g.get("name")} for g in raw_groups if g.get("id") is not None]
+                return {"ok": True, "groups": groups}
+    except Exception as e:
+        print(f"Error fetching REGOS partner groups: {e}")
+    return {"ok": False, "groups": []}
+
+@app.get("/api/integration/regos/search-partners")
+def search_regos_partners(request: Request, query: str = None, group_id: int = None, limit: int = 60):
+    company_id = get_company_id(request)
+    settings = get_company_settings(company_id, bypass_cache=True) if company_id else settings_state
+    regos_endpoint = settings.get("regos_endpoint", "")
+    regos_token = settings.get("regos_token", "")
+    if not regos_endpoint or not regos_token:
+        raise HTTPException(status_code=400, detail="REGOS API sozlanmagan")
+        
+    endpoint = regos_endpoint.strip().rstrip("/")
+    if not endpoint.startswith(("http://", "https://")):
+        endpoint = "https://" + endpoint
+        
+    url = f"{endpoint}/v1/partner/get" if "/v1" not in endpoint else f"{endpoint}/partner/get"
+    headers = {
+        "Authorization": f"Bearer {regos_token}",
+        "Content-Type": "application/json"
+    }
+    
+    body = {"limit": limit or 60}
+    if query and query.strip():
+        body["search"] = query.strip()
+    if group_id:
+        body["group_ids"] = [int(group_id)]
+        
+    try:
+        r = requests.post(url, headers=headers, json=body, timeout=10)
+        data = r.json() if r.status_code == 200 else {}
+    except Exception as e:
+        print(f"Error querying REGOS partner: {e}")
+        return {"ok": False, "count": 0, "result": [], "detail": str(e)}
+        
+    raw_partners = data.get("result", []) if isinstance(data, dict) and data.get("ok") else []
+    
+    # Check already added partners in CRM
+    existing_partner_ids = set()
+    existing_phones = set()
+    try:
+        path = f"customers?select=id,phone,phone2&company_id=eq.{company_id}&source=eq.client_directory"
+        existing = supabase_get_all(path, company_id=company_id)
+        for ex in existing:
+            c_id = ex.get("id") or ""
+            if c_id.startswith("regos_partner_"):
+                existing_partner_ids.add(c_id.replace("regos_partner_", ""))
+            p1 = (ex.get("phone") or "").replace("+", "").replace(" ", "").replace("-", "")
+            if p1 and len(p1) >= 7:
+                existing_phones.add(p1[-9:])
+    except Exception as ex_err:
+        print(f"Failed to check existing partners: {ex_err}")
+        
+    formatted = []
+    for p in raw_partners:
+        if not isinstance(p, dict):
+            continue
+        p_id = str(p.get("id"))
+        name = str(p.get("name") or "").strip()
+        fullname = str(p.get("fullname") or "").strip()
+        phones_str = str(p.get("phones") or "").strip()
+        address = str(p.get("address") or "").strip()
+        inn = str(p.get("inn") or "").strip()
+        grp = p.get("group") or {}
+        grp_name = grp.get("name") if isinstance(grp, dict) else ""
+        grp_id = grp.get("id") if isinstance(grp, dict) else None
+        legal_status = str(p.get("legal_status") or "Natural")
+        
+        # Phone parsing & formatting
+        clean_phones = [x.strip() for x in phones_str.replace(";", ",").split(",") if x.strip()]
+        display_phone = clean_phones[0] if clean_phones else ""
+        digits_phone = "".join(ch for ch in display_phone if ch.isdigit())
+        if len(digits_phone) == 12 and digits_phone.startswith("998"):
+            formatted_phone = f"+998 {digits_phone[3:5]} {digits_phone[5:8]} {digits_phone[8:10]} {digits_phone[10:12]}"
+        elif len(digits_phone) == 9:
+            formatted_phone = f"+998 {digits_phone[:2]} {digits_phone[2:5]} {digits_phone[5:7]} {digits_phone[7:9]}"
+        else:
+            formatted_phone = display_phone
+            
+        short_num = digits_phone[-9:] if len(digits_phone) >= 7 else ""
+        is_added = (p_id in existing_partner_ids) or (short_num and short_num in existing_phones)
+        
+        # Smart category deduction
+        name_lower = (name + " " + grp_name).lower()
+        if "усто" in name_lower or "usta" in name_lower or (grp_id == 19):
+            cat = "ustalar"
+        elif "абийект" in name_lower or "объект" in name_lower or "строй" in name_lower or "mchj" in name_lower or "ooo" in name_lower:
+            cat = "qurilish"
+        else:
+            cat = "ustalar"
+            
+        formatted.append({
+            "id": f"regos_partner_{p_id}",
+            "regos_partner_id": p_id,
+            "name": name or fullname or f"Kontragent #{p_id}",
+            "fullname": fullname,
+            "phone": formatted_phone,
+            "raw_phone": display_phone,
+            "phones": phones_str,
+            "address": address,
+            "inn": inn,
+            "group_id": grp_id,
+            "group_name": grp_name,
+            "legal_status": legal_status,
+            "default_category": cat,
+            "is_already_added": is_added
+        })
+        
+    return {"ok": True, "count": len(formatted), "result": formatted}
+
 # --- INVENTORY ENDPOINTS ---
 @app.get("/api/inventory")
 def get_inventory(request: Request):
