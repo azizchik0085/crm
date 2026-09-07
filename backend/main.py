@@ -5135,6 +5135,20 @@ def authenticate_usta_helper(barcode: str, phone: str, company_id: str = None):
 
     bonus_val = float(live_bonus if live_bonus is not None else (matched_customer.get("value") or 0))
 
+    # Stored debt and purchases/payments summary
+    debt_val = 0.0
+    tot_debit = None
+    tot_credit = None
+    c_op = matched_customer.get("operator") or "{}"
+    if isinstance(c_op, str) and c_op.startswith("{"):
+        try:
+            m_op = json.loads(c_op)
+            debt_val = float(m_op.get("debt") or 0.0)
+            tot_debit = m_op.get("total_debit")
+            tot_credit = m_op.get("total_credit")
+        except Exception:
+            pass
+
     return {
         "status": "success",
         "user_type": "usta",
@@ -5144,6 +5158,9 @@ def authenticate_usta_helper(barcode: str, phone: str, company_id: str = None):
             "phone": matched_customer.get("phone") or "",
             "barcode": c_bc,
             "bonus": bonus_val,
+            "debt": debt_val,
+            "total_debit": tot_debit,
+            "total_credit": tot_credit,
             "role": "usta",
             "category": "ustalar",
             "company_id": matched_customer.get("company_id") or target_company,

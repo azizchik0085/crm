@@ -970,6 +970,21 @@ select option:checked, select option:hover {
     transform: scale(0.92);
 }
 
+.usta-debt-card {
+    border-radius: 18px;
+    padding: 16px;
+    margin-top: 12px;
+    transition: all 0.3s ease;
+}
+
+.usta-debt-amount {
+    font-size: 28px;
+    font-weight: 800;
+    margin-bottom: 2px;
+    letter-spacing: -0.5px;
+    font-family: 'JetBrains Mono', monospace;
+}
+
 .usta-receipt-card {
     background: var(--bg-card);
     border: 1px solid var(--border-color);

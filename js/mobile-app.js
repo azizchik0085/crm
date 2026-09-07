@@ -530,7 +530,10 @@ window.MobileApp = {
         if (barcodeEl) barcodeEl.textContent = this.currentUser.barcode || '';
         if (bonusEl) bonusEl.textContent = `${Number(this.currentUser.bonus || 0).toLocaleString('uz-UZ')} so'm`;
 
-        // 2. Fetch live receipts and updated bonus
+        // 1.1 Populate Initial Debt UI
+        this._updateUstaDebtUI(this.currentUser.debt, this.currentUser.total_debit, this.currentUser.total_credit);
+
+        // 2. Fetch live receipts, live debt, and updated bonus
         const recentList = document.getElementById('m-usta-recent-receipts-list');
         const countBadge = document.getElementById('m-usta-receipts-count');
         if (recentList) {
@@ -549,11 +552,22 @@ window.MobileApp = {
                     if (data.bonus !== undefined && data.bonus !== null) {
                         this.currentUser.bonus = Number(data.bonus);
                         if (bonusEl) bonusEl.textContent = `${this.currentUser.bonus.toLocaleString('uz-UZ')} so'm`;
-                        const saved = JSON.parse(localStorage.getItem('mobile_auth') || '{}');
-                        if (saved.user) {
-                            saved.user.bonus = this.currentUser.bonus;
-                            localStorage.setItem('mobile_auth', JSON.stringify(saved));
-                        }
+                    }
+
+                    if (data.debt !== undefined && data.debt !== null) {
+                        this.currentUser.debt = Number(data.debt);
+                        this.currentUser.total_debit = data.total_debit;
+                        this.currentUser.total_credit = data.total_credit;
+                        this._updateUstaDebtUI(data.debt, data.total_debit, data.total_credit);
+                    }
+
+                    const saved = JSON.parse(localStorage.getItem('mobile_auth') || '{}');
+                    if (saved.user) {
+                        saved.user.bonus = this.currentUser.bonus;
+                        saved.user.debt = this.currentUser.debt;
+                        saved.user.total_debit = this.currentUser.total_debit;
+                        saved.user.total_credit = this.currentUser.total_credit;
+                        localStorage.setItem('mobile_auth', JSON.stringify(saved));
                     }
 
                     this.ustaReceiptsCache = data.receipts || [];
@@ -569,6 +583,147 @@ window.MobileApp = {
             if (recentList) recentList.innerHTML = '<div style="text-align: center; padding: 15px; color: var(--text-muted); font-size: 12px;">Cheklarni yuklashda xatolik</div>';
         } finally {
             this.loadUstaPayouts();
+        }
+    },
+
+    _updateUstaDebtUI: function(debt, totalDebit, totalCredit) {
+        const debtCard = document.getElementById('m-usta-debt-card');
+        const debtValEl = document.getElementById('m-usta-debt-val');
+        const debtBadgeEl = document.getElementById('m-usta-debt-badge');
+        const debtTitleEl = document.getElementById('m-usta-debt-title');
+        const totalDebitEl = document.getElementById('m-usta-total-debit');
+        const totalCreditEl = document.getElementById('m-usta-total-credit');
+        const statusNoteEl = document.getElementById('m-usta-debt-status-note');
+        const refreshBtn = document.getElementById('m-usta-debt-refresh-btn');
+
+        // All receipts view summary elements
+        const allSummary = document.getElementById('m-usta-all-receipts-summary');
+        const allBadge = document.getElementById('m-usta-all-debt-badge');
+        const allDebit = document.getElementById('m-usta-all-total-debit');
+        const allCredit = document.getElementById('m-usta-all-total-credit');
+        const allVal = document.getElementById('m-usta-all-debt-val');
+
+        if (!debtCard || !debtValEl) return;
+
+        debt = Number(debt || 0);
+
+        // Populate breakdown if available
+        if (totalDebit !== undefined && totalDebit !== null && totalDebitEl) {
+            totalDebitEl.textContent = `${Number(totalDebit).toLocaleString('uz-UZ')} so'm`;
+        }
+        if (totalCredit !== undefined && totalCredit !== null && totalCreditEl) {
+            totalCreditEl.textContent = `${Number(totalCredit).toLocaleString('uz-UZ')} so'm`;
+        }
+
+        if (allSummary) {
+            allSummary.style.display = 'block';
+            if (allDebit && totalDebit !== undefined && totalDebit !== null) {
+                allDebit.textContent = `${Number(totalDebit).toLocaleString('uz-UZ')} so'm`;
+            }
+            if (allCredit && totalCredit !== undefined && totalCredit !== null) {
+                allCredit.textContent = `${Number(totalCredit).toLocaleString('uz-UZ')} so'm`;
+            }
+        }
+
+        if (debt > 0) {
+            // Debt exists
+            debtCard.style.background = 'linear-gradient(135deg, rgba(239, 68, 68, 0.14), rgba(244, 63, 94, 0.08))';
+            debtCard.style.borderColor = 'rgba(239, 68, 68, 0.35)';
+            if (debtTitleEl) {
+                debtTitleEl.style.color = '#ef4444';
+                debtTitleEl.innerHTML = '<i class="fas fa-hand-holding-usd"></i> Qarz Balansingiz:';
+            }
+            if (debtBadgeEl) {
+                debtBadgeEl.style.background = 'rgba(239, 68, 68, 0.2)';
+                debtBadgeEl.style.color = '#ef4444';
+                debtBadgeEl.textContent = '⚠️ Qarzdorlik bor';
+            }
+            if (refreshBtn) {
+                refreshBtn.style.background = 'rgba(239, 68, 68, 0.15)';
+                refreshBtn.style.borderColor = 'rgba(239, 68, 68, 0.3)';
+                refreshBtn.style.color = '#ef4444';
+            }
+            debtValEl.style.color = '#ef4444';
+            debtValEl.textContent = `${debt.toLocaleString('uz-UZ')} so'm`;
+            if (statusNoteEl) {
+                statusNoteEl.textContent = "Do'kondan nasiya xaridlar bo'yicha to'lanmagan qarz";
+            }
+
+            if (allVal) {
+                allVal.style.color = '#ef4444';
+                allVal.textContent = `${debt.toLocaleString('uz-UZ')} so'm`;
+            }
+            if (allBadge) {
+                allBadge.style.background = 'rgba(239, 68, 68, 0.2)';
+                allBadge.style.color = '#ef4444';
+                allBadge.textContent = '⚠️ Qarzdorlik';
+            }
+        } else if (debt === 0) {
+            // No debt
+            debtCard.style.background = 'linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(20, 184, 166, 0.08))';
+            debtCard.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+            if (debtTitleEl) {
+                debtTitleEl.style.color = '#10b981';
+                debtTitleEl.innerHTML = '<i class="fas fa-check-circle"></i> Qarz Holati:';
+            }
+            if (debtBadgeEl) {
+                debtBadgeEl.style.background = 'rgba(16, 185, 129, 0.2)';
+                debtBadgeEl.style.color = '#10b981';
+                debtBadgeEl.textContent = "✅ Qarzi yo'q";
+            }
+            if (refreshBtn) {
+                refreshBtn.style.background = 'rgba(16, 185, 129, 0.15)';
+                refreshBtn.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+                refreshBtn.style.color = '#10b981';
+            }
+            debtValEl.style.color = '#10b981';
+            debtValEl.textContent = "0 so'm";
+            if (statusNoteEl) {
+                statusNoteEl.textContent = "Barcha xarid va hisob-kitoblar to'liq to'langan";
+            }
+
+            if (allVal) {
+                allVal.style.color = '#10b981';
+                allVal.textContent = "0 so'm";
+            }
+            if (allBadge) {
+                allBadge.style.background = 'rgba(16, 185, 129, 0.2)';
+                allBadge.style.color = '#10b981';
+                allBadge.textContent = "✅ Qarzi yo'q";
+            }
+        } else {
+            // debt < 0: advance / credit
+            debtCard.style.background = 'linear-gradient(135deg, rgba(56, 189, 248, 0.14), rgba(99, 102, 241, 0.08))';
+            debtCard.style.borderColor = 'rgba(56, 189, 248, 0.35)';
+            if (debtTitleEl) {
+                debtTitleEl.style.color = '#38bdf8';
+                debtTitleEl.innerHTML = '<i class="fas fa-handshake"></i> Ortiqcha to\'lov:';
+            }
+            if (debtBadgeEl) {
+                debtBadgeEl.style.background = 'rgba(56, 189, 248, 0.2)';
+                debtBadgeEl.style.color = '#38bdf8';
+                debtBadgeEl.textContent = '🤝 Avans / Haqdor';
+            }
+            if (refreshBtn) {
+                refreshBtn.style.background = 'rgba(56, 189, 248, 0.15)';
+                refreshBtn.style.borderColor = 'rgba(56, 189, 248, 0.3)';
+                refreshBtn.style.color = '#38bdf8';
+            }
+            debtValEl.style.color = '#38bdf8';
+            debtValEl.textContent = `${Math.abs(debt).toLocaleString('uz-UZ')} so'm`;
+            if (statusNoteEl) {
+                statusNoteEl.textContent = "Do'konda ortiqcha to'lovingiz (avans) mavjud";
+            }
+
+            if (allVal) {
+                allVal.style.color = '#38bdf8';
+                allVal.textContent = `${Math.abs(debt).toLocaleString('uz-UZ')} so'm`;
+            }
+            if (allBadge) {
+                allBadge.style.background = 'rgba(56, 189, 248, 0.2)';
+                allBadge.style.color = '#38bdf8';
+                allBadge.textContent = '🤝 Avans';
+            }
         }
     },
 
@@ -595,6 +750,8 @@ window.MobileApp = {
             const total = Number(r.total_amount || 0);
             const dateStr = r.created_at ? new Date(r.created_at).toLocaleString('uz-UZ', { dateStyle: 'medium', timeStyle: 'short' }) : '-';
             const code = r.code || r.id?.substring(0, 8) || `№ ${idx + 1}`;
+            const isPayment = Boolean(r.is_payment || (code && code.toLowerCase().includes("to'lov")));
+            const bonusEarned = Number(r.bonus_earned || 0);
             
             let items = [];
             if (Array.isArray(r.items)) {
@@ -606,40 +763,70 @@ window.MobileApp = {
 
             const itemsCount = items.length;
 
-            html += `
-                <div class="usta-receipt-card" onclick="MobileApp.toggleReceiptDetails('${rid}')">
-                    <div class="usta-receipt-top">
-                        <div>
-                            <div class="usta-receipt-code"><i class="fas fa-receipt" style="color: #38bdf8; margin-right: 5px;"></i> Chek: ${code}</div>
-                            <div class="usta-receipt-date"><i class="far fa-clock"></i> ${dateStr}</div>
-                        </div>
-                        <div style="text-align: right;">
-                            <div class="usta-receipt-sum">${total.toLocaleString('uz-UZ')} so'm</div>
-                            <div style="font-size: 11px; color: var(--text-muted);">${itemsCount > 0 ? `${itemsCount} xil tovar` : 'Xarid'} &bull; <i class="fas fa-chevron-down" style="font-size: 9px;"></i></div>
-                        </div>
-                    </div>
-                    
-                    <div id="details-${rid}" class="usta-receipt-details">
-                        ${itemsCount > 0 ? items.map(it => {
-                            const itName = it.name || it.product_name || 'Tovar';
-                            const itQty = it.quantity || it.qty || 1;
-                            const itPrice = Number(it.price || 0);
-                            const itTotal = Number(it.total || (itQty * itPrice) || 0);
-                            return `
-                                <div class="usta-receipt-item-row">
-                                    <div class="usta-receipt-item-name">${itName}</div>
-                                    <div class="usta-receipt-item-qty">${itQty} dona</div>
-                                    <div class="usta-receipt-item-price">${itTotal.toLocaleString('uz-UZ')} so'm</div>
+            if (isPayment) {
+                html += `
+                    <div class="usta-receipt-card" style="background: rgba(16, 185, 129, 0.05); border-color: rgba(16, 185, 129, 0.25);">
+                        <div class="usta-receipt-top">
+                            <div>
+                                <div class="usta-receipt-code" style="color: #10b981;">
+                                    <i class="fas fa-arrow-down" style="color: #10b981; margin-right: 5px;"></i> To'lov: ${code}
                                 </div>
-                            `;
-                        }).join('') : `
-                            <div style="font-size: 11.5px; color: var(--text-muted); padding: 4px 0;">
-                                To'lov turi: ${r.payment_type || 'Naqd / Karta'}
+                                <div class="usta-receipt-date"><i class="far fa-clock"></i> ${dateStr}</div>
                             </div>
-                        `}
+                            <div style="text-align: right;">
+                                <div class="usta-receipt-sum" style="color: #10b981;">+${total.toLocaleString('uz-UZ')} so'm</div>
+                                <div style="font-size: 11px; color: #10b981; font-weight: 600;">To'lov qabul qilindi</div>
+                            </div>
+                        </div>
+                        <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px; padding-top: 4px; border-top: 1px dashed rgba(255,255,255,0.06);">
+                            Ushbu to'lov umumiy qarz hisobidan chegirilgan
+                        </div>
                     </div>
-                </div>
-            `;
+                `;
+            } else {
+                const bonusBadgeHtml = bonusEarned > 0 
+                    ? `<div style="display: flex; justify-content: flex-end; margin-top: 4px;">
+                        <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); font-size: 10.5px; padding: 2px 7px; border-radius: 6px; font-weight: 700;">
+                            <i class="fas fa-gift" style="margin-right: 3px;"></i> +${bonusEarned.toLocaleString('uz-UZ')} so'm (${r.bonus_percent || 2}% bonus)
+                        </span>
+                       </div>`
+                    : '';
+
+                html += `
+                    <div class="usta-receipt-card" onclick="MobileApp.toggleReceiptDetails('${rid}')">
+                        <div class="usta-receipt-top">
+                            <div>
+                                <div class="usta-receipt-code"><i class="fas fa-receipt" style="color: #38bdf8; margin-right: 5px;"></i> Chek: ${code}</div>
+                                <div class="usta-receipt-date"><i class="far fa-clock"></i> ${dateStr}</div>
+                            </div>
+                            <div style="text-align: right;">
+                                <div class="usta-receipt-sum">${total.toLocaleString('uz-UZ')} so'm</div>
+                                <div style="font-size: 11px; color: var(--text-muted);">${itemsCount > 0 ? `${itemsCount} xil tovar` : 'Xarid'} &bull; <i class="fas fa-chevron-down" style="font-size: 9px;"></i></div>
+                            </div>
+                        </div>
+                        ${bonusBadgeHtml}
+                        <div id="details-${rid}" class="usta-receipt-details">
+                            ${itemsCount > 0 ? items.map(it => {
+                                const itName = it.name || it.product_name || 'Tovar';
+                                const itQty = it.quantity || it.qty || 1;
+                                const itPrice = Number(it.price || 0);
+                                const itTotal = Number(it.total || (itQty * itPrice) || 0);
+                                return `
+                                    <div class="usta-receipt-item-row">
+                                        <div class="usta-receipt-item-name">${itName}</div>
+                                        <div class="usta-receipt-item-qty">${itQty} dona</div>
+                                        <div class="usta-receipt-item-price">${itTotal.toLocaleString('uz-UZ')} so'm</div>
+                                    </div>
+                                `;
+                            }).join('') : `
+                                <div style="font-size: 11.5px; color: var(--text-muted); padding: 4px 0;">
+                                    To'lov turi: ${r.payment_type || 'Nasiya / WSL'}
+                                </div>
+                            `}
+                        </div>
+                    </div>
+                `;
+            }
         });
 
         container.innerHTML = html;
@@ -658,22 +845,9 @@ window.MobileApp = {
         if (icon) icon.classList.add('fa-spin');
 
         try {
-            const resp = await fetch(`/api/clients/${this.currentUser.id}/sync-bonus`, { method: 'POST' });
-            if (resp.ok) {
-                const data = await resp.json();
-                if (data && data.bonus !== undefined) {
-                    this.currentUser.bonus = Number(data.bonus);
-                    const bonusEl = document.getElementById('m-usta-bonus-val');
-                    if (bonusEl) bonusEl.textContent = `${this.currentUser.bonus.toLocaleString('uz-UZ')} so'm`;
-                    const saved = JSON.parse(localStorage.getItem('mobile_auth') || '{}');
-                    if (saved.user) {
-                        saved.user.bonus = this.currentUser.bonus;
-                        localStorage.setItem('mobile_auth', JSON.stringify(saved));
-                    }
-                }
-            }
+            await this.loadUstaCabinet();
         } catch (e) {
-            console.warn("Could not sync live bonus:", e);
+            console.warn("Could not sync live cabinet:", e);
         } finally {
             if (icon) icon.classList.remove('fa-spin');
         }

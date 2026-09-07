@@ -356,6 +356,33 @@
                 </button>
             </div>
 
+            <!-- 2.1 QARZ BALANSI KARTASI -->
+            <div class="m-card usta-debt-card" id="m-usta-debt-card" style="background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.3);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <span style="font-size: 13px; font-weight: 700; color: #ef4444; display: flex; align-items: center; gap: 6px;" id="m-usta-debt-title">
+                        <i class="fas fa-hand-holding-usd"></i> Qarz Balansingiz:
+                    </span>
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <span id="m-usta-debt-badge" class="badge" style="background: rgba(239, 68, 68, 0.2); color: #ef4444; font-size: 11px; padding: 3px 8px; border-radius: 8px; font-weight: 700;">
+                            Qarzdorlik
+                        </span>
+                        <button type="button" onclick="MobileApp.syncUstaBonus(this)" title="Qarzni yangilash" class="usta-refresh-bonus-btn" style="width: 28px; height: 28px; font-size: 12px; background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.3); color: #ef4444;" id="m-usta-debt-refresh-btn">
+                            <i class="fas fa-sync-alt"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="usta-debt-amount" id="m-usta-debt-val" style="color: #ef4444;">0 so'm</div>
+                <div id="m-usta-debt-sub" style="font-size: 11.5px; color: var(--text-muted); line-height: 1.4; margin-top: 6px;">
+                    <div id="m-usta-debt-breakdown" style="display: flex; justify-content: space-between; align-items: center; padding-top: 6px; border-top: 1px dashed rgba(255,255,255,0.08);">
+                        <span><i class="fas fa-shopping-cart" style="color: #38bdf8; margin-right: 4px;"></i> Xarid: <strong id="m-usta-total-debit" style="color: var(--text-main);">-</strong></span>
+                        <span><i class="fas fa-check-circle" style="color: #10b981; margin-right: 4px;"></i> To'langan: <strong id="m-usta-total-credit" style="color: #10b981;">-</strong></span>
+                    </div>
+                    <div id="m-usta-debt-status-note" style="margin-top: 4px; font-size: 11px; color: var(--text-muted);">
+                        Do'kondan nasiya xaridlar bo'yicha hisob-kitob
+                    </div>
+                </div>
+            </div>
+
             <!-- 2.5 MENING YECHISH SO'ROVLARIM -->
             <div id="m-usta-payouts-box" style="margin-top: 16px; display: none;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
@@ -416,6 +443,28 @@
                 </button>
                 <div style="font-size: 14px; font-weight: 700; color: #fff;">
                     <i class="fas fa-receipt" style="color: #10b981;"></i> Xarid Cheklari Tarixi
+                </div>
+            </div>
+
+            <!-- Financial Summary Banner in All Receipts -->
+            <div class="m-card" id="m-usta-all-receipts-summary" style="margin-bottom: 14px; background: rgba(0,0,0,0.25); border: 1px solid var(--border-color); border-radius: 14px; padding: 12px 14px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <span style="font-size: 12px; color: var(--text-muted); font-weight: 600;"><i class="fas fa-calculator" style="color: #38bdf8; margin-right: 5px;"></i> Umumiy Hisob-Kitob:</span>
+                    <span id="m-usta-all-debt-badge" class="badge" style="font-size: 11px; padding: 2px 7px; border-radius: 6px; font-weight: 700; background: rgba(239, 68, 68, 0.2); color: #ef4444;">Qarzdorlik</span>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 12px;">
+                    <div style="background: rgba(255,255,255,0.03); padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
+                        <div style="color: var(--text-muted); font-size: 11px; margin-bottom: 2px;">Jami Xarid (WSL):</div>
+                        <div id="m-usta-all-total-debit" style="font-weight: 800; color: var(--text-main); font-size: 13.5px; font-family: monospace;">-</div>
+                    </div>
+                    <div style="background: rgba(16,185,129,0.06); padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(16,185,129,0.15);">
+                        <div style="color: #10b981; font-size: 11px; margin-bottom: 2px;">To'langan summa:</div>
+                        <div id="m-usta-all-total-credit" style="font-weight: 800; color: #10b981; font-size: 13.5px; font-family: monospace;">-</div>
+                    </div>
+                </div>
+                <div style="margin-top: 8px; padding-top: 8px; border-top: 1px dashed rgba(255,255,255,0.08); display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-size: 12px; font-weight: 600; color: var(--text-muted);">Hozirgi Qarz Balansi:</span>
+                    <span id="m-usta-all-debt-val" style="font-size: 16px; font-weight: 800; font-family: monospace; color: #ef4444;">0 so'm</span>
                 </div>
             </div>
 
