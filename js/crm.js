@@ -1971,8 +1971,8 @@ window.CRM = {
         }
         this.renderCustomersTable();
 
-        // 2. Serverdan yangilash
-        await this.loadCustomersData();
+        // 2. Serverdan majburiy yangilash (darhol yangi qo'shilgan mijozlarni olish)
+        await this.loadCustomersData(true);
 
         if (!this.customerPollingInterval) {
             this.customerPollingInterval = setInterval(() => {
@@ -1987,18 +1987,38 @@ window.CRM = {
                         this.refreshCustomersDataBackground();
                     }
                 }
-            }, 10000);
+            }, 8000);
         }
     },
 
-    loadCustomersData: async function(forceRefresh = false) {
+    loadCustomersData: async function(forceRefresh = true) {
+        const refreshBtn = document.getElementById('btn-refresh-customers');
+        if (refreshBtn) {
+            refreshBtn.disabled = true;
+            refreshBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Yangilanmoqda...';
+        }
         try {
             const clients = await DB.getClients(forceRefresh);
-            this._clientsCache = clients || [];
+            if (Array.isArray(clients)) {
+                // Yangi qo'shilgan mijozlar har doim ro'yxat boshida chiqishi uchun saralaymiz
+                clients.sort((a, b) => {
+                    const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+                    const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+                    return timeB - timeA;
+                });
+                this._clientsCache = clients;
+            } else {
+                this._clientsCache = [];
+            }
         } catch (e) {
             console.error("Mijozlarni yuklashda xatolik:", e);
             if (!this._clientsCache || this._clientsCache.length === 0) {
                 this._clientsCache = AppStorage.load().clients || [];
+            }
+        } finally {
+            if (refreshBtn) {
+                refreshBtn.disabled = false;
+                refreshBtn.innerHTML = '<i class="fas fa-sync"></i> Yangilash';
             }
         }
         this.renderCustomersTable();
@@ -2008,6 +2028,11 @@ window.CRM = {
         try {
             const clients = await DB.getClients(true);
             if (Array.isArray(clients)) {
+                clients.sort((a, b) => {
+                    const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+                    const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+                    return timeB - timeA;
+                });
                 this._clientsCache = clients;
                 this.renderCustomersTable();
             }
@@ -2015,6 +2040,24 @@ window.CRM = {
     },
 
     setupCustomersViewEventListeners: function() {
+        if (!window._clientsUpdatedListenerBound) {
+            window._clientsUpdatedListenerBound = true;
+            window.addEventListener('clients-updated', (e) => {
+                if (Array.isArray(e.detail)) {
+                    const list = [...e.detail];
+                    list.sort((a, b) => {
+                        const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+                        const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+                        return timeB - timeA;
+                    });
+                    this._clientsCache = list;
+                    if (window.App && window.App.currentView === 'crm-customers') {
+                        this.renderCustomersTable();
+                    }
+                }
+            });
+        }
+
         const searchInput = document.getElementById('crm-clientlist-search') || document.getElementById('crm-custlist-search');
         if (searchInput && !searchInput._bound) {
             searchInput._bound = true;

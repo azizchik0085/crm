@@ -696,14 +696,41 @@
     <!-- Html5Qrcode Library for Camera Barcode Scanning -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
 
+    <!-- Global fetch interceptor to append x-company-id header automatically -->
+    <script>
+        const originalFetch = window.fetch;
+        window.fetch = function(url, options) {
+            options = options || {};
+            options.headers = options.headers || {};
+            
+            const companyId = localStorage.getItem('company_id') || localStorage.getItem('activeCompanyId') || 'giperbrendstroy';
+            if (companyId && (typeof url === 'string' && url.startsWith('/api/'))) {
+                if (options.headers instanceof Headers) {
+                    if (!options.headers.has('x-company-id')) {
+                        options.headers.append('x-company-id', companyId);
+                    }
+                } else if (Array.isArray(options.headers)) {
+                    if (!options.headers.some(h => h[0].toLowerCase() === 'x-company-id')) {
+                        options.headers.push(['x-company-id', companyId]);
+                    }
+                } else {
+                    if (!options.headers['x-company-id'] && !options.headers['X-Company-Id']) {
+                        options.headers['x-company-id'] = companyId;
+                    }
+                }
+            }
+            return originalFetch.call(this, url, options);
+        };
+    </script>
+
     <!-- Mobile App Main Script -->
-    <script src="/js/mobile-app.js?v=3.0"></script>
+    <script src="/js/mobile-app.js?v=3.1"></script>
 
     <!-- Register Service Worker for PWA Offline / Standalone Installation -->
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw-mobile.js?v=9')
+                navigator.serviceWorker.register('/sw-mobile.js?v=10')
                     .then(reg => {
                         reg.update();
                         console.log('Webzone Mobile SW registered');

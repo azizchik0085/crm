@@ -148,6 +148,22 @@ window.DB = {
     _clientsCache: null,
     getClients: async function(forceRefresh = false) {
         if (!forceRefresh && this._clientsCache && this._clientsCache.length > 0) {
+            // Orqa fonda ma'lumotlarni server bilan tekshirib, agar yangisi bo'lsa yangilash
+            fetch('/api/clients')
+                .then(r => r.ok ? r.json() : null)
+                .then(data => {
+                    if (Array.isArray(data)) {
+                        this._clientsCache = data;
+                        AppStorage.updateKey('clients', data);
+                        if (window.CRM) {
+                            window.CRM._clientsCache = data;
+                            if (window.App && window.App.currentView === 'crm-customers') {
+                                window.CRM.renderCustomersTable();
+                            }
+                        }
+                        window.dispatchEvent(new CustomEvent('clients-updated', { detail: data }));
+                    }
+                }).catch(() => {});
             return this._clientsCache;
         }
         const cached = AppStorage.load().clients;
@@ -160,6 +176,13 @@ window.DB = {
                     if (Array.isArray(data)) {
                         this._clientsCache = data;
                         AppStorage.updateKey('clients', data);
+                        if (window.CRM) {
+                            window.CRM._clientsCache = data;
+                            if (window.App && window.App.currentView === 'crm-customers') {
+                                window.CRM.renderCustomersTable();
+                            }
+                        }
+                        window.dispatchEvent(new CustomEvent('clients-updated', { detail: data }));
                     }
                 }).catch(() => {});
             return cached;
@@ -170,6 +193,10 @@ window.DB = {
             const data = await response.json();
             this._clientsCache = data;
             AppStorage.updateKey('clients', data);
+            if (window.CRM) {
+                window.CRM._clientsCache = data;
+            }
+            window.dispatchEvent(new CustomEvent('clients-updated', { detail: data }));
             return data;
         } catch (e) {
             console.warn("Backend-dan mijozlar bazasini yuklab bo'lmadi, keshdan o'qiladi:", e);
@@ -188,6 +215,9 @@ window.DB = {
         else data.clients.unshift(client);
         AppStorage.save(data);
         this._clientsCache = data.clients;
+        if (window.CRM) {
+            window.CRM._clientsCache = data.clients;
+        }
 
         try {
             const response = await fetch('/api/clients', {
@@ -196,6 +226,7 @@ window.DB = {
                 body: JSON.stringify(client)
             });
             if (!response.ok) throw new Error("HTTP error " + response.status);
+            window.dispatchEvent(new CustomEvent('clients-updated', { detail: this._clientsCache }));
         } catch (e) {
             console.error("Backend-ga mijozni saqlashda xatolik:", e);
         }

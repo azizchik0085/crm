@@ -50,6 +50,8 @@ window.MobileApp = {
                 const parsed = JSON.parse(savedAuth);
                 this.currentUser = parsed.user;
                 this.currentCompany = parsed.user.company_id || 'giperbrendstroy';
+                localStorage.setItem('company_id', this.currentCompany);
+                localStorage.setItem('activeCompanyId', this.currentCompany);
                 document.cookie = `company_id=${this.currentCompany}; path=/`;
                 
                 // Show app UI, hide login
@@ -220,6 +222,8 @@ window.MobileApp = {
             this.currentUser = data.user;
             this.currentCompany = data.user.company_id || 'giperbrendstroy';
             localStorage.setItem('mobile_auth', JSON.stringify({ user: data.user }));
+            localStorage.setItem('company_id', this.currentCompany);
+            localStorage.setItem('activeCompanyId', this.currentCompany);
             document.cookie = `company_id=${this.currentCompany}; path=/`;
 
             document.getElementById('mobile-login-view').style.display = 'none';
@@ -288,6 +292,8 @@ window.MobileApp = {
             this.currentUser = data.user;
             this.currentCompany = data.user.company_id || 'giperbrendstroy';
             localStorage.setItem('mobile_auth', JSON.stringify({ user: data.user }));
+            localStorage.setItem('company_id', this.currentCompany);
+            localStorage.setItem('activeCompanyId', this.currentCompany);
             document.cookie = `company_id=${this.currentCompany}; path=/`;
 
             document.getElementById('mobile-login-view').style.display = 'none';
@@ -952,8 +958,17 @@ window.MobileApp = {
             const resp = await fetch('/api/clients');
             if (!resp.ok) throw new Error("Mijozlarni yuklab bo'lmadi");
             const clients = await resp.json();
-            this.clientsCache = clients || [];
-            this.renderClientsList(this.clientsCache);
+            if (Array.isArray(clients)) {
+                clients.sort((a, b) => {
+                    const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+                    const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+                    return timeB - timeA;
+                });
+                this.clientsCache = clients;
+            } else {
+                this.clientsCache = [];
+            }
+            this.filterClients();
 
             const uCount = this.clientsCache.filter(c => {
                 const cat = (c.category || (c.company ? 'qurilish' : 'ustalar')).toLowerCase();
@@ -1503,19 +1518,35 @@ window.MobileApp = {
                 return;
             }
 
+            const activePillCat = document.querySelector('.filter-pill.active')?.getAttribute('data-cat') || 'ustalar';
+            const defaultCat = activePillCat === 'qurilish' ? 'qurilish' : 'ustalar';
+
             let html = '';
             cards.forEach(card => {
                 const bonus = Number(card.bonus || 0).toLocaleString('uz-UZ');
+                const isAdded = card.is_already_added;
                 html += `
-                    <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 12px; padding: 12px; margin-bottom: 8px;">
-                        <div style="font-weight: 700; font-size: 14px; color: var(--text-main); margin-bottom: 4px;">${card.name}</div>
+                    <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 12px; padding: 12px; margin-bottom: 10px;">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px;">
+                            <div style="font-weight: 700; font-size: 14px; color: var(--text-main);">${card.name}</div>
+                            ${isAdded ? '<span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #10b981; font-size: 11px; padding: 2px 6px; border-radius: 4px;">Qo\'shilgan</span>' : ''}
+                        </div>
                         <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 8px;">
                             <span><i class="fas fa-barcode"></i> ${card.barcode || '-'}</span> | 
                             <span><i class="fas fa-phone-alt"></i> ${card.phone || '-'}</span>
-                            <div>Bonus: <strong style="color: #10b981;">${bonus} so'm</strong></div>
+                            <div style="margin-top: 3px;">Bonus: <strong style="color: #10b981;">${bonus} so'm</strong></div>
                         </div>
-                        <button class="btn btn-primary btn-block" style="height: 38px; font-size: 13px;" onclick="MobileApp.saveRegosCardDirect('${card.regos_card_id}')">
-                            <i class="fas fa-plus"></i> CRM Mijozlariga Qo'shish
+                        <div style="margin-bottom: 10px;">
+                            <label style="font-size: 11.5px; color: var(--text-muted); display: block; margin-bottom: 4px; font-weight: 500;">
+                                <i class="fas fa-layer-group"></i> Mijoz toifasi:
+                            </label>
+                            <select id="m-regos-cat-${card.regos_card_id}" class="form-control" style="height: 38px; font-size: 12.5px; border-radius: 8px; background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); color: var(--text-main); width: 100%;">
+                                <option value="ustalar" ${defaultCat === 'ustalar' ? 'selected' : ''}>🔨 Ustalar</option>
+                                <option value="qurilish" ${defaultCat === 'qurilish' ? 'selected' : ''}>🏢 Qurilish Obyekti</option>
+                            </select>
+                        </div>
+                        <button class="btn btn-primary btn-block" style="height: 40px; font-size: 13px; font-weight: 600;" onclick="MobileApp.saveRegosCardDirect('${card.regos_card_id}')" id="m-btn-add-card-${card.regos_card_id}">
+                            <i class="fas fa-plus"></i> ${isAdded ? "Qayta Qo'shish / Yangilash" : "CRM Mijozlariga Qo'shish"}
                         </button>
                     </div>
                 `;
@@ -1537,33 +1568,61 @@ window.MobileApp = {
         const card = (this._regosCardsCache || []).find(c => String(c.regos_card_id) === String(regosCardId));
         if (!card) return;
 
+        const catSelect = document.getElementById(`m-regos-cat-${regosCardId}`);
+        const selectedCat = catSelect ? catSelect.value : (card.default_category || 'ustalar');
+        const addBtn = document.getElementById(`m-btn-add-card-${regosCardId}`);
+        if (addBtn) {
+            addBtn.disabled = true;
+            addBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Qo\'shilmoqda...';
+        }
+
         const payload = {
-            id: `regos_card_${card.regos_card_id}`,
+            id: card.id || `regos_card_${card.regos_card_id}`,
             name: card.name,
-            phone: card.phone,
-            phone2: card.barcode,
-            barcode: card.barcode,
+            phone: card.phone || card.raw_phone || card.barcode,
+            phone2: card.barcode || '',
+            barcode: card.barcode || '',
             bonus: card.bonus || 0,
             value: card.bonus || 0,
-            category: card.default_category || 'ustalar',
-            notes: `REGOS Guruh: ${card.group || ''}`
+            debt: card.debt || 0,
+            address: card.address || '',
+            category: selectedCat,
+            notes: card.group ? `REGOS Guruh: ${card.group}` : 'REGOS Xaridor kartasi',
+            source: 'client_directory',
+            status: 'client',
+            created_at: new Date().toISOString()
         };
+
+        const companyId = this.currentCompany || localStorage.getItem('company_id') || 'giperbrendstroy';
 
         try {
             const resp = await fetch('/api/clients', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'x-company-id': companyId
+                },
                 body: JSON.stringify(payload)
             });
-            if (!resp.ok) throw new Error("Mijozni saqlashda xatolik");
+            if (!resp.ok) {
+                const errData = await resp.json().catch(() => ({}));
+                throw new Error(errData.detail || "Mijozni saqlashda xatolik");
+            }
 
+            card.is_already_added = true;
             this.closeAddCardModal();
             alert("Mijoz muvaffaqiyatli qo'shildi!");
+
+            // Darhol mijozlar ro'yxatini yuklab ko'rsatish
             await this.loadClients();
             this.openClientDetail(payload.id);
 
         } catch(err) {
             alert("Xatolik: " + err.message);
+            if (addBtn) {
+                addBtn.disabled = false;
+                addBtn.innerHTML = '<i class="fas fa-plus"></i> CRM Mijozlariga Qo\'shish';
+            }
         }
     },
 

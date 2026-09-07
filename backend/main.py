@@ -153,7 +153,7 @@ def supabase_req(method, path, json_data=None, params=None, company_id=None, use
         "Content-Type": "application/json"
     }
     if method == "POST" and ("on_conflict" in path or (params and "on_conflict" in params)):
-        req_headers["Prefer"] = "resolution=merge-duplicates"
+        req_headers["Prefer"] = "resolution=merge-duplicates, return=representation"
         
     try:
         response = requests.request(method, url, headers=req_headers, json=json_data, params=params)
@@ -255,7 +255,7 @@ def get_clients(request: Request):
     company_id = get_company_id(request)
     if not company_id:
         return []
-    res = supabase_get_all(f"customers?select=*&company_id=eq.{company_id}&source=eq.client_directory&order=created_at.desc")
+    res = supabase_get_all(f"customers?select=*&company_id=eq.{company_id}&source=eq.client_directory&order=created_at.desc.nullslast")
     for c in res:
         c["address"] = c.get("email") or ""
         op = c.get("operator") or ""
@@ -345,6 +345,8 @@ def save_client(client_data: dict, request: Request):
     }
     if client_data.get("created_at"):
         payload["created_at"] = client_data["created_at"]
+    else:
+        payload["created_at"] = datetime.now(timezone.utc).isoformat()
     return supabase_req("POST", "customers?on_conflict=id", json_data=payload, company_id=company_id)
 
 @app.delete("/api/clients/{id}")
