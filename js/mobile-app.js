@@ -1148,6 +1148,9 @@ window.MobileApp = {
         // Qarz holati boshlang'ich yangilanishi
         this._updateDebtUI(debtVal, client);
 
+        // 2% Bonus holatini yangilash
+        this._updateBonus2PercentUI(client.bonus_enabled, client.bonus_percent);
+
         document.getElementById('m-sheet-bonus-val').textContent = `${bonusVal.toLocaleString('uz-UZ')} so'm`;
         this._activeDetailClient = client;
 
@@ -1242,6 +1245,105 @@ window.MobileApp = {
             if (debtSubEl) {
                 debtSubEl.textContent = "Mijoz foydasiga ortiqcha to'lov";
             }
+        }
+    },
+
+    _updateBonus2PercentUI: function(enabled, percent) {
+        enabled = Boolean(enabled);
+        percent = percent || 2.0;
+
+        const btnText = document.getElementById('m-sheet-bonus-toggle-text');
+        const btnToggle = document.getElementById('m-sheet-client-bonus-btn');
+        const badgeStatus = document.getElementById('m-bonus-status-badge');
+        const btnRowToggle = document.getElementById('m-btn-toggle-2percent');
+
+        if (btnText && btnToggle) {
+            if (enabled) {
+                btnToggle.style.background = 'rgba(16, 185, 129, 0.2)';
+                btnToggle.style.borderColor = '#10b981';
+                btnToggle.style.color = '#10b981';
+                btnText.innerHTML = `🎁 ${percent}% Bonus: Faol`;
+            } else {
+                btnToggle.style.background = 'rgba(255, 255, 255, 0.06)';
+                btnToggle.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+                btnToggle.style.color = 'var(--text-muted)';
+                btnText.innerHTML = `2% Bonus: Nofaol`;
+            }
+        }
+
+        if (badgeStatus) {
+            if (enabled) {
+                badgeStatus.style.background = 'rgba(16, 185, 129, 0.2)';
+                badgeStatus.style.color = '#10b981';
+                badgeStatus.textContent = '✅ Faol';
+            } else {
+                badgeStatus.style.background = 'rgba(239, 68, 68, 0.2)';
+                badgeStatus.style.color = '#ef4444';
+                badgeStatus.textContent = 'Nofaol';
+            }
+        }
+
+        if (btnRowToggle) {
+            if (enabled) {
+                btnRowToggle.style.background = 'rgba(239, 68, 68, 0.15)';
+                btnRowToggle.style.color = '#ef4444';
+                btnRowToggle.style.border = '1px solid rgba(239, 68, 68, 0.3)';
+                btnRowToggle.textContent = "O'chirish";
+            } else {
+                btnRowToggle.style.background = '#10b981';
+                btnRowToggle.style.color = '#fff';
+                btnRowToggle.style.border = 'none';
+                btnRowToggle.textContent = 'Yoqish';
+            }
+        }
+    },
+
+    toggleClientBonus2Percent: async function() {
+        if (!this._activeDetailClient) return;
+        if (!this.isAdmin()) {
+            alert("Kechirasiz, xarid cheklaridan 2% bonus tizimini faqat tizim administratori yoqishi yoki o'chirishi mumkin!");
+            return;
+        }
+
+        const client = this._activeDetailClient;
+        const currentEnabled = Boolean(client.bonus_enabled);
+        const newEnabled = !currentEnabled;
+
+        if (!newEnabled) {
+            if (!confirm("Ushbu mijoz uchun xaridlardan 2% bonus hisoblash tizimini o'chirmoqchimisiz?")) {
+                return;
+            }
+        }
+
+        client.bonus_enabled = newEnabled;
+        client.bonus_percent = newEnabled ? 2.0 : 0.0;
+        this._updateBonus2PercentUI(newEnabled, client.bonus_percent);
+
+        const idx = this.clientsCache.findIndex(c => c.id === client.id);
+        if (idx !== -1) {
+            this.clientsCache[idx].bonus_enabled = newEnabled;
+            this.clientsCache[idx].bonus_percent = client.bonus_percent;
+        }
+
+        try {
+            const resp = await fetch(`/api/clients/${encodeURIComponent(client.id)}/quick-update`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    bonus_enabled: newEnabled,
+                    bonus_percent: client.bonus_percent
+                })
+            });
+            const data = await resp.json();
+            if (data && data.bonus !== undefined) {
+                client.bonus = Number(data.bonus);
+                client.value = Number(data.bonus);
+                document.getElementById('m-sheet-bonus-val').textContent = `${client.bonus.toLocaleString('uz-UZ')} so'm`;
+            }
+            await this.loadClients();
+            this.loadClientReceiptsInSheet(client);
+        } catch(e) {
+            console.error("2% bonusni yangilashda xatolik:", e);
         }
     },
 
@@ -1360,6 +1462,18 @@ window.MobileApp = {
                 }
             }
 
+            // 2% Bonus ma'lumotlari
+            if (data && data.bonus_enabled !== undefined) {
+                client.bonus_enabled = Boolean(data.bonus_enabled);
+                client.bonus_percent = Number(data.bonus_percent || 2.0);
+                this._updateBonus2PercentUI(client.bonus_enabled, client.bonus_percent);
+                const idx = this.clientsCache.findIndex(c => c.id === client.id);
+                if (idx !== -1) {
+                    this.clientsCache[idx].bonus_enabled = client.bonus_enabled;
+                    this.clientsCache[idx].bonus_percent = client.bonus_percent;
+                }
+            }
+
             const receipts = (data && data.ok && Array.isArray(data.receipts)) ? data.receipts : [];
             const totalSpend = (data && data.total_debit !== undefined && data.total_debit !== null)
                 ? Number(data.total_debit)
@@ -1425,6 +1539,15 @@ window.MobileApp = {
                         </div>
                     `;
                 } else {
+                    const bonusEarned = Number(rec.bonus_earned || 0);
+                    const bonusBadgeHtml = bonusEarned > 0 
+                        ? `<div style="display: flex; justify-content: flex-end; margin-bottom: 6px;">
+                            <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); font-size: 11px; padding: 2px 8px; border-radius: 6px; font-weight: 700;">
+                                <i class="fas fa-gift" style="margin-right: 4px;"></i> +${bonusEarned.toLocaleString('uz-UZ')} so'm (${rec.bonus_percent || 2}% bonus)
+                            </span>
+                           </div>`
+                        : '';
+
                     html += `
                         <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 12px; padding: 12px; margin-bottom: 8px;">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
@@ -1437,6 +1560,7 @@ window.MobileApp = {
                                 <span><i class="far fa-clock"></i> ${dateStr}</span>
                                 <span>${compName ? `<span class="badge" style="background: rgba(255,255,255,0.06); font-size: 10px; padding: 2px 6px;">${compName}</span>` : ''} <span class="badge" style="background: rgba(56, 189, 248, 0.12); color: #38bdf8; font-size: 10px; padding: 2px 6px;">${payType}</span></span>
                             </div>
+                            ${bonusBadgeHtml}
                             ${products.length > 0 ? `
                                 <div style="background: rgba(0,0,0,0.2); border-radius: 8px; padding: 6px 8px; margin-top: 6px;">
                                     ${prodsHtml}

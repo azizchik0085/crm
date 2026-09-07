@@ -265,6 +265,8 @@ def get_clients(request: Request):
         c["operator"] = ""
         
         c["category"] = "ustalar"
+        c["bonus_enabled"] = False
+        c["bonus_percent"] = 0.0
         if op.startswith("{") and op.endswith("}"):
             try:
                 meta = json.loads(op)
@@ -275,10 +277,14 @@ def get_clients(request: Request):
                 c["notes"] = meta.get("notes") or ""
                 c["category"] = meta.get("category") or ("qurilish" if c.get("company") and c.get("company").strip() else "ustalar")
                 c["bonus_history"] = meta.get("bonus_history") or []
+                c["bonus_enabled"] = bool(meta.get("bonus_enabled") or (float(meta.get("bonus_percent") or 0) > 0))
+                c["bonus_percent"] = float(meta.get("bonus_percent") if meta.get("bonus_percent") is not None else (2.0 if c["bonus_enabled"] else 0.0))
             except Exception:
                 c["notes"] = op
                 c["category"] = "qurilish" if c.get("company") and c.get("company").strip() else "ustalar"
                 c["bonus_history"] = []
+                c["bonus_enabled"] = False
+                c["bonus_percent"] = 0.0
         elif "__NOTE_SEP__" in op:
             parts = op.split("__NOTE_SEP__", 1)
             c["operator"] = parts[0]
@@ -319,6 +325,9 @@ def save_client(client_data: dict, request: Request):
     if not isinstance(bonus_history, list):
         bonus_history = []
     
+    bonus_enabled = bool(client_data.get("bonus_enabled"))
+    bonus_percent = float(client_data.get("bonus_percent") if client_data.get("bonus_percent") is not None else (2.0 if bonus_enabled else 0.0))
+
     meta = {
         "op": operator,
         "barcode": barcode,
@@ -326,7 +335,9 @@ def save_client(client_data: dict, request: Request):
         "debt": debt,
         "notes": notes,
         "category": category,
-        "bonus_history": bonus_history
+        "bonus_history": bonus_history,
+        "bonus_enabled": bonus_enabled,
+        "bonus_percent": bonus_percent
     }
     op_val = json.dumps(meta, ensure_ascii=False)
 
@@ -371,9 +382,68 @@ def quick_update_client(client_id: str, payload: dict, request: Request):
     if "debt" in payload:
         meta["debt"] = float(payload["debt"] or 0)
     
+    if "bonus_enabled" in payload or "bonus_percent" in payload:
+        b_enabled = bool(payload.get("bonus_enabled"))
+        b_percent = float(payload.get("bonus_percent") if payload.get("bonus_percent") is not None else (2.0 if b_enabled else 0.0))
+        meta["bonus_enabled"] = b_enabled
+        meta["bonus_percent"] = b_percent
+        
+        if b_enabled and b_percent > 0:
+            # Calculate total purchases to compute bonus immediately
+            tot_spend = 0.0
+            p_id = meta.get("regos_partner_id") or (client_id.replace("regos_partner_", "") if client_id.startswith("regos_partner_") else "")
+            if p_id and str(p_id).isdigit():
+                try:
+                    settings = get_company_settings(company_id, bypass_cache=True) if company_id else settings_state
+                    ep = (settings.get("regos_endpoint") or "").strip().rstrip("/")
+                    tok = settings.get("regos_token") or ""
+                    if ep and tok:
+                        if not ep.startswith(("http://", "https://")): ep = "https://" + ep
+                        p_url = f"{ep}/v1/partnerbalance/get" if "/v1" not in ep else f"{ep}/partnerbalance/get"
+                        r_pb = requests.post(p_url, headers={"Authorization": f"Bearer {tok}", "Content-Type": "application/json"}, json={"partner_id": int(p_id), "start_date": 1577836800, "end_date": int(time.time())}, timeout=8)
+                        if r_pb.status_code == 200:
+                            data_pb = r_pb.json()
+                            if data_pb.get("ok"):
+                                tot_spend = sum(float(op.get("debit") or 0.0) for op in data_pb.get("result", []))
+                except Exception as e_pbc:
+                    print(f"Error getting partner debit in quick_update: {e_pbc}")
+            
+            if tot_spend == 0.0:
+                try:
+                    p1 = "".join(ch for ch in str(c_item.get("phone") or "") if ch.isdigit())
+                    recs = supabase_req("GET", "receipts?select=total_amount,items", company_id=company_id)
+                    if recs and isinstance(recs, list):
+                        for r in recs:
+                            items_raw = r.get("items") or {}
+                            if isinstance(items_raw, str) and items_raw.startswith("{"):
+                                try: items_raw = json.loads(items_raw)
+                                except: items_raw = {}
+                            r_ph = "".join(ch for ch in str(items_raw.get("customer_phone") or "") if ch.isdigit())
+                            if p1 and len(p1) >= 9 and r_ph.endswith(p1[-9:]):
+                                tot_spend += float(r.get("total_amount") or 0.0)
+                except Exception:
+                    pass
+
+            new_bonus = round(tot_spend * (b_percent / 100.0), 2)
+            meta["bonus"] = new_bonus
+            patch_data["value"] = new_bonus
+            
+            b_hist = meta.get("bonus_history") or []
+            b_hist.insert(0, {
+                "id": f"bh_{int(time.time() * 1000)}",
+                "date": datetime.now(timezone.utc).isoformat(),
+                "type": "add",
+                "amount": new_bonus,
+                "prev_bonus": float(c_item.get("value") or 0.0),
+                "new_bonus": new_bonus,
+                "note": f"Admin tomonidan xaridlardan {b_percent}% bonus biriktirildi ({tot_spend:,.0f} so'm xariddan)",
+                "user": "Admin"
+            })
+            meta["bonus_history"] = b_hist
+    
     patch_data["operator"] = json.dumps(meta, ensure_ascii=False)
     supabase_req("PATCH", f"customers?id=eq.{client_id}", json_data=patch_data, company_id=company_id)
-    return {"ok": True, "meta": meta}
+    return {"ok": True, "meta": meta, "bonus": meta.get("bonus")}
 
 @app.delete("/api/clients/{id}")
 def delete_client(id: str, request: Request):
@@ -728,20 +798,78 @@ def get_client_receipts(
     receipts_list = list(collected.values())
     receipts_list.sort(key=lambda x: x.get("created_at", ""), reverse=True)
 
-    # Automatically synchronize live bonus from REGOS
-    live_bonus = None
-    try:
-        live_bonus = sync_regos_card_bonus_helper(client_id=client_id, barcode=bc, phone=phone or phone2, company_id=company_id)
-    except Exception as e_b:
-        print(f"Bonus auto-sync error in get_client_receipts for {client_id}: {e_b}")
+    # Check if client has 2% purchase bonus enabled by admin
+    is_bonus_enabled = False
+    bonus_percent = 0.0
+    client_bonus_history = []
+    current_stored_value = 0.0
+    client_meta = {}
 
-    if live_bonus is None and client_id:
+    if client_id:
         try:
-            c_db = supabase_req("GET", f"customers?id=eq.{client_id}&select=value", company_id=company_id)
+            c_db = supabase_req("GET", f"customers?id=eq.{client_id}&select=value,operator", company_id=company_id)
             if c_db and isinstance(c_db, list) and len(c_db) > 0:
-                live_bonus = float(c_db[0].get("value") or 0.0)
-        except Exception:
-            pass
+                current_stored_value = float(c_db[0].get("value") or 0.0)
+                op_raw = c_db[0].get("operator") or "{}"
+                if op_raw.startswith("{"):
+                    client_meta = json.loads(op_raw)
+                    is_bonus_enabled = bool(client_meta.get("bonus_enabled") or (float(client_meta.get("bonus_percent") or 0) > 0))
+                    bonus_percent = float(client_meta.get("bonus_percent") if client_meta.get("bonus_percent") is not None else (2.0 if is_bonus_enabled else 0.0))
+                    client_bonus_history = client_meta.get("bonus_history") or []
+        except Exception as e_cm:
+            print(f"Error fetching client meta for bonus: {e_cm}")
+
+    live_bonus = None
+
+    if is_bonus_enabled and bonus_percent > 0:
+        # Calculate bonus from purchases
+        total_purchases_sum = partner_total_debit if (partner_id and partner_total_debit > 0) else sum(
+            float(r.get("total_amount") or 0.0) for r in receipts_list if not r.get("is_payment")
+        )
+        earned_bonus = round(total_purchases_sum * (bonus_percent / 100.0), 2)
+        
+        # Calculate deductions / additions from bonus_history
+        total_deductions = 0.0
+        total_additions = 0.0
+        for h in client_bonus_history:
+            amt = float(h.get("amount") or 0.0)
+            h_type = h.get("type", "")
+            if h_type in ("subtract", "deduct"):
+                total_deductions += amt
+            elif h_type == "add" and not str(h.get("note", "")).startswith("Admin tomonidan xaridlardan"):
+                total_additions += amt
+        
+        calculated_bonus = max(0.0, earned_bonus - total_deductions + total_additions)
+        live_bonus = calculated_bonus
+
+        # Persist updated bonus in Supabase if changed
+        try:
+            if abs(current_stored_value - live_bonus) > 0.01 or float(client_meta.get("bonus") or 0) != live_bonus:
+                client_meta["bonus"] = live_bonus
+                client_meta["bonus_enabled"] = is_bonus_enabled
+                client_meta["bonus_percent"] = bonus_percent
+                supabase_req("PATCH", f"customers?id=eq.{client_id}", json_data={
+                    "value": live_bonus,
+                    "operator": json.dumps(client_meta, ensure_ascii=False)
+                }, company_id=company_id)
+        except Exception as e_sv:
+            print(f"Error saving updated purchase bonus to customer: {e_sv}")
+
+        # Tag each purchase receipt with its earned bonus
+        for r in receipts_list:
+            if not r.get("is_payment"):
+                amt = float(r.get("total_amount") or 0.0)
+                r["bonus_earned"] = round(amt * (bonus_percent / 100.0), 2)
+                r["bonus_percent"] = bonus_percent
+    else:
+        # Standard flow: try syncing live retail card bonus from REGOS
+        try:
+            live_bonus = sync_regos_card_bonus_helper(client_id=client_id, barcode=bc, phone=phone or phone2, company_id=company_id)
+        except Exception as e_b:
+            print(f"Bonus auto-sync error in get_client_receipts for {client_id}: {e_b}")
+
+        if live_bonus is None:
+            live_bonus = current_stored_value
 
     final_debt = partner_debt if partner_debt is not None else client_debt
 
@@ -750,6 +878,8 @@ def get_client_receipts(
         "count": len(receipts_list), 
         "receipts": receipts_list, 
         "bonus": live_bonus,
+        "bonus_enabled": is_bonus_enabled,
+        "bonus_percent": bonus_percent,
         "debt": final_debt,
         "total_debit": partner_total_debit if partner_id else None,
         "total_credit": partner_total_credit if partner_id else None

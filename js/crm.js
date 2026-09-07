@@ -2462,6 +2462,9 @@ window.CRM = {
         // Qarz ko'rsatkich
         this._updateDebtUI(Number(client.debt || 0), client);
 
+        // 2% Bonus ko'rsatkich
+        this._updateBonus2PercentUI(client.bonus_enabled, client.bonus_percent);
+
         // Bonus ko'rsatkich
         const bonus = Number(client.bonus || client.value || 0);
         const bonusDisp = document.getElementById('cdm-bonus-display');
@@ -2597,6 +2600,109 @@ window.CRM = {
             if (debtSubEl) {
                 debtSubEl.textContent = "Mijoz foydasiga ortiqcha to'lov";
             }
+        }
+    },
+
+    _updateBonus2PercentUI: function(enabled, percent) {
+        enabled = Boolean(enabled);
+        percent = percent || 2.0;
+
+        const btnText = document.getElementById('cdm-bonus-toggle-text');
+        const btnToggle = document.getElementById('cdm-bonus-toggle-btn');
+        const badgeStatus = document.getElementById('cdm-bonus-status-badge');
+        const btnRowToggle = document.getElementById('cdm-btn-toggle-2percent');
+
+        if (btnText && btnToggle) {
+            if (enabled) {
+                btnToggle.style.background = 'rgba(16, 185, 129, 0.2)';
+                btnToggle.style.borderColor = '#10b981';
+                btnToggle.style.color = '#10b981';
+                btnText.innerHTML = `🎁 ${percent}% Bonus: Faol`;
+            } else {
+                btnToggle.style.background = 'rgba(255, 255, 255, 0.06)';
+                btnToggle.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+                btnToggle.style.color = 'var(--text-muted)';
+                btnText.innerHTML = `2% Bonus: Nofaol`;
+            }
+        }
+
+        if (badgeStatus) {
+            if (enabled) {
+                badgeStatus.style.background = 'rgba(16, 185, 129, 0.2)';
+                badgeStatus.style.color = '#10b981';
+                badgeStatus.textContent = '✅ Faol';
+            } else {
+                badgeStatus.style.background = 'rgba(239, 68, 68, 0.2)';
+                badgeStatus.style.color = '#ef4444';
+                badgeStatus.textContent = 'Nofaol';
+            }
+        }
+
+        if (btnRowToggle) {
+            if (enabled) {
+                btnRowToggle.style.background = 'rgba(239, 68, 68, 0.15)';
+                btnRowToggle.style.color = '#ef4444';
+                btnRowToggle.style.border = '1px solid rgba(239, 68, 68, 0.3)';
+                btnRowToggle.textContent = "O'chirish";
+            } else {
+                btnRowToggle.style.background = '#10b981';
+                btnRowToggle.style.color = '#fff';
+                btnRowToggle.style.border = 'none';
+                btnRowToggle.textContent = 'Yoqish';
+            }
+        }
+    },
+
+    toggleClientBonus2Percent: async function() {
+        if (!this._currentDetailClientId) return;
+        if (!this.isAdmin()) {
+            alert("Kechirasiz, xarid cheklaridan 2% bonus tizimini faqat tizim administratori yoqishi yoki o'chirishi mumkin!");
+            return;
+        }
+
+        let clients = this._clientsCache || [];
+        let client = clients.find(c => c.id === this._currentDetailClientId);
+        if (!client) return;
+
+        const currentEnabled = Boolean(client.bonus_enabled);
+        const newEnabled = !currentEnabled;
+
+        if (!newEnabled) {
+            if (!confirm("Ushbu mijoz uchun xaridlardan 2% bonus hisoblash tizimini o'chirmoqchimisiz?")) {
+                return;
+            }
+        }
+
+        client.bonus_enabled = newEnabled;
+        client.bonus_percent = newEnabled ? 2.0 : 0.0;
+        this._updateBonus2PercentUI(newEnabled, client.bonus_percent);
+
+        const idx = this._clientsCache.findIndex(c => c.id === client.id);
+        if (idx !== -1) {
+            this._clientsCache[idx].bonus_enabled = newEnabled;
+            this._clientsCache[idx].bonus_percent = client.bonus_percent;
+        }
+
+        try {
+            const resp = await fetch(`/api/clients/${encodeURIComponent(client.id)}/quick-update`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    bonus_enabled: newEnabled,
+                    bonus_percent: client.bonus_percent
+                })
+            });
+            const data = await resp.json();
+            if (data && data.bonus !== undefined) {
+                client.bonus = Number(data.bonus);
+                client.value = Number(data.bonus);
+                const bonusDisp = document.getElementById('cdm-bonus-display');
+                if (bonusDisp) bonusDisp.textContent = `${client.bonus.toLocaleString('uz-UZ')} so'm`;
+            }
+            await this.loadClients();
+            this.loadClientReceipts(client);
+        } catch(e) {
+            console.error("2% bonusni yangilashda xatolik:", e);
         }
     },
 
@@ -3007,6 +3113,18 @@ window.CRM = {
                                 }
                             }
                         }
+                        if (data.bonus_enabled !== undefined) {
+                            client.bonus_enabled = Boolean(data.bonus_enabled);
+                            client.bonus_percent = Number(data.bonus_percent || 2.0);
+                            this._updateBonus2PercentUI(client.bonus_enabled, client.bonus_percent);
+                            if (this._clientsCache) {
+                                const found = this._clientsCache.find(c => c.id === client.id);
+                                if (found) {
+                                    found.bonus_enabled = client.bonus_enabled;
+                                    found.bonus_percent = client.bonus_percent;
+                                }
+                            }
+                        }
                     }
                 }
             } catch (e_api) {
@@ -3184,6 +3302,14 @@ window.CRM = {
                             </div>
                         </div>
 
+                        ${Number(rec.bonus_earned || 0) > 0 ? `
+                            <div style="display: flex; justify-content: flex-end; margin-top: 2px;">
+                                <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); font-size: 11px; padding: 2px 8px; border-radius: 5px; font-weight: 700;">
+                                    <i class="fas fa-gift" style="margin-right: 4px;"></i> +${Number(rec.bonus_earned).toLocaleString('uz-UZ')} ${currency} (${rec.bonus_percent || 2}% bonus)
+                                </span>
+                            </div>
+                        ` : ''}
+
                         ${products.length > 0 ? `
                             <div style="background: rgba(0,0,0,0.15); border-radius: 8px; padding: 6px 10px; overflow-x: auto;">
                                 <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
@@ -3277,6 +3403,8 @@ window.CRM = {
         if (barcodeInput) barcodeInput.value = client.barcode || client.phone2 || '';
         const bonusInput = document.getElementById('client-bonus');
         if (bonusInput) bonusInput.value = client.bonus || client.value || '';
+        const b2Check = document.getElementById('client-bonus-2percent');
+        if (b2Check) b2Check.checked = Boolean(client.bonus_enabled);
         const phone2Input = document.getElementById('client-phone2');
         if (phone2Input) phone2Input.value = (client.phone2 && client.phone2 !== client.barcode) ? client.phone2 : '';
         const addrInput = document.getElementById('client-address');
@@ -3350,6 +3478,7 @@ window.CRM = {
         }
 
         try {
+            const isBonus2 = Boolean(document.getElementById('client-bonus-2percent')?.checked);
             const clientData = {
                 name,
                 company,
@@ -3359,6 +3488,8 @@ window.CRM = {
                 barcode: barcode || phone2,
                 bonus,
                 value: bonus,
+                bonus_enabled: isBonus2,
+                bonus_percent: isBonus2 ? 2.0 : 0.0,
                 email: address,
                 notes,
                 operator,
