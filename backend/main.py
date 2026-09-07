@@ -5,6 +5,7 @@ import json
 import asyncio
 from datetime import datetime, timezone, timedelta
 from contextvars import ContextVar
+import urllib.parse
 import requests
 from fastapi import FastAPI, HTTPException, Request, BackgroundTasks
 from fastapi.responses import JSONResponse
@@ -2321,167 +2322,403 @@ def normalize_uzbek(text: str) -> str:
         
     return text
 
-def generate_analyze_fallback(prompt: str, customers: list, inventory: list, total_income: float, total_expense: float, net_balance: float) -> str:
-    prompt_lower = prompt.lower().strip()
-    prompt_norm = normalize_uzbek(prompt)
-    
-    # Clean words in prompt for word-by-word matching
+def process_ai_business_query(prompt: str, company_id: str = None) -> str:
+    prompt_raw = (prompt or "").strip()
+    if not prompt_raw:
+        return "Iltimos, biror savol yozing."
+
+    prompt_lower = prompt_raw.lower()
+    prompt_norm = normalize_uzbek(prompt_raw)
     prompt_words = [w.strip("?,.:!\"'()-") for w in prompt_norm.split()]
-    
-    # Excluded common words that should not trigger specific product matches
-    exclusions = {
-        "bor", "bormi", "yoq", "yo'q", "narx", "narxi", "narxlari", "qancha", "necha", "pul", "som", "so'm", 
-        "ombor", "mahsulot", "tovar", "qoldiq", "stock", "inventory", "nechta", "tahlil", "yordamchi", "tizim",
-        "moliya", "balans", "kirim", "chiqim", "daromad", "foyda", "xodim", "sotuv", "dona", "kabel", "yangi",
-        "lead", "voronka", "status", "customer", "kontakt"
-    }
 
-    # 1. Search for specific product matches in inventory
-    matched_products = []
-    for p in inventory:
-        p_name = p.get("name", "")
-        p_name_norm = normalize_uzbek(p_name)
-        p_sku = p.get("sku", "")
-        p_sku_norm = normalize_uzbek(p_sku)
-        
-        # Check SKU match
-        sku_match = p_sku_norm and p_sku_norm in prompt_norm
-        
-        # Check if the entire product name is in the prompt
-        full_match = (len(p_name_norm) >= 3 and p_name_norm in prompt_norm)
-        
-        # Check word-by-word match with suffix-awareness (prefix/substring matching)
-        word_match = False
-        p_words = [w.strip("(),\"'.-") for w in p_name_norm.split()]
-        for pw in p_words:
-            if len(pw) >= 3 and pw not in exclusions:
-                for prw in prompt_words:
-                    if len(prw) >= 3 and prw not in exclusions:
-                        if prw in pw or pw in prw:
-                            word_match = True
-                            break
-                if word_match:
-                    break
+    # 1. GREETING & HELP & CAPABILITIES ("qanday yordam bera olasan", "salom", etc.)
+    help_keywords = [
+        "yordam", "qanday yordam", "nima qila olasan", "nimalar qila olasan", "qanaqa yordam",
+        "imkoniyat", "sen kimsan", "salom", "assalom", "qalesiz", "hello", "hi",
+        "privet", "привет", "здравствуйте", "помощь", "что ты умеешь", "чем можешь помочь",
+        "что умеешь", "как дела", "yaxshimisiz", "charchamang"
+    ]
+    if (any(k in prompt_norm for k in help_keywords) or any(k in prompt_lower for k in help_keywords)) and len(prompt_words) <= 7:
+        return """👋 **Assalomu alaykum! Men sizning sun'iy intellekt biznes yordamchingizman.**
+
+Men tizimingizdagi barcha jonli ma'lumotlar bazasi bilan integratsiya qilinganman va quyidagi savollarga darhol aniq javob bera olaman:
+
+📦 **Omborxona va Mahsulotlar:**
+- *"Omborda nimalar tugayapti?"* — Tugagan va kam qolgan tovarlar ro'yxati
+- *"Sement bormi?"* yoki *"Knauf narxi qancha?"* — 16 000+ ta tovar orasidan bir zumda qidirish
+
+💰 **Jonli Savdo va Kassa:**
+- *"Bugungi savdo qancha?"* — Bugungi tushum, cheklar soni, naqd/karta taqsimoti
+- *"Shu oygi savdo"*, *"Kassa holati"*
+
+🏆 **Yetakchi Mahsulotlar (Bestsellers):**
+- *"Eng ko'p sotilgan tovarlar qaysi?"* — Savdolar bo'yicha eng xaridorgir tovarlar
+
+👥 **CRM va Mijozlar:**
+- *"Mijozlar voronkasi"* yoki *"Yangi leadlar nechta?"*
+
+👨‍💼 **Sotuvchilar Reytingi:**
+- *"Sotuvchilar reytingi"* yoki *"Kim ko'p sotdi?"* — Kassirlar natijalari
+
+📊 **Biznes Tahlili & Tavsiyalar:**
+- *"Umumiy biznes tahlili"* — Daromad, ombor va xaridlar bo'yicha strategik tavsiyalar
+
+💡 *Quyidagi tayyor tugmalardan birini bosing yoki o'zingiz istagan savolni yozing!*"""
+
+    # 2. LOW STOCK / OUT OF STOCK ("Omborda nimalar tugayapti?")
+    low_stock_keywords = [
+        "tugayapti", "tugagan", "tugayabdi", "kam qolgan", "qoldiq kam", "kam qoldi",
+        "nimalar kam", "kamomad", "out of stock", "tovar tugadi", "mahsulot tugadi",
+        "tugaganlar", "tugayotgan", "заканчивается", "что заканчивается", "мало на складе",
+        "нет на складе", "кончается", "дефицит", "остатки на складе"
+    ]
+    if any(k in prompt_norm for k in low_stock_keywords) or any(k in prompt_lower for k in low_stock_keywords):
+        try:
+            inv_path = "inventory?stock=lte.5&order=stock.asc&limit=40"
+            if company_id:
+                inv_path += f"&company_id=eq.{company_id}"
+            items = supabase_req("GET", inv_path) or []
+            
+            zero_stock = [p for p in items if float(p.get("stock", 0)) <= 0]
+            low_stock = [p for p in items if 0 < float(p.get("stock", 0)) <= 5]
+            
+            lines = ["⚠️ **Ombordagi Qoldiqlar Tahlili (Tugagan va Kam qolgan tovarlar):**\n"]
+            
+            if zero_stock:
+                lines.append(f"🔴 **Butunlay Tugagan Mahsulotlar ({len(zero_stock)} ta ko'rsatilmoqda):**")
+                for p in zero_stock[:12]:
+                    p_name = p.get("name", "Noma'lum")
+                    p_sku = p.get("sku", "-")
+                    p_price = float(p.get("price", 0))
+                    lines.append(f"- **{p_name}** | SKU: `{p_sku}` | Narxi: {p_price:,.0f} so'm | ❌ **0 dona (Tugagan)**")
+                if len(zero_stock) > 12:
+                    lines.append(f"*(va yana {len(zero_stock) - 12} ta tugagan tovar mavjud)*")
+                lines.append("")
+                
+            if low_stock:
+                lines.append(f"🟡 **Tugash Arafasidagi Mahsulotlar (Qoldig'i 5 donadan kam):**")
+                for p in low_stock[:12]:
+                    p_name = p.get("name", "Noma'lum")
+                    p_sku = p.get("sku", "-")
+                    p_price = float(p.get("price", 0))
+                    p_stk = p.get("stock", 0)
+                    lines.append(f"- **{p_name}** | SKU: `{p_sku}` | Narxi: {p_price:,.0f} so'm | ⚠️ **{p_stk} dona qoldi**")
+                if len(low_stock) > 12:
+                    lines.append(f"*(va yana {len(low_stock) - 12} ta kam qolgan tovar mavjud)*")
+                lines.append("")
+
+            if not zero_stock and not low_stock:
+                lines.append("✅ **Hozirda barcha asosiy mahsulotlar qoldig'i yetarli miqdorda mavjud.**")
+            else:
+                lines.append("📋 **AI Tavsiyasi:** Yuqoridagi qizil va sariq toifadagi tovarlar uchun ta'minotchilarga zudlik bilan yangi xarid buyurtmasi (zakaz) rasmiylashtirish zarur.")
+
+            return "\n".join(lines)
+        except Exception as e:
+            print(f"Error in low stock query: {e}")
+
+    # 3. TODAY'S SALES / CASH / RECEIPTS
+    sales_keywords = [
+        "bugungi savdo", "bugun savdo", "bugungi tushum", "bugun qancha", "kassa",
+        "kassa holati", "cheklar", "bugungi chek", "tushum qancha", "savdo qancha",
+        "выручка", "касса сегодня", "продажи сегодня", "сколько продаж", "сегодня продажи"
+    ]
+    if any(k in prompt_norm for k in sales_keywords) or any(k in prompt_lower for k in sales_keywords):
+        try:
+            now_tz = datetime.now(timezone(timedelta(hours=5)))
+            today_str = now_tz.strftime("%Y-%m-%d")
+            
+            rec_path = f"receipts?created_at=gte.{today_str}T00:00:00&order=created_at.desc&limit=300"
+            if company_id:
+                rec_path += f"&company_id=eq.{company_id}"
+                
+            receipts = supabase_req("GET", rec_path) or []
+            
+            total_rev = sum(float(r.get("total_amount", 0)) for r in receipts)
+            total_cnt = len(receipts)
+            avg_check = round(total_rev / total_cnt) if total_cnt > 0 else 0
+            total_disc = sum(float(r.get("discount", 0)) for r in receipts)
+            
+            naqd = sum(float(r.get("total_amount", 0)) for r in receipts if "naqd" in str(r.get("payment_type", "")).lower())
+            karta = sum(float(r.get("total_amount", 0)) for r in receipts if any(x in str(r.get("payment_type", "")).lower() for x in ["kart", "term", "humo", "uzcard"]))
+            other = total_rev - (naqd + karta)
+            if other < 0:
+                other = 0.0
+                
+            # Group by cashier
+            cashiers = {}
+            for r in receipts:
+                c_name = r.get("cashier_name") or "Operator"
+                cashiers[c_name] = cashiers.get(c_name, 0) + float(r.get("total_amount", 0))
+                
+            res = [
+                f"💰 **Bugungi Savdo va Kassa Hisoboti ({today_str}):**\n",
+                f"- 💵 **Jami Savdo (Tushum):** **{total_rev:,.0f}** so'm",
+                f"- 🧾 **Urilgan Cheklar Soni:** **{total_cnt}** ta",
+                f"- 🏷️ **O'rtacha Chek Qiymati:** **{avg_check:,.0f}** so'm",
+                f"- 🎁 **Chegirmalar:** **{total_disc:,.0f}** so'm\n",
+                f"💳 **To'lov Turlari Bo'yicha:**",
+                f"- 💵 Naqd: **{naqd:,.0f}** so'm",
+                f"- 💳 Karta / Terminal: **{karta:,.0f}** so'm",
+            ]
+            if other > 0:
+                res.append(f"- 🔄 Boshqa / Perevod / Nasiya: **{other:,.0f}** so'm")
+                
+            if cashiers:
+                res.append("\n👤 **Faol Smena / Kassirlar:**")
+                for c_name, c_sum in sorted(cashiers.items(), key=lambda x: x[1], reverse=True)[:4]:
+                    res.append(f"- {c_name}: **{c_sum:,.0f}** so'm")
                     
-        if sku_match or full_match or word_match:
-            matched_products.append(p)
+            return "\n".join(res)
+        except Exception as e:
+            print(f"Error in sales query: {e}")
+
+    # 4. TOP BESTSELLING PRODUCTS ("Eng ko'p sotilgan tovarlar")
+    top_keywords = [
+        "eng kop", "eng ko'p", "eng kup", "top mahsulot", "top tovar", "xaridorgir",
+        "hit tovar", "hit mahsulot", "kop sotilayotgan", "bestseller",
+        "топ продаж", "популярные товары", "лучшие товары", "лидеры продаж", "хит продаж"
+    ]
+    if any(k in prompt_norm for k in top_keywords) or any(k in prompt_lower for k in top_keywords):
+        try:
+            rec_path = "receipts?order=created_at.desc&limit=150"
+            if company_id:
+                rec_path += f"&company_id=eq.{company_id}"
+            receipts = supabase_req("GET", rec_path) or []
             
-    # 2. Check if a category was queried
-    matched_categories = set()
-    for p in inventory:
-        cat = p.get("category", "")
-        if cat and len(cat) >= 3 and normalize_uzbek(cat) in prompt_norm:
-            matched_categories.add(cat)
+            product_stats = {}
+            for r in receipts:
+                items_data = r.get("items")
+                if isinstance(items_data, str):
+                    try:
+                        items_data = json.loads(items_data)
+                    except Exception:
+                        items_data = None
+                if isinstance(items_data, dict):
+                    products = items_data.get("products", [])
+                elif isinstance(items_data, list):
+                    products = items_data
+                else:
+                    products = []
+                    
+                for prod in products:
+                    name = prod.get("name")
+                    if not name:
+                        continue
+                    qty = float(prod.get("quantity") or 1)
+                    tot = float(prod.get("total") or prod.get("price", 0) * qty)
+                    if name not in product_stats:
+                        product_stats[name] = {"qty": 0.0, "total": 0.0}
+                    product_stats[name]["qty"] += qty
+                    product_stats[name]["total"] += tot
+                    
+            if product_stats:
+                top_sorted = sorted(product_stats.items(), key=lambda x: x[1]["qty"], reverse=True)[:10]
+                lines = ["🏆 **Eng Ko'p Sotilgan Top Mahsulotlar (So'nggi savdolar tahlili):**\n"]
+                medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"]
+                for i, (p_name, stat) in enumerate(top_sorted):
+                    m = medals[i] if i < len(medals) else f"{i+1}."
+                    lines.append(f"{m} **{p_name}**\n   - Sotilgan: **{stat['qty']:,.0f}** dona | Jami summa: **{stat['total']:,.0f}** so'm")
+                return "\n".join(lines)
+            else:
+                return "ℹ️ Hozircha cheklarda mahsulotlar tarixi kam. Savdolar bo'yicha ko'proq chek urilgach, to'liq statistika shakllanadi."
+        except Exception as e:
+            print(f"Error in top products: {e}")
+
+    # 5. SELLERS RATING ("Sotuvchilar reytingi", "Kim ko'p sotdi?")
+    sellers_keywords = [
+        "sotuvchi", "sotuvchilar", "kim kop", "kim ko'p", "xodimlar natija", "kassirlar",
+        "reyting", "рейтинг продавцов", "кто больше продал", "продавцы", "кассиры"
+    ]
+    if any(k in prompt_norm for k in sellers_keywords) or any(k in prompt_lower for k in sellers_keywords):
+        try:
+            rec_path = "receipts?order=created_at.desc&limit=250"
+            if company_id:
+                rec_path += f"&company_id=eq.{company_id}"
+            receipts = supabase_req("GET", rec_path) or []
             
-    # 3. Handle specific product results
-    if matched_products:
-        res_list = []
-        for p in matched_products[:5]:
-            stock = p.get("stock", 0)
-            status = f"✅ Omborda bor ({stock} dona)" if stock > 0 else "❌ Omborda tugagan"
-            price = p.get("price", 0)
-            res_list.append(
-                f"### 📦 **{p.get('name')}**\n"
-                f"- 🏷️ **SKU:** `{p.get('sku')}`\n"
-                f"- 💰 **Sotish narxi:** {price:,} so'm\n"
-                f"- 📊 **Kategoriya:** {p.get('category')}\n"
-                f"- 📈 **Holati:** {status}"
-            )
-        matched_str = "\n\n".join(res_list)
-        if len(matched_products) > 5:
-            matched_str += f"\n\n*Yana {len(matched_products) - 5} ta mos keladigan mahsulot topildi. Savolingizni aniqroq bering.*"
-        return f"""🔍 **Qidirilgan Mahsulotlar (Lokal Dvigatel):**
+            cashiers = {}
+            for r in receipts:
+                name = r.get("cashier_name") or "Operator"
+                if name not in cashiers:
+                    cashiers[name] = {"total": 0.0, "count": 0}
+                cashiers[name]["total"] += float(r.get("total_amount", 0))
+                cashiers[name]["count"] += 1
+                
+            if cashiers:
+                sorted_c = sorted(cashiers.items(), key=lambda x: x[1]["total"], reverse=True)
+                medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"]
+                lines = ["👨‍💼 **Sotuvchilar va Kassirlar Savdo Reytingi:**\n"]
+                for i, (name, data) in enumerate(sorted_c[:8]):
+                    m = medals[i] if i < len(medals) else f"{i+1}."
+                    lines.append(f"{m} **{name}**\n   - Savdo hajmi: **{data['total']:,.0f}** so'm ({data['count']} ta chek)")
+                return "\n".join(lines)
+            else:
+                return "ℹ️ Sotuvchilar bo'yicha cheklar ma'lumoti topilmadi."
+        except Exception as e:
+            print(f"Error in sellers query: {e}")
 
-{matched_str}
-
-*Eslatma: Jonli ma'lumotlar ombordan qidirib ko'rsatildi.*"""
-
-    # 4. Handle category results
-    if matched_categories:
-        cat_products = [p for p in inventory if p.get("category") in matched_categories]
-        if cat_products:
-            res_list = []
-            for p in cat_products[:10]:
-                stock = p.get("stock", 0)
-                status = f"{stock} dona" if stock > 0 else "Tugagan ❌"
-                res_list.append(f"- **{p.get('name')}** (SKU: `{p.get('sku')}`): Narxi: {p.get('price'):,} so'm | Qoldiq: {status}")
-            cat_str = "\n".join(res_list)
-            if len(cat_products) > 10:
-                cat_str += f"\n- ... va yana {len(cat_products) - 10} ta mahsulot."
-            return f"""📁 **Kategoriyadagi mahsulotlar ({', '.join(matched_categories)}) (Lokal Dvigatel):**
-
-{cat_str}
-
-*Eslatma: Ushbu toifadagi ma'lumotlar ombordan olindi.*"""
-
-    # 5. Fallback to general financial, stock or customer reports
-    if any(k in prompt_lower for k in ["moliya", "pul", "balans", "kirim", "chiqim", "daromad", "foyda", "expense", "income", "balance"]):
-        return f"""💰 **Moliyaviy Tahlil (Lokal Dvigatel):**
-
-- 💵 **Jami Kirim:** {total_income:,} so'm
-- 💸 **Jami Chiqim:** {total_expense:,} so'm
-- 📊 **Sof Balans:** {net_balance:,} so'm
-
-*Eslatma: Ma'lumotlar to'g'ridan-to'g'ri ma'lumotlar bazasidan hisoblab ko'rsatildi.*"""
-
-    if any(k in prompt_lower for k in ["ombor", "mahsulot", "qoldiq", "tovar", "stock", "inventory", "nechta", "bor"]):
-        total_products = len(inventory)
-        in_stock = sum(1 for p in inventory if p.get("stock", 0) > 0)
-        out_of_stock = total_products - in_stock
-        
-        products_list = []
-        for p in inventory[:10]:
-            status = f"{p.get('stock')} dona" if p.get('stock', 0) > 0 else "Tugagan ❌"
-            products_list.append(f"- **{p.get('name')}**: Narxi: {p.get('price'):,} so'm | Qoldiq: {status}")
+    # 6. CRM & CUSTOMERS FUNNEL ("Mijozlar", "Yangi leadlar", "Voronka")
+    crm_keywords = [
+        "mijoz", "mijozlar", "lead", "leadlar", "voronka", "kontakt", "yangi mijoz",
+        "клиенты", "лиды", "воронка", "crm"
+    ]
+    if any(k in prompt_norm for k in crm_keywords) or any(k in prompt_lower for k in crm_keywords):
+        try:
+            cust_path = "customers?select=id,name,phone,status,created_at,value&order=created_at.desc&limit=200"
+            if company_id:
+                cust_path += f"&company_id=eq.{company_id}"
+            customers = supabase_req("GET", cust_path) or []
             
-        products_str = "\n".join(products_list)
-        if total_products > 10:
-            products_str += f"\n- ... va yana {total_products - 10} ta mahsulot."
+            leads_count = len([c for c in customers if c.get("status") == "lead"])
+            contacted_count = len([c for c in customers if c.get("status") == "contacted"])
+            proposal_count = len([c for c in customers if c.get("status") == "proposal"])
+            won_count = len([c for c in customers if c.get("status") == "won"])
+            lost_count = len([c for c in customers if c.get("status") == "lost"])
             
-        return f"""📦 **Omborxona Tahlili (Lokal Dvigatel):**
+            cnt_res = supabase_req("GET", f"customers?select=count&company_id=eq.{company_id}" if company_id else "customers?select=count")
+            total_cust = cnt_res[0].get("count") if cnt_res and isinstance(cnt_res, list) else len(customers)
+            
+            lines = [
+                f"👥 **CRM va Mijozlar Voronkasi Hisoboti:**\n",
+                f"- 📊 **Jami ro'yxatga olingan mijozlar:** **{total_cust}** ta",
+                f"- 🆕 **Yangi Leadlar:** **{leads_count}** ta",
+                f"- 💬 **Muzokarada:** **{contacted_count}** ta",
+                f"- 📄 **Taklif yuborilgan:** **{proposal_count}** ta",
+                f"- 🎉 **Yutib olingan (Mijozlar):** **{won_count}** ta",
+                f"- ❌ **Yo'qotilgan:** **{lost_count}** ta\n",
+                f"🆕 **Oxirgi kelib tushgan leadlar:**"
+            ]
+            for c in customers[:5]:
+                name = c.get("name") or "Noma'lum"
+                phone = c.get("phone") or "Telefon yo'q"
+                st = c.get("status") or "lead"
+                lines.append(f"- **{name}** ({phone}) — holati: `{st}`")
+            return "\n".join(lines)
+        except Exception as e:
+            print(f"Error in crm query: {e}")
 
-Jami mahsulot turlari: **{total_products}** ta.
-- Sotuvda bor: **{in_stock}** ta
-- Tugagan: **{out_of_stock}** ta
+    # 7. FINANCE & BALANCES ("Moliya", "Balans", "Foyda", "Kirim-chiqim")
+    fin_keywords = [
+        "moliya", "balans", "kirim", "chiqim", "daromad", "foyda", "sof foyda",
+        "финансы", "баланс", "прибыль", "доходы", "расходы"
+    ]
+    if any(k in prompt_norm for k in fin_keywords) or any(k in prompt_lower for k in fin_keywords):
+        try:
+            tx_path = "transactions?select=type,amount,created_at&limit=500"
+            if company_id:
+                tx_path += f"&company_id=eq.{company_id}"
+            txs = supabase_req("GET", tx_path) or []
+            
+            income = sum(float(t.get("amount", 0)) for t in txs if t.get("type") == "income")
+            expense = sum(float(t.get("amount", 0)) for t in txs if t.get("type") == "expense")
+            net_bal = income - expense
+            
+            return f"""💰 **Moliyaviy Ko'rsatkichlar va Balans:**
 
-**Mahsulotlar ro'yxati (top 10):**
-{products_str}
+- 💵 **Jami Kirim:** **{income:,.0f}** so'm
+- 💸 **Jami Chiqim:** **{expense:,.0f}** so'm
+- 📊 **Sof Balans:** **{net_bal:,.0f}** so'm
 
-*Eslatma: Jonli ma'lumotlar bazadan olindi.*"""
+*Eslatma: Ma'lumotlar moliya modulidagi real vaqtdagi tranzaksiyalardan hisoblandi.*"""
+        except Exception as e:
+            print(f"Error in finance query: {e}")
 
-    if any(k in prompt_lower for k in ["mijoz", "lead", "voronka", "status", "customer", "kontakt"]):
-        leads_count = len([c for c in customers if c.get("status") == "lead"])
-        contacted_count = len([c for c in customers if c.get("status") == "contacted"])
-        proposal_count = len([c for c in customers if c.get("status") == "proposal"])
-        won_count = len([c for c in customers if c.get("status") == "won"])
-        lost_count = len([c for c in customers if c.get("status") == "lost"])
-        
-        return f"""👥 **Mijozlar Voronkasi (Lokal Dvigatel):**
-
-- 🆕 **Yangi Leadlar:** {leads_count} ta
-- 💬 **Muzokarada:** {contacted_count} ta
-- 📄 **Taklif yuborilgan:** {proposal_count} ta
-- 🎉 **Yutib olingan (Mijoz):** {won_count} ta
-- ❌ **Yo'qotilgan:** {lost_count} ta
-
-Jami ro'yxatdan o'tgan mijozlar: **{len(customers)}** ta.
-
-*Eslatma: Jonli ma'lumotlar bazadan olindi.*"""
-
-    total_products = len(inventory)
-    total_customers = len(customers)
-    won_count = len([c for c in customers if c.get("status") == "won"])
-    leads_count = len([c for c in customers if c.get("status") == "lead"])
+    # 8. SPECIFIC PRODUCT SEARCH ("Knauf bormi?", "Sement narxi", "Drel", etc.)
+    stop_words = {
+        "bor", "bormi", "yoq", "yo'q", "narx", "narxi", "narxlari", "qancha", "necha",
+        "pul", "som", "so'm", "dona", "mahsulot", "tovar", "ombor", "omborda", "bor-yoqligi",
+        "skladdami", "sklad", "nechta", "haqida", "qoldig'i", "qoldigi", "qoldiq",
+        "есть", "цена", "сколько", "стоит", "наличие", "товар", "на складе", "почем"
+    }
+    search_terms = [w for w in prompt_words if len(w) >= 2 and w not in stop_words]
     
-    return f"""🤖 **Tizimning Umumiy Holati (Lokal Dvigatel):**
+    if search_terms:
+        search_query = " ".join(search_terms)
+        try:
+            enc_query = urllib.parse.quote(search_query)
+            inv_search_path = f"inventory?or=(name.ilike.*{enc_query}*,sku.ilike.*{enc_query}*)&limit=10"
+            if company_id:
+                inv_search_path += f"&company_id=eq.{company_id}"
+            found = supabase_req("GET", inv_search_path) or []
+            
+            # If 0 found and query was Latin, try Cyrillic
+            if not found:
+                cyr_query = urllib.parse.quote(to_cyrillic(search_query))
+                cyr_path = f"inventory?name=ilike.*{cyr_query}*&limit=10"
+                if company_id:
+                    cyr_path += f"&company_id=eq.{company_id}"
+                found = supabase_req("GET", cyr_path) or []
+                
+            # If 0 found and query was Cyrillic, try Latin
+            if not found:
+                lat_query = urllib.parse.quote(to_latin(search_query))
+                lat_path = f"inventory?name=ilike.*{lat_query}*&limit=10"
+                if company_id:
+                    lat_path += f"&company_id=eq.{company_id}"
+                found = supabase_req("GET", lat_path) or []
 
-Tizimning jonli hisoboti:
+            if found:
+                lines = [f"🔍 **Qidiruv Natijalari (\"{search_query}\"):**\n"]
+                for p in found[:6]:
+                    p_name = p.get("name", "")
+                    p_sku = p.get("sku", "-")
+                    p_price = float(p.get("price", 0))
+                    p_stock = float(p.get("stock", 0))
+                    p_cat = p.get("category") or "Umumiy"
+                    
+                    if p_stock > 3:
+                        st_badge = f"✅ Omborda bor ({p_stock:,.0f} dona)"
+                    elif p_stock > 0:
+                        st_badge = f"⚠️ Kam qolgan ({p_stock:,.0f} dona)"
+                    else:
+                        st_badge = "❌ Omborda tugagan (0 dona)"
+                        
+                    lines.append(
+                        f"📦 **{p_name}**\n"
+                        f"- 🏷️ SKU / Shtrix-kod: `{p_sku}`\n"
+                        f"- 💰 Narxi: **{p_price:,.0f}** so'm\n"
+                        f"- 📊 Kategoriya: {p_cat}\n"
+                        f"- 📈 Holati: {st_badge}\n"
+                    )
+                if len(found) > 6:
+                    lines.append(f"*Yana {len(found) - 6} ta o'xshash tovar mavjud.*")
+                return "\n".join(lines)
+        except Exception as e:
+            print(f"Error in product search: {e}")
 
-- 💰 **Moliya:** Net Balans **{net_balance:,}** so'm (Kirim: {total_income:,} / Chiqim: {total_expense:,})
-- 📦 **Omborxona:** **{total_products}** turdagi mahsulotlar mavjud.
-- 👥 **CRM:** **{total_customers}** ta mijoz (shundan **{won_count}** ta yutib olingan, **{leads_count}** ta yangi lead).
+    # 9. GENERAL BUSINESS REPORT & RECOMMENDATIONS (Fallback)
+    try:
+        cnt_inv = supabase_req("GET", f"inventory?select=count&company_id=eq.{company_id}" if company_id else "inventory?select=count")
+        tot_inv = cnt_inv[0].get("count") if cnt_inv and isinstance(cnt_inv, list) else 0
+        
+        cnt_cust = supabase_req("GET", f"customers?select=count&company_id=eq.{company_id}" if company_id else "customers?select=count")
+        tot_cust = cnt_cust[0].get("count") if cnt_cust and isinstance(cnt_cust, list) else 0
+        
+        now_tz = datetime.now(timezone(timedelta(hours=5)))
+        today_str = now_tz.strftime("%Y-%m-%d")
+        rec_path = f"receipts?created_at=gte.{today_str}T00:00:00&limit=200"
+        if company_id:
+            rec_path += f"&company_id=eq.{company_id}"
+        recs_today = supabase_req("GET", rec_path) or []
+        today_sum = sum(float(r.get("total_amount", 0)) for r in recs_today)
+        
+        return f"""📊 **Biznes Tizimining Umumiy Holati:**
 
-*Qo'shimcha ma'lumot olish uchun savolni aniqroq bering (masalan: 'moliya' yoki 'ombor' deb yozing).*"""
+- 📦 **Omborxona:** Jami **{tot_inv:,}** turdagi mahsulotlar ro'yxatda.
+- 💰 **Bugungi savdo ({today_str}):** **{today_sum:,.0f}** so'm ({len(recs_today)} ta chek).
+- 👥 **Mijozlar bazasi:** **{tot_cust:,}** ta mijoz ro'yxatdan o'tgan.
+
+💡 **Siz nimalarni so'rashingiz mumkin:**
+1. *"Omborda nimalar tugayapti?"* — kam qolgan tovarlar
+2. *"Bugungi savdo qancha?"* — kassa hisoboti
+3. *"[Tovar nomi] bormi?"* — masalan, "Knauf bormi?" yoki "Sement narxi"
+4. *"Sotuvchilar reytingi"* — qaysi kassir ko'p sotdi"""
+    except Exception as e:
+        print(f"Error in general fallback: {e}")
+        return "Tizim ma'lumotlarini tahlil qilishda xatolik yuz berdi. Iltimos, savolingizni aniqroq bering."
+
+def generate_analyze_fallback(prompt: str, customers: list = None, inventory: list = None, total_income: float = 0, total_expense: float = 0, net_balance: float = 0, company_id: str = None) -> str:
+    return process_ai_business_query(prompt, company_id=company_id)
 
 def generate_chat_fallback(customer_name: str, message_text: str, inventory: list) -> str:
     msg_lower = message_text.lower().strip() if message_text else ""
@@ -2557,8 +2794,9 @@ def generate_chat_fallback(customer_name: str, message_text: str, inventory: lis
         
     return "Xabaringiz qabul qilindi. Tez orada operatorimiz siz bilan bog'lanadi va sizga yordam beradi."
 
-def call_openai(prompt: str, system_instruction: str = None) -> str:
-    api_key = settings_state.get("openai_api_key", "")
+def call_openai(prompt: str, system_instruction: str = None, settings: dict = None) -> str:
+    active_settings = settings if settings is not None else settings_state
+    api_key = active_settings.get("openai_api_key", "")
     if not api_key:
         return "ERROR: OpenAI API Key kiritilmagan!"
     url = "https://api.openai.com/v1/chat/completions"
@@ -2575,16 +2813,20 @@ def call_openai(prompt: str, system_instruction: str = None) -> str:
         "messages": messages,
         "temperature": 0.3
     }
-    response = requests.post(url, headers=headers, json=payload, timeout=20)
-    response.raise_for_status()
-    resp_data = response.json()
-    choices = resp_data.get("choices", [])
-    if choices:
-        return choices[0].get("message", {}).get("content", "")
-    return "ERROR: OpenAI dan bo'sh javob qaytdi."
+    try:
+        response = requests.post(url, headers=headers, json=payload, timeout=20)
+        response.raise_for_status()
+        resp_data = response.json()
+        choices = resp_data.get("choices", [])
+        if choices:
+            return choices[0].get("message", {}).get("content", "")
+        return "ERROR: OpenAI dan bo'sh javob qaytdi."
+    except Exception as e:
+        return f"ERROR: OpenAI xatosi: {e}"
 
-def call_groq(prompt: str, system_instruction: str = None) -> str:
-    api_key = settings_state.get("groq_api_key", "")
+def call_groq(prompt: str, system_instruction: str = None, settings: dict = None) -> str:
+    active_settings = settings if settings is not None else settings_state
+    api_key = active_settings.get("groq_api_key", "")
     if not api_key:
         return "ERROR: Groq API Key kiritilmagan!"
     url = "https://api.groq.com/openai/v1/chat/completions"
@@ -2597,17 +2839,31 @@ def call_groq(prompt: str, system_instruction: str = None) -> str:
         messages.append({"role": "system", "content": system_instruction})
     messages.append({"role": "user", "content": prompt})
     payload = {
-        "model": "llama3-8b-8192",
+        "model": "llama-3.3-70b-versatile",
         "messages": messages,
         "temperature": 0.3
     }
-    response = requests.post(url, headers=headers, json=payload, timeout=20)
-    response.raise_for_status()
-    resp_data = response.json()
-    choices = resp_data.get("choices", [])
-    if choices:
-        return choices[0].get("message", {}).get("content", "")
-    return "ERROR: Groq dan bo'sh javob qaytdi."
+    try:
+        response = requests.post(url, headers=headers, json=payload, timeout=20)
+        response.raise_for_status()
+        resp_data = response.json()
+        choices = resp_data.get("choices", [])
+        if choices:
+            return choices[0].get("message", {}).get("content", "")
+        return "ERROR: Groq dan bo'sh javob qaytdi."
+    except Exception:
+        # Fallback to llama-3.1-8b-instant
+        try:
+            payload["model"] = "llama-3.1-8b-instant"
+            response = requests.post(url, headers=headers, json=payload, timeout=20)
+            response.raise_for_status()
+            resp_data = response.json()
+            choices = resp_data.get("choices", [])
+            if choices:
+                return choices[0].get("message", {}).get("content", "")
+        except Exception as e:
+            return f"ERROR: Groq xatosi: {e}"
+        return "ERROR: Groq dan bo'sh javob qaytdi."
 
 def call_ai_engine(prompt: str, system_instruction: str = None, company_id: str = None) -> str:
     settings = get_company_settings(company_id) if company_id else settings_state
@@ -2722,89 +2978,38 @@ class AIAnalyzePayload(BaseModel):
 @app.post("/api/ai/analyze")
 def ai_analyze(payload: AIAnalyzePayload, request: Request):
     company_id = get_company_id(request)
-    try:
-        # Fetch CRM context
-        cust_path = "customers?select=*"
-        inv_path = "inventory?select=*"
-        tx_path = "transactions?select=*"
-        if company_id:
-            cust_path += f"&company_id=eq.{company_id}"
-            inv_path += f"&company_id=eq.{company_id}"
-            tx_path += f"&company_id=eq.{company_id}"
-            
-        customers = supabase_req("GET", cust_path)
-        inventory = supabase_req("GET", inv_path)
-        transactions = supabase_req("GET", tx_path)
+    prompt = (payload.prompt or "").strip()
+    if not prompt:
+        return {"response": "Iltimos, biror savol yozing."}
         
-        # Calculate financials
-        total_income = sum(t.get("amount", 0) for t in transactions if t.get("type") == "income")
-        total_expense = sum(t.get("amount", 0) for t in transactions if t.get("type") == "expense")
-        net_balance = total_income - total_expense
-        
-        # Calculate lead counts
-        leads_count = len([c for c in customers if c.get("status") == "lead"])
-        contacted_count = len([c for c in customers if c.get("status") == "contacted"])
-        proposal_count = len([c for c in customers if c.get("status") == "proposal"])
-        won_count = len([c for c in customers if c.get("status") == "won"])
-        lost_count = len([c for c in customers if c.get("status") == "lost"])
-        
-        # Format inventory context
-        inv_list = []
-        for p in inventory:
-            status = "Tugagan" if p.get("stock", 0) <= 0 else (f"{p.get('stock')} dona" if p.get("stock", 0) > 3 else f"Kam qoldi ({p.get('stock')} dona)")
-            inv_list.append(f"- {p.get('name')} (SKU: {p.get('sku')}), Narxi: {p.get('price')} so'm, Qoldiq: {status}, Kategoriya: {p.get('category')}")
-        inv_context = "\n".join(inv_list)
-        
-        system_instruction = f"""Siz Webzone CRM & ERP tizimining aqlli tahlilchisi va yordamchisisiz.
-Sizda quyidagi real-vaqtdagi kompaniya ma'lumotlari mavjud:
-
-Moliyaviy Holat:
-- Jami Kirim: {total_income:,} so'm
-- Jami Chiqim: {total_expense:,} so'm
-- Net Balans: {net_balance:,} so'm
-
-Mijozlar Voronkasi (CRM):
-- Yangi (Leads): {leads_count} ta
-- Muzokarada (Contacted): {contacted_count} ta
-- Taklif yuborilgan (Proposal): {proposal_count} ta
-- Yutib olingan (Won): {won_count} ta
-- Yo'tqotilgan (Lost): {lost_count} ta
-Jami mijozlar soni: {len(customers)} ta.
-
-Omborxona (ERP) Mahsulotlar Qoldig'i:
-{inv_context if inv_context else "- Omborda mahsulotlar yo'q."}
+    settings = get_company_settings(company_id) if company_id else settings_state
+    provider = settings.get("ai_provider", "local")
+    
+    # If external LLM (gemini, openai, groq) is selected, try LLM with targeted context
+    if provider in ["gemini", "openai", "groq"]:
+        try:
+            context_summary = process_ai_business_query(prompt, company_id=company_id)
+            system_instruction = f"""Siz Webzone CRM & ERP tizimining professional AI tahlilchisi va biznes yordamchisisiz.
+Kompaniya tizimidan olingan eng so'nggi real tahlil natijalari:
+{context_summary}
 
 Qoidalar:
-1. Foydalanuvchining savoliga faqatgina yuqoridagi ma'lumotlarga tayangan holda professional va aniq javob bering.
-2. Savolga o'zbek tilida javob bering.
-3. Javobingizni chiroyli Markdown formatida yozing (masalan, muhim ma'lumotlarni qalin harflar bilan yoki ro'yxat ko'rinishida bering).
-4. Qisqa va lo'nda bo'ling. Keraksiz ortiqcha gaplar qo'shmang."""
+1. Foydalanuvchining savoliga o'zbek tilida (yoki agar ruscha so'ralsa, rus tilida), xushmuomala, professional va aniq javob bering.
+2. Yuqoridagi faktik ma'lumotlarga tayangan holda tahlil bering.
+3. Javobni Markdown formatida (muhim ma'lumotlarni qalin harflar bilan, ro'yxat ko'rinishida) chiroyli bering."""
+            ai_reply = call_ai_engine(prompt, system_instruction, company_id=company_id)
+            if ai_reply and ai_reply != "FALLBACK" and not ai_reply.startswith("ERROR:"):
+                return {"response": ai_reply}
+        except Exception as e:
+            print(f"LLM call failed in ai_analyze: {e}")
 
-        ai_reply = call_ai_engine(payload.prompt, system_instruction, company_id=company_id)
-        if ai_reply == "FALLBACK":
-            ai_reply = generate_analyze_fallback(payload.prompt, customers, inventory, total_income, total_expense, net_balance)
-            
-        return {"response": ai_reply}
+    # Blazing-fast smart local business intelligence engine
+    try:
+        reply = process_ai_business_query(prompt, company_id=company_id)
+        return {"response": reply}
     except Exception as e:
         print(f"AI Analyze failed: {e}")
-        try:
-            cust_path = "customers?select=*"
-            inv_path = "inventory?select=*"
-            tx_path = "transactions?select=*"
-            if company_id:
-                cust_path += f"&company_id=eq.{company_id}"
-                inv_path += f"&company_id=eq.{company_id}"
-                tx_path += f"&company_id=eq.{company_id}"
-            customers = supabase_req("GET", cust_path)
-            inventory = supabase_req("GET", inv_path)
-            transactions = supabase_req("GET", tx_path)
-            total_income = sum(t.get("amount", 0) for t in transactions if t.get("type") == "income")
-            total_expense = sum(t.get("amount", 0) for t in transactions if t.get("type") == "expense")
-            net_balance = total_income - total_expense
-            ai_reply = generate_analyze_fallback(payload.prompt, customers, inventory, total_income, total_expense, net_balance)
-            return {"response": ai_reply}
-        except Exception:
-            return {"response": "Kechirasiz, tahlil qilishda xatolik yuz berdi."}
+        return {"response": f"Kechirasiz, tahlil qilishda xatolik yuz berdi: {e}"}
 
 class AISuggestPayload(BaseModel):
     customer_id: str

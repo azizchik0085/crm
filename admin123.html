@@ -2505,7 +2505,7 @@ CREATE TABLE IF NOT EXISTS public.messages (
     <!-- Floating AI Assistant Widget -->
     <div id="ai-assistant-widget" class="ai-widget-closed">
         <!-- Floating Toggle Button -->
-        <button id="ai-widget-toggle" class="ai-pulse-button" title="AI Yordamchi">
+        <button id="ai-widget-toggle" class="ai-pulse-button" title="Smart AI Yordamchi">
             <i class="fas fa-robot"></i>
         </button>
         
@@ -2521,18 +2521,36 @@ CREATE TABLE IF NOT EXISTS public.messages (
                         </span>
                     </div>
                 </div>
-                <button id="ai-widget-close" class="close-btn">&times;</button>
+                <div style="display:flex; align-items:center; gap:4px;">
+                    <button type="button" id="ai-widget-clear" class="ai-header-btn" title="Suhbatni tozalash">
+                        <i class="fas fa-trash-alt"></i>
+                    </button>
+                    <button type="button" id="ai-widget-close" class="close-btn">&times;</button>
+                </div>
             </div>
             
             <div id="ai-widget-messages" class="ai-widget-body">
                 <div class="ai-message assistant">
-                    Assalomu alaykum! Men sizning sun'iy intellekt yordamchingizman. Biznesingiz tahlili, ombor qoldiqlari, daromadlar yoki mijozlar bo'yicha savol bering (masalan: *"Omborda nimalar tugayapti?"*).
+                    👋 <strong>Assalomu alaykum!</strong> Men sizning sun'iy intellekt biznes yordamchingizman. Biznesingiz tahlili, ombor qoldiqlari, kassa yoki savdo bo'yicha savol bering yoki pastdagi tayyor tugmalardan foydalaning.
                 </div>
+            </div>
+
+            <!-- Quick Suggestion Chips -->
+            <div id="ai-widget-chips" class="ai-widget-chips">
+                <button type="button" class="ai-chip" data-prompt="Omborda nimalar tugayapti?">📦 Nimalar tugayapti?</button>
+                <button type="button" class="ai-chip" data-prompt="Bugungi savdo qancha?">💰 Bugungi savdo</button>
+                <button type="button" class="ai-chip" data-prompt="Eng ko'p sotilgan tovarlar">🏆 Top tovarlar</button>
+                <button type="button" class="ai-chip" data-prompt="Sotuvchilar reytingi">👨‍💼 Sotuvchilar</button>
+                <button type="button" class="ai-chip" data-prompt="Mijozlar voronkasi">👥 Mijozlar</button>
+                <button type="button" class="ai-chip" data-prompt="Umumiy biznes tahlili">📊 Biznes tahlili</button>
             </div>
             
             <form id="ai-widget-form" class="ai-widget-footer">
-                <input type="text" id="ai-widget-input" placeholder="Savol yozing..." required autocomplete="off">
-                <button type="submit" id="ai-widget-send-btn">
+                <input type="text" id="ai-widget-input" placeholder="Savol yozing (masalan: Sement bormi?)..." required autocomplete="off">
+                <button type="button" id="ai-widget-mic-btn" class="ai-mic-btn" title="Ovoz bilan kiritish">
+                    <i class="fas fa-microphone"></i>
+                </button>
+                <button type="submit" id="ai-widget-send-btn" title="Yuborish">
                     <i class="fas fa-paper-plane"></i>
                 </button>
             </form>

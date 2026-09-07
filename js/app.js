@@ -1736,6 +1736,7 @@ window.App = {
         const widget = document.getElementById('ai-assistant-widget');
         const toggleBtn = document.getElementById('ai-widget-toggle');
         const closeBtn = document.getElementById('ai-widget-close');
+        const clearBtn = document.getElementById('ai-widget-clear');
         const form = document.getElementById('ai-widget-form');
         const input = document.getElementById('ai-widget-input');
         const messagesContainer = document.getElementById('ai-widget-messages');
@@ -1747,7 +1748,7 @@ window.App = {
             if (widget.classList.contains('ai-widget-closed')) {
                 widget.classList.remove('ai-widget-closed');
                 widget.classList.add('ai-widget-open');
-                input.focus();
+                setTimeout(() => input.focus(), 150);
             } else {
                 widget.classList.remove('ai-widget-open');
                 widget.classList.add('ai-widget-closed');
@@ -1758,6 +1759,78 @@ window.App = {
             widget.classList.remove('ai-widget-open');
             widget.classList.add('ai-widget-closed');
         };
+
+        // Clear chat
+        if (clearBtn) {
+            clearBtn.onclick = () => {
+                messagesContainer.innerHTML = `
+                    <div class="ai-message assistant">
+                        👋 <strong>Assalomu alaykum!</strong> Men sizning sun'iy intellekt biznes yordamchingizman. Biznesingiz tahlili, ombor qoldiqlari, kassa yoki savdo bo'yicha savol bering yoki pastdagi tayyor tugmalardan foydalaning.
+                    </div>
+                `;
+            };
+        }
+
+        // Quick Suggestion Chips
+        const chips = widget.querySelectorAll('.ai-chip');
+        chips.forEach(chip => {
+            chip.onclick = () => {
+                const prompt = chip.getAttribute('data-prompt');
+                if (prompt) {
+                    input.value = prompt;
+                    form.dispatchEvent(new Event('submit', { cancelable: true }));
+                }
+            };
+        });
+
+        // Speech Recognition (Microphone)
+        const micBtn = document.getElementById('ai-widget-mic-btn');
+        if (micBtn) {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (SpeechRecognition) {
+                const recognition = new SpeechRecognition();
+                recognition.lang = 'uz-UZ';
+                recognition.interimResults = false;
+                recognition.continuous = false;
+                let isRecording = false;
+
+                micBtn.onclick = () => {
+                    if (isRecording) {
+                        recognition.stop();
+                        return;
+                    }
+                    try {
+                        recognition.start();
+                        isRecording = true;
+                        micBtn.classList.add('recording');
+                    } catch (err) {
+                        console.warn("Speech recognition error:", err);
+                        isRecording = false;
+                        micBtn.classList.remove('recording');
+                    }
+                };
+
+                recognition.onresult = (event) => {
+                    const transcript = event.results[0][0].transcript;
+                    if (transcript) {
+                        input.value = transcript;
+                        form.dispatchEvent(new Event('submit', { cancelable: true }));
+                    }
+                };
+
+                recognition.onerror = () => {
+                    isRecording = false;
+                    micBtn.classList.remove('recording');
+                };
+
+                recognition.onend = () => {
+                    isRecording = false;
+                    micBtn.classList.remove('recording');
+                };
+            } else {
+                micBtn.style.display = 'none';
+            }
+        }
 
         // Form submit
         form.onsubmit = async (e) => {
@@ -1770,13 +1843,16 @@ window.App = {
             input.value = '';
 
             // Render typing indicator
-            const typingIndicator = this.appendAIMessage('typing', '<i class="fas fa-spinner fa-spin"></i> AI o\'ylamoqda...');
+            const typingIndicator = this.appendAIMessage('typing', '<i class="fas fa-spinner fa-spin"></i> AI tahlil qilmoqda...');
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
 
             try {
                 const response = await fetch('/api/ai/analyze', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'x-company-id': localStorage.getItem('company_id') || 'giperbrendstroy'
+                    },
                     body: JSON.stringify({ prompt: text })
                 });
                 
@@ -1784,14 +1860,14 @@ window.App = {
                 if (typingIndicator) typingIndicator.remove();
 
                 if (!response.ok) {
-                    throw new Error("API error");
+                    throw new Error("API error: " + response.status);
                 }
 
                 const resData = await response.json();
-                this.appendAIMessage('assistant', resData.response);
+                this.appendAIMessage('assistant', resData.response || "Javob olinmadi.");
             } catch (err) {
                 if (typingIndicator) typingIndicator.remove();
-                this.appendAIMessage('assistant', 'Kechirasiz, sun\'iy intellektdan javob olishda xatolik yuz berdi. Sozlamalarda Gemini API Key to\'g\'riligini tekshiring.');
+                this.appendAIMessage('assistant', 'Kechirasiz, tahlil qilishda xatolik yuz berdi. Iltimos, qaytadan urinib ko\'ring.');
             }
             
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
@@ -1808,8 +1884,10 @@ window.App = {
         if (sender === 'typing') {
             msgDiv.innerHTML = text;
         } else {
-            // Very simple markdown formatting helper (bullet lists, newlines, bold text)
+            // Enhanced Markdown formatting (headers, bold, lists, code, status icons)
             let formatted = this.escapeHTML(text)
+                .replace(/###\s*(.*?)(?:<br>|\n|$)/g, '<h4>$1</h4>')
+                .replace(/`([^`]+)`/g, '<code>$1</code>')
                 .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
                 .replace(/\*(.*?)\*/g, '<em>$1</em>')
                 .replace(/\n/g, '<br>')
@@ -1826,7 +1904,7 @@ window.App = {
     },
 
     escapeHTML: function(str) {
-        return str
+        return (str || '')
             .replace(/&/g, "&amp;")
             .replace(/</g, "&lt;")
             .replace(/>/g, "&gt;")
