@@ -1125,20 +1125,28 @@ window.MobileApp = {
         const initial = (client.name || 'M').trim().charAt(0).toUpperCase();
         const cat = (client.category || (client.company ? 'qurilish' : 'ustalar')).toLowerCase();
         const isQurilish = cat === 'qurilish';
-        const barcodeVal = client.barcode || client.phone2 || '';
+        const barcodeVal = client.barcode || '';
         const bonusVal = Number(client.bonus || client.value || 0);
+        const debtVal = Number(client.debt || 0);
 
         document.getElementById('m-sheet-client-name').textContent = client.name || 'Mijoz';
         document.getElementById('m-sheet-client-avatar').textContent = initial;
         document.getElementById('m-sheet-client-phone').textContent = client.phone || '-';
         document.getElementById('m-sheet-client-phone-link').href = client.phone ? `tel:${client.phone}` : 'javascript:void(0)';
-        document.getElementById('m-sheet-client-barcode').textContent = barcodeVal || '-';
+        
+        const bcSpan = document.getElementById('m-sheet-client-barcode');
+        if (bcSpan) {
+            bcSpan.textContent = barcodeVal || "Shtrix-kod yo'q";
+        }
         
         const catBadge = document.getElementById('m-sheet-client-cat');
         if (catBadge) {
             catBadge.className = isQurilish ? 'badge-qurilish' : 'badge-ustalar';
-            catBadge.innerHTML = `<i class="fas ${isQurilish ? 'fa-building' : 'fa-hammer'}"></i> ${isQurilish ? 'Qurilish obyekti' : 'Ustalar'}`;
+            catBadge.innerHTML = `<i class="fas ${isQurilish ? 'fa-building' : 'fa-hammer'}"></i> <span>${isQurilish ? 'Qurilish obyekti' : 'Ustalar'}</span> <i class="fas fa-sync-alt" style="font-size: 9px; opacity: 0.6; margin-left: 2px;"></i>`;
         }
+
+        // Qarz holati boshlang'ich yangilanishi
+        this._updateDebtUI(debtVal, client);
 
         document.getElementById('m-sheet-bonus-val').textContent = `${bonusVal.toLocaleString('uz-UZ')} so'm`;
         this._activeDetailClient = client;
@@ -1171,6 +1179,142 @@ window.MobileApp = {
         this._activeDetailClient = null;
     },
 
+    _updateDebtUI: function(debt, client, totalDebit, totalCredit) {
+        const debtCard = document.getElementById('m-sheet-debt-card');
+        const debtValEl = document.getElementById('m-sheet-debt-val');
+        const debtBadgeEl = document.getElementById('m-sheet-debt-badge');
+        const debtSubEl = document.getElementById('m-sheet-debt-sub');
+        const debtTitleEl = document.getElementById('m-sheet-debt-title');
+        if (!debtCard || !debtValEl) return;
+
+        debt = Number(debt || 0);
+        if (debt > 0) {
+            debtCard.style.background = 'rgba(239, 68, 68, 0.08)';
+            debtCard.style.borderColor = 'rgba(239, 68, 68, 0.35)';
+            if (debtTitleEl) {
+                debtTitleEl.style.color = '#ef4444';
+                debtTitleEl.innerHTML = '<i class="fas fa-hand-holding-usd" style="margin-right: 4px;"></i> Qarz Balansi:';
+            }
+            if (debtBadgeEl) {
+                debtBadgeEl.style.background = 'rgba(239, 68, 68, 0.2)';
+                debtBadgeEl.style.color = '#ef4444';
+                debtBadgeEl.textContent = '⚠️ Qarzdorlik bor';
+            }
+            debtValEl.style.color = '#ef4444';
+            debtValEl.textContent = `${debt.toLocaleString('uz-UZ')} so'm`;
+            if (debtSubEl) {
+                debtSubEl.textContent = (totalDebit !== undefined && totalCredit !== undefined)
+                    ? `Xarid: ${Number(totalDebit).toLocaleString('uz-UZ')} | To'langan: ${Number(totalCredit).toLocaleString('uz-UZ')}`
+                    : "To'lanmagan summa";
+            }
+        } else if (debt === 0) {
+            debtCard.style.background = 'rgba(16, 185, 129, 0.08)';
+            debtCard.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+            if (debtTitleEl) {
+                debtTitleEl.style.color = '#10b981';
+                debtTitleEl.innerHTML = '<i class="fas fa-check-circle" style="margin-right: 4px;"></i> Qarz Holati:';
+            }
+            if (debtBadgeEl) {
+                debtBadgeEl.style.background = 'rgba(16, 185, 129, 0.2)';
+                debtBadgeEl.style.color = '#10b981';
+                debtBadgeEl.textContent = '✅ Qarzi yo\'q';
+            }
+            debtValEl.style.color = '#10b981';
+            debtValEl.textContent = "0 so'm";
+            if (debtSubEl) {
+                debtSubEl.textContent = "Barcha hisob-kitoblar to'langan";
+            }
+        } else {
+            // debt < 0: avans / ortiqcha to'lov
+            debtCard.style.background = 'rgba(56, 189, 248, 0.08)';
+            debtCard.style.borderColor = 'rgba(56, 189, 248, 0.3)';
+            if (debtTitleEl) {
+                debtTitleEl.style.color = '#38bdf8';
+                debtTitleEl.innerHTML = '<i class="fas fa-handshake" style="margin-right: 4px;"></i> Ortiqcha to\'lov:';
+            }
+            if (debtBadgeEl) {
+                debtBadgeEl.style.background = 'rgba(56, 189, 248, 0.2)';
+                debtBadgeEl.style.color = '#38bdf8';
+                debtBadgeEl.textContent = '🤝 Avans / Haqdor';
+            }
+            debtValEl.style.color = '#38bdf8';
+            debtValEl.textContent = `${Math.abs(debt).toLocaleString('uz-UZ')} so'm`;
+            if (debtSubEl) {
+                debtSubEl.textContent = "Mijoz foydasiga ortiqcha to'lov";
+            }
+        }
+    },
+
+    toggleClientCategory: async function() {
+        if (!this._activeDetailClient) return;
+        const client = this._activeDetailClient;
+        const currentCat = (client.category || 'ustalar').toLowerCase();
+        const newCat = currentCat === 'ustalar' ? 'qurilish' : 'ustalar';
+        
+        client.category = newCat;
+        if (newCat === 'qurilish') client.company = client.company || 'Qurilish';
+        else client.company = '';
+        
+        const catBadge = document.getElementById('m-sheet-client-cat');
+        if (catBadge) {
+            const isQ = newCat === 'qurilish';
+            catBadge.className = isQ ? 'badge-qurilish' : 'badge-ustalar';
+            catBadge.innerHTML = `<i class="fas ${isQ ? 'fa-building' : 'fa-hammer'}"></i> <span>${isQ ? 'Qurilish obyekti' : 'Ustalar'}</span> <i class="fas fa-sync-alt" style="font-size: 9px; opacity: 0.6; margin-left: 2px;"></i>`;
+        }
+        
+        const idx = this.clientsCache.findIndex(c => c.id === client.id);
+        if (idx !== -1) {
+            this.clientsCache[idx].category = newCat;
+            this.clientsCache[idx].company = client.company;
+        }
+
+        try {
+            await fetch(`/api/clients/${encodeURIComponent(client.id)}/quick-update`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ category: newCat })
+            });
+            await this.loadClients();
+        } catch(e) {
+            console.error("Toifani saqlashda xatolik:", e);
+        }
+    },
+
+    editClientBarcode: async function() {
+        if (!this._activeDetailClient) return;
+        const client = this._activeDetailClient;
+        const currentBc = client.barcode || '';
+        const newBc = prompt("Mijoz uchun yangi shtrix-kodni kiriting (yoki bo'sh qoldiring):", currentBc);
+        if (newBc === null) return;
+        
+        const cleanBc = newBc.trim();
+        client.barcode = cleanBc;
+        client.phone2 = cleanBc;
+        
+        const bcSpan = document.getElementById('m-sheet-client-barcode');
+        if (bcSpan) {
+            bcSpan.textContent = cleanBc || "Shtrix-kod yo'q";
+        }
+
+        const idx = this.clientsCache.findIndex(c => c.id === client.id);
+        if (idx !== -1) {
+            this.clientsCache[idx].barcode = cleanBc;
+            this.clientsCache[idx].phone2 = cleanBc;
+        }
+        
+        try {
+            await fetch(`/api/clients/${encodeURIComponent(client.id)}/quick-update`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ barcode: cleanBc })
+            });
+            await this.loadClients();
+            this.loadClientReceiptsInSheet(client);
+        } catch(e) {
+            console.error("Shtrix-kodni saqlashda xatolik:", e);
+        }
+    },
+
     loadClientReceiptsInSheet: async function(client) {
         const receiptsListEl = document.getElementById('m-sheet-receipts-list');
         const countEl = document.getElementById('m-sheet-receipts-count');
@@ -1189,6 +1333,18 @@ window.MobileApp = {
             const resp = await fetch(`/api/clients/${encodeURIComponent(client.id)}/receipts?${params.toString()}`);
             const data = await resp.json();
 
+            // Jonli qarz balansi (REGOS / CRM)
+            if (data && data.debt !== undefined && data.debt !== null) {
+                const newDebt = Number(data.debt);
+                client.debt = newDebt;
+                this._updateDebtUI(newDebt, client, data.total_debit, data.total_credit);
+                const idx = this.clientsCache.findIndex(c => c.id === client.id);
+                if (idx !== -1) {
+                    this.clientsCache[idx].debt = newDebt;
+                }
+            }
+
+            // Jonli bonus
             if (data && data.bonus !== undefined && data.bonus !== null) {
                 const newBonus = Number(data.bonus);
                 client.bonus = newBonus;
@@ -1205,7 +1361,9 @@ window.MobileApp = {
             }
 
             const receipts = (data && data.ok && Array.isArray(data.receipts)) ? data.receipts : [];
-            const totalSpend = receipts.reduce((acc, r) => acc + (parseFloat(r.total_amount) || 0), 0);
+            const totalSpend = (data && data.total_debit !== undefined && data.total_debit !== null)
+                ? Number(data.total_debit)
+                : receipts.filter(r => !r.is_payment).reduce((acc, r) => acc + (parseFloat(r.total_amount) || 0), 0);
 
             if (countEl) countEl.textContent = `${receipts.length} ta`;
             if (totalPurchasesEl) totalPurchasesEl.textContent = `${totalSpend.toLocaleString('uz-UZ')} so'm`;
@@ -1216,7 +1374,7 @@ window.MobileApp = {
                 receiptsListEl.innerHTML = `
                     <div style="text-align: center; padding: 24px 10px; color: var(--text-muted); font-size: 13px; background: rgba(255,255,255,0.02); border-radius: 12px;">
                         <i class="fas fa-receipt" style="font-size: 26px; opacity: 0.3; margin-bottom: 8px; display: block;"></i>
-                        <span>Biriktirilgan cheklar topilmadi</span>
+                        <span>Biriktirilgan cheklar yoki hisob-fakturalar topilmadi</span>
                     </div>
                 `;
                 return;
@@ -1234,7 +1392,8 @@ window.MobileApp = {
                 const dateStr = isNaN(d.getTime()) ? rec.created_at : d.toLocaleDateString('uz-UZ', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
                 const total = parseFloat(rec.total_amount) || 0;
                 const recCode = rec.code || 'CH-' + String(rec.id).substring(0, 8);
-                const payType = rec.payment_type || 'Naqd';
+                const isPayment = rec.is_payment === true;
+                const payType = rec.payment_type || (isPayment ? 'To\'lov' : 'Naqd');
                 const compName = rec.company_id === 'giperbrendstroy' ? 'Giper Brend Stroy' : (rec.company_id === 'protechctiy' ? 'Protech City' : (rec.company_id || ''));
 
                 let prodsHtml = '';
@@ -1250,25 +1409,42 @@ window.MobileApp = {
                     `;
                 });
 
-                html += `
-                    <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 12px; padding: 12px; margin-bottom: 8px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                            <span style="font-weight: 700; color: var(--accent); font-family: monospace; font-size: 13px;">
-                                <i class="fas fa-receipt"></i> ${recCode}
-                            </span>
-                            <span style="font-weight: 800; color: #10b981; font-size: 14px;">${total.toLocaleString('uz-UZ')} so'm</span>
-                        </div>
-                        <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); margin-bottom: 8px;">
-                            <span><i class="far fa-clock"></i> ${dateStr}</span>
-                            <span>${compName ? `<span class="badge" style="background: rgba(255,255,255,0.06); font-size: 10px; padding: 2px 6px;">${compName}</span>` : ''} ${payType}</span>
-                        </div>
-                        ${products.length > 0 ? `
-                            <div style="background: rgba(0,0,0,0.2); border-radius: 8px; padding: 6px 8px; margin-top: 6px;">
-                                ${prodsHtml}
+                if (isPayment) {
+                    html += `
+                        <div style="background: rgba(16, 185, 129, 0.05); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 12px; padding: 12px; margin-bottom: 8px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                                <span style="font-weight: 700; color: #10b981; font-family: monospace; font-size: 13px;">
+                                    <i class="fas fa-check-circle"></i> ${recCode}
+                                </span>
+                                <span style="font-weight: 800; color: #10b981; font-size: 14px;">+${total.toLocaleString('uz-UZ')} so'm</span>
                             </div>
-                        ` : ''}
-                    </div>
-                `;
+                            <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted);">
+                                <span><i class="far fa-clock"></i> ${dateStr}</span>
+                                <span><span class="badge" style="background: rgba(16, 185, 129, 0.2); color: #10b981; font-size: 10px; padding: 2px 7px;">${payType}</span></span>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    html += `
+                        <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 12px; padding: 12px; margin-bottom: 8px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                                <span style="font-weight: 700; color: var(--accent); font-family: monospace; font-size: 13px;">
+                                    <i class="fas fa-file-invoice"></i> ${recCode}
+                                </span>
+                                <span style="font-weight: 800; color: #f59e0b; font-size: 14px;">${total.toLocaleString('uz-UZ')} so'm</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); margin-bottom: 8px;">
+                                <span><i class="far fa-clock"></i> ${dateStr}</span>
+                                <span>${compName ? `<span class="badge" style="background: rgba(255,255,255,0.06); font-size: 10px; padding: 2px 6px;">${compName}</span>` : ''} <span class="badge" style="background: rgba(56, 189, 248, 0.12); color: #38bdf8; font-size: 10px; padding: 2px 6px;">${payType}</span></span>
+                            </div>
+                            ${products.length > 0 ? `
+                                <div style="background: rgba(0,0,0,0.2); border-radius: 8px; padding: 6px 8px; margin-top: 6px;">
+                                    ${prodsHtml}
+                                </div>
+                            ` : ''}
+                        </div>
+                    `;
+                }
             });
 
             receiptsListEl.innerHTML = html;
@@ -1924,8 +2100,9 @@ window.MobileApp = {
             id: partner.id || `regos_partner_${partner.regos_partner_id}`,
             name: partner.name,
             phone: partner.phone || partner.raw_phone || partner.phones || '',
-            phone2: partner.phones || '',
-            barcode: partner.inn || partner.regos_partner_id || '',
+            phone2: '',
+            barcode: partner.barcode || '',
+            regos_partner_id: partner.regos_partner_id,
             bonus: 0,
             value: 0,
             debt: 0,

@@ -349,6 +349,32 @@ def save_client(client_data: dict, request: Request):
         payload["created_at"] = datetime.now(timezone.utc).isoformat()
     return supabase_req("POST", "customers?on_conflict=id", json_data=payload, company_id=company_id)
 
+@app.patch("/api/clients/{client_id}/quick-update")
+def quick_update_client(client_id: str, payload: dict, request: Request):
+    company_id = get_company_id(request)
+    c_res = supabase_req("GET", f"customers?id=eq.{client_id}", company_id=company_id)
+    if not c_res or not isinstance(c_res, list) or len(c_res) == 0:
+        raise HTTPException(status_code=404, detail="Mijoz topilmadi")
+    c_item = c_res[0]
+    op_str = c_item.get("operator") or "{}"
+    meta = json.loads(op_str) if op_str.startswith("{") else {}
+    
+    patch_data = {}
+    if "barcode" in payload:
+        bc = str(payload["barcode"]).strip()
+        meta["barcode"] = bc
+        patch_data["phone2"] = bc
+    if "category" in payload:
+        cat = str(payload["category"]).strip().lower()
+        meta["category"] = cat
+        patch_data["company"] = "Qurilish" if cat == "qurilish" else ""
+    if "debt" in payload:
+        meta["debt"] = float(payload["debt"] or 0)
+    
+    patch_data["operator"] = json.dumps(meta, ensure_ascii=False)
+    supabase_req("PATCH", f"customers?id=eq.{client_id}", json_data=patch_data, company_id=company_id)
+    return {"ok": True, "meta": meta}
+
 @app.delete("/api/clients/{id}")
 def delete_client(id: str, request: Request):
     company_id = get_company_id(request)
@@ -539,12 +565,22 @@ def get_client_receipts(
     barcode: str = None, 
     card_id: str = None
 ):
-    import re
-    
-    # If phone or barcode not passed, try loading from customers table
-    if not phone and not barcode and client_id:
+    import re, time
+    from datetime import datetime, timezone
+    company_id = get_company_id(request)
+
+    partner_id = None
+    if client_id and client_id.startswith('regos_partner_'):
         try:
-            c_data = supabase_req("GET", f"customers?id=eq.{client_id}")
+            partner_id = int(client_id.replace('regos_partner_', ''))
+        except ValueError:
+            pass
+
+    client_debt = 0.0
+    # If phone or barcode not passed, try loading from customers table
+    if client_id:
+        try:
+            c_data = supabase_req("GET", f"customers?id=eq.{client_id}", company_id=company_id)
             if c_data and isinstance(c_data, list) and len(c_data) > 0:
                 c_item = c_data[0]
                 if not phone:
@@ -557,16 +593,20 @@ def get_client_receipts(
                         m = json.loads(op_str)
                         if not barcode:
                             barcode = m.get("barcode")
+                        if not partner_id and m.get("regos_partner_id"):
+                            partner_id = int(m.get("regos_partner_id"))
+                        client_debt = float(m.get("debt") or 0.0)
                     except Exception:
                         pass
         except Exception as e_c:
             print(f"Could not load customer record for receipts lookup: {e_c}")
 
     clean_p1 = re.sub(r'\D', '', str(phone or ''))
-    p1_9 = clean_p1[-9:] if len(clean_p1) >= 9 else clean_p1
+    # IMPORTANT: Only search phone if at least 7 digits (prevents matching short 4-digit partner IDs)
+    p1_9 = clean_p1[-9:] if len(clean_p1) >= 7 else None
     
     clean_p2 = re.sub(r'\D', '', str(phone2 or ''))
-    p2_9 = clean_p2[-9:] if len(clean_p2) >= 9 else clean_p2
+    p2_9 = clean_p2[-9:] if len(clean_p2) >= 7 else None
     
     bc = str(barcode or '').strip()
     
@@ -581,20 +621,20 @@ def get_client_receipts(
         queries.append(f"receipts?select=*&items->>customer_phone=ilike.*{p1_9}*&order=created_at.desc&limit=500")
     if p2_9 and p2_9 != p1_9:
         queries.append(f"receipts?select=*&items->>customer_phone=ilike.*{p2_9}*&order=created_at.desc&limit=500")
-    if bc:
+    if bc and len(bc) >= 5 and bc != str(partner_id):
         queries.append(f"receipts?select=*&items->>card_barcode=eq.{bc}&order=created_at.desc&limit=500")
         if len(bc) >= 9:
             bc_clean = re.sub(r'\D', '', bc)
-            if bc_clean[-9:] != p1_9 and bc_clean[-9:] != p2_9:
+            if bc_clean[-9:] != p1_9 and (not p2_9 or bc_clean[-9:] != p2_9):
                 queries.append(f"receipts?select=*&items->>customer_phone=ilike.*{bc_clean[-9:]}*&order=created_at.desc&limit=500")
     if c_id:
         queries.append(f"receipts?select=*&items->>card_id=eq.{c_id}&order=created_at.desc&limit=500")
-    if client_id:
+    if client_id and not partner_id:
         queries.append(f"receipts?select=*&items->>customer_id=eq.{client_id}&order=created_at.desc&limit=500")
 
     for q in queries:
         try:
-            res = supabase_req("GET", q)
+            res = supabase_req("GET", q, company_id=company_id)
             if isinstance(res, list):
                 for r in res:
                     if isinstance(r, dict) and "id" in r:
@@ -602,11 +642,93 @@ def get_client_receipts(
         except Exception as e:
             print(f"Error querying client receipts with {q}: {e}")
 
+    # If this client is a REGOS partner, fetch live partner balance & WSL sales & payments from REGOS
+    partner_debt = None
+    partner_total_debit = 0.0
+    partner_total_credit = 0.0
+    if partner_id:
+        try:
+            settings = get_company_settings(company_id, bypass_cache=True) if company_id else settings_state
+            regos_endpoint = (settings.get("regos_endpoint") or "").strip().rstrip("/")
+            regos_token = settings.get("regos_token") or ""
+            if regos_endpoint and regos_token:
+                if not regos_endpoint.startswith(("http://", "https://")):
+                    regos_endpoint = "https://" + regos_endpoint
+                pb_url = f"{regos_endpoint}/v1/partnerbalance/get" if "/v1" not in regos_endpoint else f"{regos_endpoint}/partnerbalance/get"
+                now_ts = int(time.time())
+                pb_payload = {
+                    "partner_id": int(partner_id),
+                    "start_date": 1577836800,  # from 2020-01-01
+                    "end_date": now_ts
+                }
+                pb_res = requests.post(pb_url, headers={"Authorization": f"Bearer {regos_token}", "Content-Type": "application/json"}, json=pb_payload, timeout=8)
+                if pb_res.status_code == 200:
+                    pb_data = pb_res.json()
+                    if pb_data.get("ok") and isinstance(pb_data.get("result"), list):
+                        for op in pb_data["result"]:
+                            deb = float(op.get("debit") or 0.0)
+                            cred = float(op.get("credit") or 0.0)
+                            partner_total_debit += deb
+                            partner_total_credit += cred
+                            
+                            doc_id = op.get("document_id")
+                            doc_code = op.get("document_code") or f"DOC-{doc_id}"
+                            op_date = op.get("date")
+                            d_str = datetime.fromtimestamp(op_date, tz=timezone.utc).isoformat() if op_date else ""
+                            doc_type_name = (op.get("document_type") or {}).get("name") or "Hisob-faktura"
+                            
+                            if deb > 0:
+                                collected[f"regos_wsl_{doc_id}"] = {
+                                    "id": f"regos_wsl_{doc_id}",
+                                    "code": doc_code,
+                                    "cashier_name": "REGOS",
+                                    "total_amount": deb,
+                                    "discount": 0.0,
+                                    "payment_type": "Yuk xati (Nasiya)" if deb > cred else "Hisobdan",
+                                    "created_at": d_str,
+                                    "company_id": company_id,
+                                    "items": {
+                                        "status": "REGOS WSL",
+                                        "doc_type": doc_type_name,
+                                        "products": []
+                                    }
+                                }
+                            elif cred > 0:
+                                collected[f"regos_pay_{doc_id}"] = {
+                                    "id": f"regos_pay_{doc_id}",
+                                    "code": f"To'lov: {doc_code}",
+                                    "cashier_name": "REGOS",
+                                    "total_amount": cred,
+                                    "discount": 0.0,
+                                    "payment_type": "Kirim To'lov",
+                                    "is_payment": True,
+                                    "created_at": d_str,
+                                    "company_id": company_id,
+                                    "items": {
+                                        "status": "REGOS To'lov",
+                                        "doc_type": doc_type_name,
+                                        "products": []
+                                    }
+                                }
+                        partner_debt = round(partner_total_debit - partner_total_credit, 2)
+                        # Asynchronously update debt in customer record if changed
+                        try:
+                            c_up = supabase_req("GET", f"customers?id=eq.{client_id}", company_id=company_id)
+                            if c_up and isinstance(c_up, list) and len(c_up) > 0:
+                                old_op = c_up[0].get("operator") or "{}"
+                                m_up = json.loads(old_op) if old_op.startswith("{") else {}
+                                if float(m_up.get("debt") or 0.0) != partner_debt:
+                                    m_up["debt"] = partner_debt
+                                    supabase_req("PATCH", f"customers?id=eq.{client_id}", json_data={"operator": json.dumps(m_up, ensure_ascii=False)}, company_id=company_id)
+                        except Exception:
+                            pass
+        except Exception as e_pb:
+            print(f"Error fetching partner balance: {e_pb}")
+
     receipts_list = list(collected.values())
     receipts_list.sort(key=lambda x: x.get("created_at", ""), reverse=True)
 
     # Automatically synchronize live bonus from REGOS
-    company_id = get_company_id(request)
     live_bonus = None
     try:
         live_bonus = sync_regos_card_bonus_helper(client_id=client_id, barcode=bc, phone=phone or phone2, company_id=company_id)
@@ -621,7 +743,17 @@ def get_client_receipts(
         except Exception:
             pass
 
-    return {"ok": True, "count": len(receipts_list), "receipts": receipts_list, "bonus": live_bonus}
+    final_debt = partner_debt if partner_debt is not None else client_debt
+
+    return {
+        "ok": True, 
+        "count": len(receipts_list), 
+        "receipts": receipts_list, 
+        "bonus": live_bonus,
+        "debt": final_debt,
+        "total_debit": partner_total_debit if partner_id else None,
+        "total_credit": partner_total_credit if partner_id else None
+    }
 
 @app.post("/api/clients/{client_id}/sync-bonus")
 def sync_client_bonus(client_id: str, request: Request):

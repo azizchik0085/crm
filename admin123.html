@@ -1726,12 +1726,14 @@ CREATE TABLE IF NOT EXISTS public.messages (
                     <div>
                         <div style="display: flex; align-items: center; gap: 10px;">
                             <h3 id="cdm-name" style="margin: 0; font-size: 18px; font-weight: 700; color: var(--text-main);">Mijoz Nomi</h3>
-                            <span id="cdm-category-badge" class="badge">Ustalar</span>
+                            <button type="button" id="cdm-category-badge" class="badge" onclick="CRM.toggleClientCategory()" style="border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600;" title="Toifani o'zgartirish (Usta / Qurilish)">
+                                <span>Ustalar</span> <i class="fas fa-sync-alt" style="font-size: 10px; opacity: 0.6; margin-left: 3px;"></i>
+                            </button>
                         </div>
-                        <div style="display: flex; align-items: center; gap: 12px; margin-top: 4px; font-size: 12px; color: var(--text-muted);">
-                            <span id="cdm-barcode-badge" style="font-family: monospace; background: rgba(56, 189, 248, 0.12); color: #38bdf8; padding: 2px 7px; border-radius: 4px; font-weight: 600;">
-                                <i class="fas fa-barcode"></i> -
-                            </span>
+                        <div style="display: flex; align-items: center; gap: 12px; margin-top: 5px; font-size: 12px; color: var(--text-muted);">
+                            <button type="button" id="cdm-barcode-badge" onclick="CRM.editClientBarcode()" style="border: none; cursor: pointer; font-family: monospace; background: rgba(56, 189, 248, 0.12); color: #38bdf8; padding: 3px 9px; border-radius: 6px; font-weight: 600; display: inline-flex; align-items: center; gap: 5px;" title="Shtrix-kodni o'zgartirish yoki qo'shish">
+                                <i class="fas fa-barcode"></i> <span id="cdm-barcode-text">-</span> <i class="fas fa-pencil-alt" style="font-size: 9px; opacity: 0.7;"></i>
+                            </button>
                             <span id="cdm-created-date"><i class="far fa-calendar-alt"></i> -</span>
                         </div>
                     </div>
@@ -1749,6 +1751,24 @@ CREATE TABLE IF NOT EXISTS public.messages (
                 
                 <!-- Quick KPI Summary Cards -->
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px;">
+                    <!-- Qarz Balansi Card -->
+                    <div id="cdm-debt-card" style="background: rgba(239, 68, 68, 0.05); border: 1px solid rgba(239, 68, 68, 0.25); border-radius: 12px; padding: 14px 16px; position: relative;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                            <span id="cdm-debt-title" style="font-size: 12px; font-weight: 600; color: #ef4444; text-transform: uppercase; letter-spacing: 0.5px;">
+                                <i class="fas fa-hand-holding-usd" style="margin-right: 4px;"></i> Qarz Balansi
+                            </span>
+                            <span id="cdm-debt-badge" style="background: rgba(239, 68, 68, 0.2); color: #ef4444; border-radius: 20px; padding: 2px 8px; font-size: 11px; font-weight: 600;">
+                                Qarzdorlik
+                            </span>
+                        </div>
+                        <div id="cdm-debt-display" style="font-size: 22px; font-weight: 800; color: #ef4444; margin-bottom: 10px; font-family: 'JetBrains Mono', monospace;">
+                            0 so'm
+                        </div>
+                        <div id="cdm-debt-subtext" style="font-size: 12px; color: var(--text-muted);">
+                            -
+                        </div>
+                    </div>
+
                     <!-- Bonus Balansi Card -->
                     <div style="background: linear-gradient(145deg, rgba(16, 185, 129, 0.08), rgba(16, 185, 129, 0.02)); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 12px; padding: 14px 16px; position: relative;">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">

@@ -2419,26 +2419,25 @@ window.CRM = {
         if (catBadgeEl) {
             if (cat === 'qurilish') {
                 catBadgeEl.className = 'badge';
-                catBadgeEl.style.cssText = 'background: rgba(139, 92, 246, 0.15); color: #a78bfa; border: 1px solid rgba(139, 92, 246, 0.3); font-size: 12px; padding: 3px 8px; border-radius: 6px; font-weight: 600;';
-                catBadgeEl.innerHTML = '<i class="fas fa-building" style="margin-right: 4px;"></i> Qurilish obyekti';
+                catBadgeEl.style.cssText = 'border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; background: rgba(139, 92, 246, 0.15); color: #a78bfa; border: 1px solid rgba(139, 92, 246, 0.3);';
+                catBadgeEl.innerHTML = '<i class="fas fa-building" style="margin-right: 3px;"></i> <span>Qurilish obyekti</span> <i class="fas fa-sync-alt" style="font-size: 10px; opacity: 0.6; margin-left: 3px;"></i>';
             } else {
                 catBadgeEl.className = 'badge';
-                catBadgeEl.style.cssText = 'background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); font-size: 12px; padding: 3px 8px; border-radius: 6px; font-weight: 600;';
-                catBadgeEl.innerHTML = '<i class="fas fa-hammer" style="margin-right: 4px;"></i> Ustalar';
+                catBadgeEl.style.cssText = 'border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3);';
+                catBadgeEl.innerHTML = '<i class="fas fa-hammer" style="margin-right: 3px;"></i> <span>Ustalar</span> <i class="fas fa-sync-alt" style="font-size: 10px; opacity: 0.6; margin-left: 3px;"></i>';
             }
         }
 
         // Shtrix-kod badji
-        const barcodeVal = client.barcode || client.phone2 || '';
+        const barcodeVal = client.barcode || '';
+        const barcodeTextEl = document.getElementById('cdm-barcode-text');
         const barcodeBadgeEl = document.getElementById('cdm-barcode-badge');
-        if (barcodeBadgeEl) {
-            if (barcodeVal) {
-                barcodeBadgeEl.innerHTML = `<i class="fas fa-barcode"></i> ${barcodeVal}`;
-                barcodeBadgeEl.style.display = 'inline-flex';
-            } else {
-                barcodeBadgeEl.style.display = 'none';
-            }
+        if (barcodeTextEl) {
+            barcodeTextEl.textContent = barcodeVal || "Shtrix-kod yo'q";
+        } else if (barcodeBadgeEl) {
+            barcodeBadgeEl.innerHTML = `<i class="fas fa-barcode"></i> ${barcodeVal || "Shtrix-kod yo'q"}`;
         }
+        if (barcodeBadgeEl) barcodeBadgeEl.style.display = 'inline-flex';
 
         // Sana
         const dateEl = document.getElementById('cdm-created-date');
@@ -2459,6 +2458,9 @@ window.CRM = {
                 CRM.openEditClientModal(id);
             };
         }
+
+        // Qarz ko'rsatkich
+        this._updateDebtUI(Number(client.debt || 0), client);
 
         // Bonus ko'rsatkich
         const bonus = Number(client.bonus || client.value || 0);
@@ -2526,6 +2528,156 @@ window.CRM = {
         this.loadClientReceipts(client);
         this.renderClientBonusHistory(client);
         this.checkAndTrackRegosSync();
+    },
+
+    _updateDebtUI: function(debt, client, totalDebit, totalCredit) {
+        const debtCard = document.getElementById('cdm-debt-card');
+        const debtTitleEl = document.getElementById('cdm-debt-title');
+        const debtBadgeEl = document.getElementById('cdm-debt-badge');
+        const debtDispEl = document.getElementById('cdm-debt-display');
+        const debtSubEl = document.getElementById('cdm-debt-subtext');
+
+        if (!debtCard || !debtDispEl) return;
+
+        debt = Number(debt || 0);
+
+        if (debt > 0) {
+            debtCard.style.background = 'rgba(239, 68, 68, 0.05)';
+            debtCard.style.borderColor = 'rgba(239, 68, 68, 0.25)';
+            if (debtTitleEl) {
+                debtTitleEl.style.color = '#ef4444';
+                debtTitleEl.innerHTML = '<i class="fas fa-hand-holding-usd" style="margin-right: 4px;"></i> Qarz Balansi';
+            }
+            if (debtBadgeEl) {
+                debtBadgeEl.style.background = 'rgba(239, 68, 68, 0.2)';
+                debtBadgeEl.style.color = '#ef4444';
+                debtBadgeEl.textContent = 'Qarzdorlik';
+            }
+            debtDispEl.style.color = '#ef4444';
+            debtDispEl.textContent = `${debt.toLocaleString('uz-UZ')} so'm`;
+            if (debtSubEl) {
+                if (totalDebit !== undefined && totalCredit !== undefined) {
+                    debtSubEl.textContent = `Xarid: ${Number(totalDebit).toLocaleString('uz-UZ')} | To'langan: ${Number(totalCredit).toLocaleString('uz-UZ')}`;
+                } else {
+                    debtSubEl.textContent = "Mijozning to'lanmagan qarzi mavjud";
+                }
+            }
+        } else if (debt === 0) {
+            debtCard.style.background = 'rgba(16, 185, 129, 0.05)';
+            debtCard.style.borderColor = 'rgba(16, 185, 129, 0.25)';
+            if (debtTitleEl) {
+                debtTitleEl.style.color = '#10b981';
+                debtTitleEl.innerHTML = '<i class="fas fa-check-circle" style="margin-right: 4px;"></i> Qarz Holati';
+            }
+            if (debtBadgeEl) {
+                debtBadgeEl.style.background = 'rgba(16, 185, 129, 0.2)';
+                debtBadgeEl.style.color = '#10b981';
+                debtBadgeEl.textContent = "Qarzi yo'q";
+            }
+            debtDispEl.style.color = '#10b981';
+            debtDispEl.textContent = "0 so'm";
+            if (debtSubEl) {
+                debtSubEl.textContent = "Barcha hisob-kitoblar to'liq to'langan";
+            }
+        } else {
+            // debt < 0: avans / ortiqcha to'lov
+            debtCard.style.background = 'rgba(56, 189, 248, 0.05)';
+            debtCard.style.borderColor = 'rgba(56, 189, 248, 0.25)';
+            if (debtTitleEl) {
+                debtTitleEl.style.color = '#38bdf8';
+                debtTitleEl.innerHTML = '<i class="fas fa-handshake" style="margin-right: 4px;"></i> Ortiqcha to\'lov';
+            }
+            if (debtBadgeEl) {
+                debtBadgeEl.style.background = 'rgba(56, 189, 248, 0.2)';
+                debtBadgeEl.style.color = '#38bdf8';
+                debtBadgeEl.textContent = 'Avans / Haqdor';
+            }
+            debtDispEl.style.color = '#38bdf8';
+            debtDispEl.textContent = `${Math.abs(debt).toLocaleString('uz-UZ')} so'm`;
+            if (debtSubEl) {
+                debtSubEl.textContent = "Mijoz foydasiga ortiqcha to'lov";
+            }
+        }
+    },
+
+    toggleClientCategory: async function() {
+        if (!this._currentDetailClientId) return;
+        let clients = this._clientsCache || [];
+        let client = clients.find(c => c.id === this._currentDetailClientId);
+        if (!client) return;
+
+        const currentCat = (client.category || 'ustalar').toLowerCase();
+        const newCat = currentCat === 'ustalar' ? 'qurilish' : 'ustalar';
+
+        client.category = newCat;
+        if (newCat === 'qurilish') client.company = client.company || 'Qurilish';
+        else client.company = '';
+
+        const catBadgeEl = document.getElementById('cdm-category-badge');
+        if (catBadgeEl) {
+            if (newCat === 'qurilish') {
+                catBadgeEl.style.background = 'rgba(139, 92, 246, 0.15)';
+                catBadgeEl.style.color = '#a78bfa';
+                catBadgeEl.style.borderColor = 'rgba(139, 92, 246, 0.3)';
+                catBadgeEl.innerHTML = '<i class="fas fa-building" style="margin-right: 3px;"></i> <span>Qurilish obyekti</span> <i class="fas fa-sync-alt" style="font-size: 10px; opacity: 0.6; margin-left: 3px;"></i>';
+            } else {
+                catBadgeEl.style.background = 'rgba(16, 185, 129, 0.15)';
+                catBadgeEl.style.color = '#10b981';
+                catBadgeEl.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+                catBadgeEl.innerHTML = '<i class="fas fa-hammer" style="margin-right: 3px;"></i> <span>Ustalar</span> <i class="fas fa-sync-alt" style="font-size: 10px; opacity: 0.6; margin-left: 3px;"></i>';
+            }
+        }
+
+        const infoCatEl = document.getElementById('cdm-info-category');
+        if (infoCatEl) {
+            infoCatEl.textContent = newCat === 'qurilish' ? 'Qurilish obyekti' : 'Ustalar';
+        }
+
+        try {
+            await fetch(`/api/clients/${encodeURIComponent(client.id)}/quick-update`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ category: newCat })
+            });
+            await this.loadClients();
+        } catch(e) {
+            console.error("Toifani yangilashda xatolik:", e);
+        }
+    },
+
+    editClientBarcode: async function() {
+        if (!this._currentDetailClientId) return;
+        let clients = this._clientsCache || [];
+        let client = clients.find(c => c.id === this._currentDetailClientId);
+        if (!client) return;
+
+        const currentBc = client.barcode || '';
+        const newBc = prompt("Mijoz uchun yangi shtrix-kodni kiriting (yoki bo'sh qoldiring):", currentBc);
+        if (newBc === null) return;
+
+        const cleanBc = newBc.trim();
+        client.barcode = cleanBc;
+
+        const bcTextEl = document.getElementById('cdm-barcode-text');
+        if (bcTextEl) {
+            bcTextEl.textContent = cleanBc || "Shtrix-kod yo'q";
+        }
+        const infoBcEl = document.getElementById('cdm-info-barcode');
+        if (infoBcEl) {
+            infoBcEl.textContent = cleanBc || '-';
+        }
+
+        try {
+            await fetch(`/api/clients/${encodeURIComponent(client.id)}/quick-update`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ barcode: cleanBc })
+            });
+            await this.loadClients();
+            this.loadClientReceipts(client);
+        } catch(e) {
+            console.error("Shtrix-kodni saqlashda xatolik:", e);
+        }
     },
 
     switchClientDetailTab: function(tabName) {
@@ -2815,6 +2967,7 @@ window.CRM = {
             const currency = settings.currency || "so'm";
 
             let clientReceipts = [];
+            let receiptsApiData = null;
             try {
                 const params = new URLSearchParams();
                 if (client.phone) params.append('phone', client.phone);
@@ -2824,9 +2977,19 @@ window.CRM = {
                 const resp = await fetch(`/api/clients/${encodeURIComponent(client.id)}/receipts?${params.toString()}`);
                 if (resp.ok) {
                     const data = await resp.json();
+                    receiptsApiData = data;
                     if (data && data.ok) {
                         if (Array.isArray(data.receipts)) {
                             clientReceipts = data.receipts;
+                        }
+                        if (data.debt !== undefined && data.debt !== null) {
+                            const newDebt = Number(data.debt);
+                            client.debt = newDebt;
+                            this._updateDebtUI(newDebt, client, data.total_debit, data.total_credit);
+                            if (this._clientsCache) {
+                                const found = this._clientsCache.find(c => c.id === client.id);
+                                if (found) found.debt = newDebt;
+                            }
                         }
                         if (data.bonus !== undefined && data.bonus !== null) {
                             const newBonus = Number(data.bonus);
@@ -2890,7 +3053,9 @@ window.CRM = {
 
             clientReceipts.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
-            const totalSpend = clientReceipts.reduce((acc, r) => acc + (parseFloat(r.total_amount) || 0), 0);
+            const totalSpend = (receiptsApiData && receiptsApiData.total_debit !== undefined && receiptsApiData.total_debit !== null)
+                ? Number(receiptsApiData.total_debit)
+                : clientReceipts.filter(r => !r.is_payment).reduce((acc, r) => acc + (parseFloat(r.total_amount) || 0), 0);
 
             if (countEl) countEl.textContent = `${clientReceipts.length} ta`;
             if (badgeEl) badgeEl.textContent = `${clientReceipts.length}`;
@@ -2930,14 +3095,46 @@ window.CRM = {
                 const dateObj = new Date(rec.created_at);
                 const dateStr = isNaN(dateObj.getTime()) ? rec.created_at : dateObj.toLocaleString('uz-UZ', { hour12: false });
                 const recCode = rec.code || 'CH-' + String(rec.id).substring(0, 8);
-                const payType = rec.payment_type || 'Naqd';
-                const payBadgeClass = payType === 'Karta' 
-                    ? 'badge-primary' 
-                    : (payType === 'Elektron' ? 'badge-success' : 'badge-secondary');
+                const isPayment = rec.is_payment === true;
+                const payType = rec.payment_type || (isPayment ? "To'lov (Kirim)" : 'Naqd');
+                const totalAmount = parseFloat(rec.total_amount) || 0;
 
                 let compName = '';
                 if (rec.company_id) {
                     compName = rec.company_id === 'giperbrendstroy' ? 'Giper Brend Stroy' : (rec.company_id === 'protechctiy' ? 'Protech City' : rec.company_id);
+                }
+
+                if (isPayment) {
+                    html += `
+                        <div style="background: rgba(16, 185, 129, 0.04); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 10px; transition: var(--transition);">
+                            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <span style="font-weight: 700; color: #10b981; font-family: monospace; font-size: 13.5px;">
+                                        <i class="fas fa-check-circle" style="margin-right: 4px;"></i> ${recCode}
+                                    </span>
+                                    <span class="badge" style="background: rgba(16, 185, 129, 0.2); color: #10b981; font-size: 11px; padding: 2px 8px; border-radius: 5px; font-weight: 600;">
+                                        ${payType}
+                                    </span>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 12px;">
+                                    <span style="color: var(--text-muted); font-size: 12px;">
+                                        <i class="far fa-clock" style="margin-right: 4px;"></i> ${dateStr}
+                                    </span>
+                                    <span style="font-size: 16px; font-weight: 800; color: #10b981; font-family: monospace;">
+                                        +${totalAmount.toLocaleString('uz-UZ')} ${currency}
+                                    </span>
+                                </div>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11.5px; color: var(--text-muted); border-top: 1px dashed rgba(255,255,255,0.06); padding-top: 6px;">
+                                <span>
+                                    ${compName ? `<span class="badge" style="background: rgba(255,255,255,0.08); color: var(--text-muted); margin-right: 6px; font-size: 10px; text-transform: uppercase;"><i class="fas fa-store" style="font-size: 9px; margin-right: 3px;"></i>${compName}</span>` : ''}
+                                    <i class="fas fa-file-invoice-dollar" style="margin-right: 4px; color: #10b981;"></i> REGOS orqali to'lov kiritilgan
+                                </span>
+                                <span style="color: #10b981; font-weight: 600;">Kirim to'lovi</span>
+                            </div>
+                        </div>
+                    `;
+                    return;
                 }
 
                 let productsRows = '';
@@ -2958,14 +3155,22 @@ window.CRM = {
                     `;
                 });
 
+                const isWsl = recCode.startsWith('WSL');
+                const payBadgeClass = isWsl 
+                    ? '' 
+                    : (payType === 'Karta' ? 'badge-primary' : (payType === 'Elektron' ? 'badge-success' : 'badge-secondary'));
+                const payBadgeStyle = isWsl 
+                    ? 'background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); font-size: 11px; padding: 2px 7px; border-radius: 5px; font-weight: 600;' 
+                    : 'font-size: 11px; padding: 2px 7px; border-radius: 5px; font-weight: 600;';
+
                 html += `
                     <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 10px; transition: var(--transition);">
                         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
                             <div style="display: flex; align-items: center; gap: 10px;">
-                                <span style="font-weight: 700; color: var(--accent); font-family: monospace; font-size: 13.5px;">
-                                    <i class="fas fa-receipt" style="margin-right: 4px;"></i> ${recCode}
+                                <span style="font-weight: 700; color: ${isWsl ? '#38bdf8' : 'var(--accent)'}; font-family: monospace; font-size: 13.5px;">
+                                    <i class="fas ${isWsl ? 'fa-file-invoice' : 'fa-receipt'}" style="margin-right: 4px;"></i> ${recCode}
                                 </span>
-                                <span class="badge ${payBadgeClass}" style="font-size: 11px; padding: 2px 7px; border-radius: 5px; font-weight: 600;">
+                                <span class="badge ${payBadgeClass}" style="${payBadgeStyle}">
                                     ${payType}
                                 </span>
                             </div>
@@ -2973,8 +3178,8 @@ window.CRM = {
                                 <span style="color: var(--text-muted); font-size: 12px;">
                                     <i class="far fa-clock" style="margin-right: 4px;"></i> ${dateStr}
                                 </span>
-                                <span style="font-size: 15px; font-weight: 800; color: #10b981; font-family: monospace;">
-                                    ${(parseFloat(rec.total_amount) || 0).toLocaleString('uz-UZ')} ${currency}
+                                <span style="font-size: 15px; font-weight: 800; color: ${isWsl ? '#f59e0b' : '#10b981'}; font-family: monospace;">
+                                    ${totalAmount.toLocaleString('uz-UZ')} ${currency}
                                 </span>
                             </div>
                         </div>
@@ -3650,8 +3855,9 @@ window.CRM = {
             name: partner.name,
             category: category || partner.default_category || 'ustalar',
             phone: partner.phone || partner.raw_phone || partner.phones || '',
-            phone2: partner.phones || '',
-            barcode: partner.inn || partner.regos_partner_id || '',
+            phone2: '',
+            barcode: partner.barcode || '',
+            regos_partner_id: partner.regos_partner_id,
             bonus: 0,
             value: 0,
             debt: 0,
