@@ -2257,15 +2257,20 @@
             <div class="modal-body" style="padding: 18px 22px; overflow-y: auto; flex-grow: 1;">
                 <!-- TAB 1: KONTRAGENTLAR (DEFAULT) -->
                 <div id="regos-view-partners">
-                    <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 14px;">
+                    <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">
                         REGOS bazasidagi kontragentlarni guruh bo'yicha saralang yoki qidiring. Faqat siz tanlaganlar CRM mijozlar ro'yxatiga qo'shiladi.
                     </p>
+
+                    <!-- Group Filter Pills (Horizontal Quick Filter) -->
+                    <div class="filter-pills" id="regos-partner-group-pills" style="margin-bottom: 12px; display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none;">
+                        <button type="button" class="filter-pill active" data-group-id="" onclick="CRM.selectPartnerGroupPill('', this)">📁 Barchasi</button>
+                    </div>
 
                     <!-- Filter & Search Bar -->
                     <div style="display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap;">
                         <div style="min-width: 180px; flex: 1;">
-                            <select id="regos-partner-group-filter" class="form-control" onchange="CRM.onRegosPartnerGroupChange()" style="height: 42px; font-size: 13.5px; background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); color: var(--text-main); border-radius: 8px; width: 100%;">
-                                <option value="">📁 Barcha guruhlar</option>
+                            <select id="regos-partner-group-filter" class="form-control" onchange="CRM.onRegosPartnerGroupChange()" style="height: 42px; font-size: 13.5px; background-color: #0f172a !important; color: #f8fafc !important; color-scheme: dark !important; border: 1px solid var(--border-color); border-radius: 8px; width: 100%;">
+                                <option value="" style="background-color: #0f172a; color: #ffffff;">📁 Barcha guruhlar</option>
                             </select>
                         </div>
                         <div class="search-box" style="flex: 2; min-width: 200px; margin: 0; position: relative;">

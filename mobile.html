@@ -600,9 +600,14 @@
                         Guruh bo'yicha saralang yoki ism/telefon orqali qidiring. Faqat tanlanganlar qo'shiladi:
                     </p>
 
+                    <!-- Group Filter Pills -->
+                    <div class="filter-pills" id="m-regos-group-pills" style="margin-bottom: 10px; display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none;">
+                        <button type="button" class="filter-pill active" data-group-id="" onclick="MobileApp.selectGroupPill('', this)">📁 Barchasi</button>
+                    </div>
+
                     <div style="margin-bottom: 10px;">
-                        <select id="m-regos-group-filter" class="form-control" onchange="MobileApp.onPartnerGroupChange()" style="height: 40px; font-size: 13px; border-radius: 8px; background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); color: var(--text-main); width: 100%; margin-bottom: 8px;">
-                            <option value="">📁 Barcha guruhlar</option>
+                        <select id="m-regos-group-filter" class="form-control" onchange="MobileApp.onPartnerGroupChange()" style="height: 42px; font-size: 13px; border-radius: 8px; background-color: #0f172a !important; color: #f8fafc !important; color-scheme: dark !important; border: 1px solid var(--border-color); width: 100%; margin-bottom: 8px;">
+                            <option value="" style="background-color: #0f172a; color: #ffffff;">📁 Barcha guruhlar</option>
                         </select>
                         <div style="display: flex; gap: 8px;">
                             <input type="text" id="m-regos-partner-search-input" class="form-control" placeholder="Ism yoki telefon..." onkeydown="if(event.key==='Enter') MobileApp.searchRegosPartners()" style="height: 40px; font-size: 13px;">

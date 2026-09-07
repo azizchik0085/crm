@@ -1541,28 +1541,83 @@ window.MobileApp = {
         }
     },
 
+    _getGroupIcon: function(name) {
+        const n = (name || '').toLowerCase();
+        if (n.includes('усто') || n.includes('usta')) return '🔨';
+        if (n.includes('покупател') || n.includes('xaridor') || n.includes('mijoz')) return '🛒';
+        if (n.includes('поставщик') || n.includes("ta'minot") || n.includes('ombor')) return '📦';
+        if (n.includes('imkon') || n.includes('ishonch')) return '🤝';
+        if (n.includes('работ') || n.includes('xodim')) return '👷';
+        if (n.includes('машин') || n.includes('avto')) return '🚗';
+        if (n.includes('кредит') || n.includes('nasiya')) return '💳';
+        if (n.includes('залог')) return '🔒';
+        if (n.includes('систем')) return '💻';
+        return '📁';
+    },
+
     loadRegosPartnerGroups: async function() {
-        const select = document.getElementById('m-regos-group-filter');
-        if (!select) return;
-        if (this._regosPartnerGroups && this._regosPartnerGroups.length > 0) return;
+        if (this._regosPartnerGroups && this._regosPartnerGroups.length > 0) {
+            this._renderPartnerGroupOptions(this._regosPartnerGroups);
+            return;
+        }
 
         try {
             const resp = await fetch('/api/integration/regos/partner-groups');
             const data = await resp.json();
             if (data.ok && Array.isArray(data.groups)) {
                 this._regosPartnerGroups = data.groups;
-                let html = '<option value="">📁 Barcha guruhlar</option>';
-                data.groups.forEach(g => {
-                    html += `<option value="${g.id}">${g.name}</option>`;
-                });
-                select.innerHTML = html;
+                this._renderPartnerGroupOptions(data.groups);
             }
         } catch (e) {
             console.error("Mobile partner guruhlarini yuklashda xatolik:", e);
         }
     },
 
+    _renderPartnerGroupOptions: function(groups) {
+        const select = document.getElementById('m-regos-group-filter');
+        const pillsContainer = document.getElementById('m-regos-group-pills');
+
+        if (select) {
+            let html = '<option value="" style="background-color: #0f172a !important; color: #ffffff !important; padding: 10px;">📁 Barcha guruhlar</option>';
+            groups.forEach(g => {
+                const icon = this._getGroupIcon(g.name);
+                html += `<option value="${g.id}" style="background-color: #0f172a !important; color: #ffffff !important; padding: 10px;">${icon} ${g.name}</option>`;
+            });
+            select.innerHTML = html;
+        }
+
+        if (pillsContainer) {
+            let pillsHtml = `<button type="button" class="filter-pill active" data-group-id="" onclick="MobileApp.selectGroupPill('', this)">📁 Barchasi</button>`;
+            groups.forEach(g => {
+                const icon = this._getGroupIcon(g.name);
+                pillsHtml += `<button type="button" class="filter-pill" data-group-id="${g.id}" onclick="MobileApp.selectGroupPill('${g.id}', this)">${icon} ${g.name}</button>`;
+            });
+            pillsContainer.innerHTML = pillsHtml;
+        }
+    },
+
+    selectGroupPill: function(groupId, btnEl) {
+        const pills = document.querySelectorAll('#m-regos-group-pills .filter-pill');
+        pills.forEach(p => p.classList.remove('active'));
+        if (btnEl) btnEl.classList.add('active');
+
+        const select = document.getElementById('m-regos-group-filter');
+        if (select) select.value = groupId || '';
+
+        this.searchRegosPartners();
+    },
+
     onPartnerGroupChange: function() {
+        const select = document.getElementById('m-regos-group-filter');
+        const val = select ? select.value : '';
+        const pills = document.querySelectorAll('#m-regos-group-pills .filter-pill');
+        pills.forEach(p => {
+            if (p.getAttribute('data-group-id') === String(val)) {
+                p.classList.add('active');
+            } else {
+                p.classList.remove('active');
+            }
+        });
         this.searchRegosPartners();
     },
 
@@ -1615,28 +1670,29 @@ window.MobileApp = {
             partners.forEach(partner => {
                 const isAdded = partner.is_already_added;
                 const defaultCat = partner.default_category || 'ustalar';
+                const groupIcon = this._getGroupIcon(partner.group_name);
 
                 html += `
                     <div style="background: rgba(255,255,255,0.03); border: 1px solid ${isAdded ? 'rgba(16, 185, 129, 0.3)' : 'var(--border-color)'}; border-radius: 12px; padding: 12px; margin-bottom: 10px;">
                         <div style="display: flex; align-items: flex-start; gap: 10px;">
-                            <input type="checkbox" class="m-partner-checkbox" data-id="${partner.regos_partner_id}" ${isAdded ? 'disabled' : ''} onchange="MobileApp.onPartnerCheckboxChange()" style="width: 18px; height: 18px; margin-top: 2px;">
+                            <input type="checkbox" class="m-partner-checkbox" data-id="${partner.regos_partner_id}" ${isAdded ? 'disabled' : ''} onchange="MobileApp.onPartnerCheckboxChange()" style="width: 18px; height: 18px; margin-top: 2px; accent-color: #38bdf8;">
                             <div style="flex: 1;">
                                 <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 6px; margin-bottom: 3px;">
-                                    <strong style="font-size: 14px; color: var(--text-main);">${partner.name}</strong>
+                                    <strong style="font-size: 14px; color: #f8fafc;">${partner.name}</strong>
                                     ${isAdded ? '<span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #10b981; font-size: 11px; padding: 2px 6px; border-radius: 4px; white-space: nowrap;">Qo\'shilgan</span>' : ''}
                                 </div>
                                 <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 8px;">
                                     <span><i class="fas fa-phone-alt" style="color: var(--success);"></i> ${partner.phone || partner.phones || '-'}</span>
-                                    ${partner.group_name ? ` | <span class="badge" style="background: rgba(56, 189, 248, 0.12); color: #38bdf8; font-size: 10.5px; padding: 1px 6px; border-radius: 4px;">${partner.group_name}</span>` : ''}
+                                    ${partner.group_name ? ` | <span class="badge" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; font-size: 10.5px; padding: 1px 7px; border-radius: 4px; font-weight: 600;">${groupIcon} ${partner.group_name}</span>` : ''}
                                     ${partner.address ? `<div style="margin-top: 3px;"><i class="fas fa-map-marker-alt" style="color: #f59e0b;"></i> ${partner.address}</div>` : ''}
                                 </div>
 
                                 <div id="m-partner-action-box-${partner.regos_partner_id}">
                                     ${isAdded ? '' : `
                                         <div style="display: flex; gap: 8px;">
-                                            <select id="m-partner-cat-${partner.regos_partner_id}" class="form-control" style="height: 36px; font-size: 12px; border-radius: 8px; background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); color: var(--text-main); flex: 1;">
-                                                <option value="ustalar" ${defaultCat === 'ustalar' ? 'selected' : ''}>🔨 Ustalar</option>
-                                                <option value="qurilish" ${defaultCat === 'qurilish' ? 'selected' : ''}>🏢 Qurilish Obyekti</option>
+                                            <select id="m-partner-cat-${partner.regos_partner_id}" class="form-control" style="height: 36px; font-size: 12px; border-radius: 8px; background-color: #0f172a !important; color: #f8fafc !important; color-scheme: dark !important; border: 1px solid var(--border-color); flex: 1;">
+                                                <option value="ustalar" style="background-color: #0f172a !important; color: #ffffff !important;" ${defaultCat === 'ustalar' ? 'selected' : ''}>🔨 Ustalar</option>
+                                                <option value="qurilish" style="background-color: #0f172a !important; color: #ffffff !important;" ${defaultCat === 'qurilish' ? 'selected' : ''}>🏢 Qurilish Obyekti</option>
                                             </select>
                                             <button class="btn btn-primary" id="m-btn-add-partner-${partner.regos_partner_id}" style="height: 36px; padding: 0 14px; font-size: 12px; font-weight: 600;" onclick="MobileApp.addSinglePartner('${partner.regos_partner_id}')">
                                                 <i class="fas fa-plus"></i> Qo'shish
