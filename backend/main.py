@@ -453,7 +453,154 @@ def delete_client(id: str, request: Request):
         path += f"&company_id=eq.{company_id}"
     return supabase_req("DELETE", path, company_id=company_id)
 
-# --- REGOS CARD BONUS SYNCHRONIZATION HELPERS ---
+# --- REGOS CARD BONUS OPERATIONS & SYNCHRONIZATION HELPERS ---
+def execute_regos_bonus_operation(
+    client_id: str = None,
+    barcode: str = None,
+    phone: str = None,
+    action: str = "outcome",
+    amount: float = 0.0,
+    description: str = "",
+    company_id: str = None
+) -> dict:
+    try:
+        if amount <= 0:
+            return {"ok": False, "detail": "Summa 0 dan katta bo'lishi kerak"}
+
+        customer_record = None
+        clean_bc = str(barcode or "").strip()
+        card_id = None
+
+        if client_id:
+            if str(client_id).startswith("regos_card_"):
+                try:
+                    card_id = int(str(client_id).replace("regos_card_", ""))
+                except Exception:
+                    pass
+            c_res = supabase_req("GET", f"customers?id=eq.{client_id}&select=*", company_id=company_id)
+            if c_res and isinstance(c_res, list) and len(c_res) > 0:
+                customer_record = c_res[0]
+                if not company_id:
+                    company_id = customer_record.get("company_id")
+                if not clean_bc:
+                    clean_bc = str(customer_record.get("phone2") or "").strip()
+                if not phone:
+                    phone = customer_record.get("phone")
+                op_raw = customer_record.get("operator") or ""
+                if op_raw.startswith("{"):
+                    try:
+                        m = json.loads(op_raw)
+                        if not clean_bc:
+                            clean_bc = str(m.get("barcode") or "").strip()
+                        if not card_id and m.get("regos_card_id"):
+                            card_id = int(m.get("regos_card_id"))
+                    except Exception:
+                        pass
+
+        settings = get_company_settings(company_id, bypass_cache=True) if company_id else settings_state
+        regos_endpoint = settings.get("regos_endpoint", "")
+        regos_token = settings.get("regos_token", "")
+
+        if not regos_endpoint or not regos_token:
+            return {"ok": False, "detail": "REGOS integratsiya sozlamalari (endpoint yoki token) mavjud emas"}
+
+        endpoint = regos_endpoint.strip().rstrip("/")
+        if not endpoint.startswith(("http://", "https://")):
+            endpoint = "https://" + endpoint
+
+        regos_headers = {
+            "Authorization": f"Bearer {regos_token}",
+            "Content-Type": "application/json"
+        }
+
+        cards = []
+        get_card_url = f"{endpoint}/v1/retailcard/get" if "/v1" not in endpoint else f"{endpoint}/retailcard/get"
+
+        if clean_bc:
+            try:
+                r_bc = requests.post(get_card_url, headers=regos_headers, json={"barcode_value": clean_bc, "limit": 1}, timeout=6)
+                if r_bc.status_code == 200 and r_bc.json().get("ok"):
+                    cards = r_bc.json().get("result", [])
+            except Exception as e_bc:
+                print(f"REGOS search by barcode error: {e_bc}")
+
+        if not cards and card_id:
+            try:
+                r_id = requests.post(get_card_url, headers=regos_headers, json={"search": str(card_id), "limit": 10}, timeout=6)
+                if r_id.status_code == 200 and r_id.json().get("ok"):
+                    cards = [c for c in r_id.json().get("result", []) if int(c.get("id")) == int(card_id)]
+            except Exception as e_id:
+                print(f"REGOS search by card id error: {e_id}")
+
+        if not cards and phone:
+            digits_phone = "".join(ch for ch in str(phone) if ch.isdigit())
+            if len(digits_phone) >= 7:
+                try:
+                    r_ph = requests.post(get_card_url, headers=regos_headers, json={"search": digits_phone[-9:], "limit": 5}, timeout=6)
+                    if r_ph.status_code == 200 and r_ph.json().get("ok"):
+                        cards = r_ph.json().get("result", [])
+                except Exception as e_ph:
+                    print(f"REGOS search by phone error: {e_ph}")
+
+        matched_card = None
+        if card_id:
+            for c in cards:
+                if int(c.get("id")) == int(card_id):
+                    matched_card = c
+                    break
+        if not matched_card and cards:
+            matched_card = cards[0]
+
+        if not matched_card:
+            return {"ok": False, "detail": "Mijozning REGOS xaridor kartasi topilmadi"}
+
+        actual_card_id = int(matched_card.get("id"))
+        promo_info = matched_card.get("promo") or {}
+        promo_id = int(promo_info.get("id") or 1)
+
+        is_outcome = action.lower() in ("outcome", "subtract", "deduct")
+        op_path = "createmanualoutcomeoperation" if is_outcome else "createmanualincomeoperation"
+        op_url = f"{endpoint}/v1/promobonus/{op_path}" if "/v1" not in endpoint else f"{endpoint}/promobonus/{op_path}"
+
+        regos_body = {
+            "card_id": actual_card_id,
+            "promo_id": promo_id,
+            "value": float(amount),
+            "description": description or ("Bonus yechildi" if is_outcome else "Bonus qo'shildi")
+        }
+
+        r_op = requests.post(op_url, headers=regos_headers, json=regos_body, timeout=10)
+        if r_op.status_code != 200:
+            return {"ok": False, "detail": f"REGOS serveri javob bermadi (status: {r_op.status_code})"}
+
+        data_op = r_op.json()
+        if not data_op.get("ok"):
+            err_desc = (data_op.get("result") or {}).get("description") or "Noma'lum xatolik"
+            return {"ok": False, "detail": f"REGOS xatolik qaytardi: {err_desc}"}
+
+        # Query updated card balance immediately from REGOS
+        new_balance = None
+        try:
+            r_bal = requests.post(get_card_url, headers=regos_headers, json={"id": actual_card_id, "limit": 1}, timeout=6)
+            if r_bal.status_code == 200 and r_bal.json().get("ok"):
+                bal_cards = r_bal.json().get("result", [])
+                if bal_cards:
+                    new_balance = float(bal_cards[0].get("bonus_amount") or 0.0)
+        except Exception as e_nb:
+            print(f"Error fetching updated REGOS card balance: {e_nb}")
+
+        return {
+            "ok": True,
+            "regos_synced": True,
+            "card_id": actual_card_id,
+            "promo_id": promo_id,
+            "new_balance": new_balance,
+            "detail": "REGOS tizimidan muvaffaqiyatli amalga oshirildi"
+        }
+    except Exception as e:
+        print(f"Error in execute_regos_bonus_operation: {e}")
+        return {"ok": False, "detail": f"Tizim xatoligi: {str(e)}"}
+
 def sync_regos_card_bonus_helper(client_id: str = None, barcode: str = None, phone: str = None, company_id: str = None) -> float:
     try:
         customer_record = None
@@ -542,7 +689,7 @@ def sync_regos_card_bonus_helper(client_id: str = None, barcode: str = None, pho
                 customer_record = c_res[0]
                 target_client_id = customer_record.get("id")
 
-        # Deduct completed payouts from REGOS reported bonus
+        # Deduct completed payouts from REGOS reported bonus (only if NOT already synced to REGOS)
         total_payouts = 0.0
         try:
             all_payouts = load_payout_requests(company_id=company_id or "giperbrendstroy")
@@ -552,18 +699,18 @@ def sync_regos_card_bonus_helper(client_id: str = None, barcode: str = None, pho
                     (card_id and p.get("client_id") == f"regos_card_{card_id}") or
                     (clean_bc and p.get("client_barcode") == clean_bc)
                 )
-                if p_match and p.get("status") == "completed":
+                if p_match and p.get("status") == "completed" and not p.get("regos_synced"):
                     total_payouts += float(p.get("amount") or 0.0)
         except Exception as e_p:
             print(f"Error summing completed payouts: {e_p}")
 
-        # Also sum payouts from customer_record.operator.bonus_history in DB
+        # Also sum payouts from customer_record.operator.bonus_history in DB (only unsynced ones)
         try:
             op_raw = (customer_record.get("operator") or "") if customer_record else ""
             if op_raw.startswith("{"):
                 op_obj = json.loads(op_raw)
                 b_hist = op_obj.get("bonus_history") or []
-                hist_payouts = sum(float(h.get("amount") or 0.0) for h in b_hist if h.get("type") == "subtract")
+                hist_payouts = sum(float(h.get("amount") or 0.0) for h in b_hist if h.get("type") in ("subtract", "deduct") and not h.get("regos_synced"))
                 total_payouts = max(total_payouts, hist_payouts)
         except Exception as e_h:
             print(f"Error reading bonus_history payouts: {e_h}")
@@ -899,6 +1046,98 @@ def sync_client_bonus(client_id: str, request: Request):
     if live_bonus is not None:
         return {"ok": True, "bonus": live_bonus}
     return {"ok": False, "detail": "Bonusni yangilab bo'lmadi yoki REGOS API ulanmadi"}
+
+@app.post("/api/clients/{client_id}/adjust-bonus")
+def adjust_client_bonus(client_id: str, payload: dict, request: Request):
+    company_id = get_company_id(request)
+    if not company_id:
+        raise HTTPException(status_code=400, detail="Company ID talab qilinadi")
+
+    action_type = str(payload.get("type") or payload.get("action") or "deduct").lower()
+    amount = float(payload.get("amount") or 0.0)
+    note = str(payload.get("note") or "").strip()
+    user_name = str(payload.get("user") or "Operator").strip()
+
+    if amount <= 0 and action_type != 'set':
+        raise HTTPException(status_code=400, detail="Summa 0 dan katta bo'lishi kerak")
+
+    # Fetch customer from Supabase
+    c_res = supabase_req("GET", f"customers?id=eq.{client_id}", company_id=company_id)
+    if not c_res or not isinstance(c_res, list) or len(c_res) == 0:
+        raise HTTPException(status_code=404, detail="Mijoz topilmadi")
+
+    client = c_res[0]
+    old_bonus = float(client.get("value") or 0.0)
+    op_raw = client.get("operator") or "{}"
+    meta = json.loads(op_raw) if op_raw.startswith("{") else {}
+
+    # Calculate new bonus & REGOS action
+    regos_action = "outcome" if action_type in ("deduct", "subtract") else "income"
+    regos_amount = amount
+
+    if action_type in ("deduct", "subtract"):
+        new_bonus = max(0.0, old_bonus - amount)
+    elif action_type == "add":
+        new_bonus = old_bonus + amount
+    elif action_type == "set":
+        new_bonus = max(0.0, amount)
+        delta = new_bonus - old_bonus
+        if delta < 0:
+            regos_action = "outcome"
+            regos_amount = abs(delta)
+        else:
+            regos_action = "income"
+            regos_amount = delta
+
+    # Execute REGOS operation if regos_amount > 0
+    regos_res = {"ok": False, "detail": "Mijozning REGOS kartasi topilmadi"}
+    if regos_amount > 0:
+        regos_res = execute_regos_bonus_operation(
+            client_id=client_id,
+            action=regos_action,
+            amount=regos_amount,
+            description=note or ("Bonus yechildi" if regos_action == "outcome" else "Bonus qo'shildi"),
+            company_id=company_id
+        )
+
+    regos_synced = bool(regos_res.get("ok"))
+
+    # Update history
+    history = meta.get("bonus_history") or []
+    rec = {
+        "id": f"bh_{int(time.time() * 1000)}",
+        "date": datetime.now(timezone.utc).isoformat(),
+        "type": action_type,
+        "amount": amount,
+        "prev_bonus": old_bonus,
+        "new_bonus": new_bonus,
+        "note": note or ("Bonus yechildi" if action_type in ("deduct", "subtract") else "Bonus qo'shildi"),
+        "user": user_name,
+        "regos_synced": regos_synced
+    }
+    history.insert(0, rec)
+    meta["bonus_history"] = history
+    meta["bonus"] = new_bonus
+
+    # If REGOS synced and returned real balance, align with REGOS
+    if regos_synced and regos_res.get("new_balance") is not None:
+        new_bonus = float(regos_res["new_balance"])
+        meta["bonus"] = new_bonus
+        rec["new_bonus"] = new_bonus
+
+    supabase_req("PATCH", f"customers?id=eq.{client_id}", json_data={
+        "value": new_bonus,
+        "operator": json.dumps(meta, ensure_ascii=False)
+    }, company_id=company_id)
+
+    return {
+        "ok": True,
+        "bonus": new_bonus,
+        "prev_bonus": old_bonus,
+        "regos_synced": regos_synced,
+        "regos_detail": regos_res.get("detail") or "",
+        "record": rec
+    }
 
 @app.post("/api/integration/regos/sync-all-bonuses")
 def sync_all_bonuses(request: Request, background_tasks: BackgroundTasks):
@@ -6835,13 +7074,25 @@ def execute_payout_approval(payout_id, company_id="giperbrendstroy", approver_in
             
     new_bonus = max(0.0, current_bonus - deduct_amount)
     
-    # 2. Update bonus history
+    # 2. Update bonus history & synchronize with REGOS
     history = meta.get("bonus_history") or []
+    regos_res = execute_regos_bonus_operation(
+        client_id=client_id,
+        action="outcome",
+        amount=deduct_amount,
+        description=f"Kartaga yechildi ({target.get('card_number')}) - {approver_info}",
+        company_id=company_id
+    )
+    regos_synced = bool(regos_res.get("ok"))
+    if regos_synced and regos_res.get("new_balance") is not None:
+        new_bonus = float(regos_res["new_balance"])
+
     history.append({
         "type": "subtract",
         "amount": deduct_amount,
         "note": f"Kartaga yechildi ({target.get('card_number')}) - {approver_info}",
-        "date": datetime.now().isoformat()
+        "date": datetime.now().isoformat(),
+        "regos_synced": regos_synced
     })
     meta["bonus"] = new_bonus
     meta["bonus_history"] = history
@@ -6857,6 +7108,7 @@ def execute_payout_approval(payout_id, company_id="giperbrendstroy", approver_in
     target["status"] = "completed"
     target["completed_at"] = datetime.now().isoformat()
     target["completed_by"] = approver_info
+    target["regos_synced"] = regos_synced
     save_payout_requests(reqs, company_id=company_id)
     
     return {

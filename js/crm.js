@@ -2991,8 +2991,42 @@ window.CRM = {
             this.toggleBonusAction(null);
             this.renderCustomersTable();
 
-            // Backend va Supabase-ga saqlash
-            await DB.saveClient(client);
+            // Backend va REGOS API-ga yuborish
+            const res = await fetch(`/api/clients/${encodeURIComponent(clientId)}/adjust-bonus`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    type: actionType,
+                    amount: amount,
+                    note: note,
+                    user: (window.currentUser && (window.currentUser.name || window.currentUser.username)) || 'Operator'
+                })
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                if (data && data.ok) {
+                    if (data.bonus !== undefined) {
+                        newBonus = Number(data.bonus);
+                        client.bonus = newBonus;
+                        client.value = newBonus;
+                        if (bonusDisp) bonusDisp.textContent = `${newBonus.toLocaleString('uz-UZ')} so'm`;
+                        this.renderCustomersTable();
+                    }
+                    if (data.record) {
+                        record.regos_synced = data.regos_synced;
+                        this.renderClientBonusHistory(client);
+                    }
+                    const regosMsg = data.regos_synced 
+                        ? "\n✅ REGOS tizimidan ham muvaffaqiyatli amalga oshirildi!" 
+                        : (data.regos_detail ? `\nℹ️ REGOS: ${data.regos_detail}` : "");
+                    alert(`Bonus muvaffaqiyatli saqlandi!${regosMsg}`);
+                } else {
+                    await DB.saveClient(client);
+                }
+            } else {
+                await DB.saveClient(client);
+            }
 
         } catch(err) {
             alert("Bonusni saqlashda xatolik: " + err.message);
@@ -3036,12 +3070,17 @@ window.CRM = {
                 badgeHtml = `<span style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; font-weight: 700; padding: 3px 8px; border-radius: 6px; font-size: 12px;"><i class="fas fa-sliders-h"></i> = ${amt} so'm</span>`;
             }
 
+            const regosBadge = item.regos_synced 
+                ? `<span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); font-size: 10px; padding: 1px 6px; border-radius: 4px; font-weight: 600;" title="REGOS Cloud bilan sinxronlangan"><i class="fas fa-check-double"></i> REGOS</span>`
+                : '';
+
             html += `
                 <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px 14px; display: flex; justify-content: space-between; align-items: center; gap: 12px;">
                     <div>
                         <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
                             ${badgeHtml}
                             <span style="font-size: 12.5px; font-weight: 600; color: var(--text-main);">${item.note || 'Bonus amali'}</span>
+                            ${regosBadge}
                         </div>
                         <div style="font-size: 11.5px; color: var(--text-muted); display: flex; gap: 12px;">
                             <span><i class="far fa-clock"></i> ${dateStr}</span>

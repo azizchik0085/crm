@@ -1807,20 +1807,44 @@ window.MobileApp = {
         }
 
         try {
-            const payload = {
-                ...client,
-                bonus: newBonus,
-                value: newBonus,
-                notes: note || client.notes || ''
-            };
+            let regosSynced = false;
+            let regosDetail = '';
 
-            const resp = await fetch('/api/clients', {
+            const resp = await fetch(`/api/clients/${encodeURIComponent(client.id)}/adjust-bonus`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+                body: JSON.stringify({
+                    type: type,
+                    amount: amount,
+                    note: note,
+                    user: (window.currentUser && (window.currentUser.name || window.currentUser.username)) || 'Mobil Xodim'
+                })
             });
 
-            if (!resp.ok) throw new Error("Bonusni saqlab bo'lmadi");
+            if (resp.ok) {
+                const data = await resp.json();
+                if (data && data.ok) {
+                    if (data.bonus !== undefined) {
+                        newBonus = Number(data.bonus);
+                    }
+                    regosSynced = Boolean(data.regos_synced);
+                    regosDetail = data.regos_detail || '';
+                }
+            } else {
+                // Fallback to direct client POST
+                const payload = {
+                    ...client,
+                    bonus: newBonus,
+                    value: newBonus,
+                    notes: note || client.notes || ''
+                };
+                const fbResp = await fetch('/api/clients', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (!fbResp.ok) throw new Error("Bonusni saqlab bo'lmadi");
+            }
 
             client.bonus = newBonus;
             client.value = newBonus;
@@ -1837,7 +1861,10 @@ window.MobileApp = {
                 this.renderClientsList(this.clientsCache);
             }
 
-            alert("Bonus muvaffaqiyatli yangilandi!");
+            const regosMsg = regosSynced 
+                ? "\n✅ REGOS tizimidan ham muvaffaqiyatli amalga oshirildi!" 
+                : (regosDetail ? `\nℹ️ REGOS: ${regosDetail}` : "");
+            alert(`Bonus muvaffaqiyatli yangilandi!${regosMsg}`);
 
         } catch(err) {
             alert("Xatolik: " + err.message);
