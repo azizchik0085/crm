@@ -328,6 +328,26 @@ def save_client(client_data: dict, request: Request):
     bonus_enabled = bool(client_data.get("bonus_enabled"))
     bonus_percent = float(client_data.get("bonus_percent") if client_data.get("bonus_percent") is not None else (2.0 if bonus_enabled else 0.0))
 
+    # If editing an existing client, load existing metadata to preserve history/ids
+    existing_meta = {}
+    if client_data.get("id"):
+        try:
+            ex_res = supabase_req("GET", f"customers?id=eq.{client_data['id']}&select=*", company_id=company_id)
+            if ex_res and isinstance(ex_res, list) and len(ex_res) > 0:
+                ex_c = ex_res[0]
+                ex_op = ex_c.get("operator") or ""
+                if ex_op.startswith("{"):
+                    existing_meta = json.loads(ex_op)
+                if not bonus_history and existing_meta.get("bonus_history"):
+                    bonus_history = existing_meta.get("bonus_history")
+                if not barcode and (ex_c.get("phone2") or existing_meta.get("barcode")):
+                    barcode = ex_c.get("phone2") or existing_meta.get("barcode")
+                if "bonus_enabled" not in client_data and "bonus_enabled" in existing_meta:
+                    bonus_enabled = bool(existing_meta.get("bonus_enabled"))
+                    bonus_percent = float(existing_meta.get("bonus_percent") or 0.0)
+        except Exception:
+            pass
+
     # Auto-create or link customer & retail card in REGOS Cloud if requested or if new client
     create_regos = bool(client_data.get("create_regos_card", True))
     is_new = not client_data.get("id") or str(client_data.get("id", "")).startswith("client_")
@@ -350,7 +370,7 @@ def save_client(client_data: dict, request: Request):
             print(f"Notice: REGOS card creation error in save_client: {e_reg}")
 
     meta = {
-        "op": operator,
+        "op": operator or existing_meta.get("op", ""),
         "barcode": barcode,
         "bonus": bonus,
         "debt": debt,
@@ -360,6 +380,10 @@ def save_client(client_data: dict, request: Request):
         "bonus_enabled": bonus_enabled,
         "bonus_percent": bonus_percent
     }
+    if existing_meta.get("regos_card_id"):
+        meta["regos_card_id"] = existing_meta["regos_card_id"]
+    if existing_meta.get("regos_customer_id"):
+        meta["regos_customer_id"] = existing_meta["regos_customer_id"]
     if regos_res and regos_res.get("ok"):
         meta["regos_card_id"] = regos_res.get("regos_card_id")
         meta["regos_customer_id"] = regos_res.get("regos_customer_id")
@@ -480,8 +504,11 @@ def quick_update_client(client_id: str, payload: dict, request: Request):
     company_id = get_company_id(request)
     c_res = supabase_req("GET", f"customers?id=eq.{client_id}", company_id=company_id)
     if not c_res or not isinstance(c_res, list) or len(c_res) == 0:
+        c_res = supabase_req("GET", f"customers?phone2=eq.{client_id}", company_id=company_id)
+    if not c_res or not isinstance(c_res, list) or len(c_res) == 0:
         raise HTTPException(status_code=404, detail="Mijoz topilmadi")
     c_item = c_res[0]
+    client_id = c_item.get("id") or client_id
     op_str = c_item.get("operator") or "{}"
     meta = json.loads(op_str) if op_str.startswith("{") else {}
     
@@ -804,9 +831,9 @@ def execute_regos_bonus_operation(
 
         if not cards and card_id:
             try:
-                r_id = requests.post(get_card_url, headers=regos_headers, json={"search": str(card_id), "limit": 10}, timeout=6)
+                r_id = requests.post(get_card_url, headers=regos_headers, json={"ids": [int(card_id)]}, timeout=6)
                 if r_id.status_code == 200 and r_id.json().get("ok"):
-                    cards = [c for c in r_id.json().get("result", []) if int(c.get("id")) == int(card_id)]
+                    cards = r_id.json().get("result", [])
             except Exception as e_id:
                 print(f"REGOS search by card id error: {e_id}")
 
@@ -823,7 +850,7 @@ def execute_regos_bonus_operation(
         matched_card = None
         if card_id:
             for c in cards:
-                if int(c.get("id")) == int(card_id):
+                if str(c.get("id")) == str(card_id):
                     matched_card = c
                     break
         if not matched_card and cards:
@@ -832,7 +859,7 @@ def execute_regos_bonus_operation(
         if not matched_card:
             return {"ok": False, "detail": "Mijozning REGOS xaridor kartasi topilmadi"}
 
-        actual_card_id = int(matched_card.get("id"))
+        actual_card_id = int(matched_card.get("id") or 0)
         promo_info = matched_card.get("promo") or {}
         promo_id = int(promo_info.get("id") or 1)
 
@@ -859,13 +886,15 @@ def execute_regos_bonus_operation(
         # Query updated card balance immediately from REGOS
         new_balance = None
         try:
-            bc_to_query = matched_card.get("barcode_value") or clean_bc
-            if bc_to_query:
-                r_bal = requests.post(get_card_url, headers=regos_headers, json={"barcode_value": str(bc_to_query).strip(), "limit": 1}, timeout=6)
-                if r_bal.status_code == 200 and r_bal.json().get("ok"):
-                    bal_cards = r_bal.json().get("result", [])
-                    if bal_cards:
-                        new_balance = float(bal_cards[0].get("bonus_amount") or 0.0)
+            r_bal = None
+            if actual_card_id:
+                r_bal = requests.post(get_card_url, headers=regos_headers, json={"ids": [actual_card_id]}, timeout=6)
+            elif clean_bc:
+                r_bal = requests.post(get_card_url, headers=regos_headers, json={"barcode_value": str(clean_bc).strip(), "limit": 1}, timeout=6)
+            if r_bal and r_bal.status_code == 200 and r_bal.json().get("ok"):
+                bal_cards = r_bal.json().get("result", [])
+                if bal_cards:
+                    new_balance = float(bal_cards[0].get("bonus_amount") or 0.0)
         except Exception as e_nb:
             print(f"Error fetching updated REGOS card balance: {e_nb}")
 
@@ -924,6 +953,22 @@ def sync_regos_card_bonus_helper(client_id: str = None, barcode: str = None, pho
 
         cards = []
         clean_bc = str(barcode or "").strip()
+        card_id = None
+        if client_id and str(client_id).startswith("regos_card_"):
+            try:
+                card_id = int(str(client_id).replace("regos_card_", ""))
+            except Exception:
+                pass
+        if not card_id and customer_record:
+            op_raw = customer_record.get("operator") or ""
+            if op_raw.startswith("{"):
+                try:
+                    m = json.loads(op_raw)
+                    if m.get("regos_card_id"):
+                        card_id = int(m.get("regos_card_id"))
+                except Exception:
+                    pass
+
         if clean_bc:
             try:
                 r = requests.post(url, headers=regos_headers, json={"barcode_value": clean_bc, "limit": 1}, timeout=5)
@@ -933,6 +978,16 @@ def sync_regos_card_bonus_helper(client_id: str = None, barcode: str = None, pho
                         cards = data.get("result", [])
             except Exception as e_bc:
                 print(f"Error querying REGOS with barcode {clean_bc}: {e_bc}")
+
+        if not cards and card_id:
+            try:
+                r_id = requests.post(url, headers=regos_headers, json={"ids": [int(card_id)]}, timeout=5)
+                if r_id.status_code == 200:
+                    data = r_id.json()
+                    if isinstance(data, dict) and data.get("ok"):
+                        cards = data.get("result", [])
+            except Exception as e_id:
+                print(f"Error querying REGOS with card_id {card_id}: {e_id}")
 
         if not cards and phone:
             digits_phone = "".join(ch for ch in str(phone) if ch.isdigit())
@@ -1343,6 +1398,46 @@ def adjust_client_bonus(client_id: str, payload: dict, request: Request):
 
     # Fetch customer from Supabase
     c_res = supabase_req("GET", f"customers?id=eq.{client_id}", company_id=company_id)
+    if not c_res or not isinstance(c_res, list) or len(c_res) == 0:
+        c_res = supabase_req("GET", f"customers?phone2=eq.{client_id}", company_id=company_id)
+    if not c_res or not isinstance(c_res, list) or len(c_res) == 0:
+        if str(client_id).startswith("regos_card_"):
+            card_id_num = str(client_id).replace("regos_card_", "")
+            settings = get_company_settings(company_id, bypass_cache=True) if company_id else settings_state
+            ep = (settings.get("regos_endpoint") or "").strip().rstrip("/")
+            tok = settings.get("regos_token") or ""
+            if ep and tok and card_id_num.isdigit():
+                if not ep.startswith(("http://", "https://")): ep = "https://" + ep
+                get_card_url = f"{ep}/v1/retailcard/get" if "/v1" not in ep else f"{ep}/retailcard/get"
+                try:
+                    r_cd = requests.post(get_card_url, headers={"Authorization": f"Bearer {tok}", "Content-Type": "application/json"}, json={"ids": [int(card_id_num)]}, timeout=6)
+                    if r_cd.status_code == 200 and r_cd.json().get("ok"):
+                        c_list = r_cd.json().get("result", [])
+                        if c_list:
+                            cd = c_list[0]
+                            cust = cd.get("customer") or {}
+                            full_name = f"{cust.get('first_name') or ''} {cust.get('last_name') or ''}".strip() or f"Mijoz ({cd.get('barcode_value')})"
+                            new_c_payload = {
+                                "id": client_id,
+                                "name": full_name,
+                                "phone": cust.get("main_phone") or "",
+                                "phone2": cd.get("barcode_value") or "",
+                                "value": float(cd.get("bonus_amount") or 0.0),
+                                "status": "client",
+                                "company_id": company_id,
+                                "operator": json.dumps({
+                                    "regos_card_id": int(card_id_num),
+                                    "regos_customer_id": cust.get("id"),
+                                    "barcode": cd.get("barcode_value"),
+                                    "bonus": float(cd.get("bonus_amount") or 0.0),
+                                    "category": "ustalar"
+                                }, ensure_ascii=False)
+                            }
+                            supabase_req("POST", "customers?on_conflict=id", json_data=new_c_payload, company_id=company_id)
+                            c_res = [new_c_payload]
+                except Exception as e_c_fetch:
+                    print(f"Error auto-creating customer in adjust_client_bonus: {e_c_fetch}")
+
     if not c_res or not isinstance(c_res, list) or len(c_res) == 0:
         raise HTTPException(status_code=404, detail="Mijoz topilmadi")
 
@@ -7340,11 +7435,17 @@ def execute_payout_approval(payout_id, company_id="giperbrendstroy", approver_in
     # 1. Fetch current customer data from DB
     c_res = supabase_req("GET", f"customers?id=eq.{client_id}", company_id=company_id)
     if not c_res or not isinstance(c_res, list) or len(c_res) == 0:
-        raise HTTPException(status_code=404, detail="Usta mijozlar bazasidan topilmadi")
+        p_bc = target.get("client_barcode")
+        if p_bc:
+            c_res = supabase_req("GET", f"customers?phone2=eq.{p_bc}", company_id=company_id)
+        if not c_res or not isinstance(c_res, list) or len(c_res) == 0:
+            p_ph = target.get("client_phone")
+            if p_ph:
+                c_res = supabase_req("GET", f"customers?phone=eq.{p_ph}", company_id=company_id)
         
-    c = c_res[0]
-    current_bonus = float(c.get("value") or 0)
-    op = c.get("operator") or ""
+    c = c_res[0] if (c_res and isinstance(c_res, list) and len(c_res) > 0) else None
+    current_bonus = float(c.get("value") or 0) if c else 0.0
+    op = (c.get("operator") or "") if c else ""
     meta = {}
     if op.startswith("{") and op.endswith("}"):
         try:
@@ -7358,6 +7459,8 @@ def execute_payout_approval(payout_id, company_id="giperbrendstroy", approver_in
     history = meta.get("bonus_history") or []
     regos_res = execute_regos_bonus_operation(
         client_id=client_id,
+        barcode=target.get("client_barcode"),
+        phone=target.get("client_phone"),
         action="outcome",
         amount=deduct_amount,
         description=f"Kartaga yechildi ({target.get('card_number')}) - {approver_info}",
@@ -7378,11 +7481,24 @@ def execute_payout_approval(payout_id, company_id="giperbrendstroy", approver_in
     meta["bonus_history"] = history
     new_op = json.dumps(meta, ensure_ascii=False)
     
-    # 3. Patch customer in DB
-    supabase_req("PATCH", f"customers?id=eq.{client_id}", {
-        "value": new_bonus,
-        "operator": new_op
-    }, company_id=company_id)
+    # 3. Patch or insert customer in DB
+    if c:
+        supabase_req("PATCH", f"customers?id=eq.{c.get('id') or client_id}", {
+            "value": new_bonus,
+            "operator": new_op
+        }, company_id=company_id)
+    else:
+        supabase_req("POST", "customers?on_conflict=id", json_data={
+            "id": client_id or f"client_{int(time.time() * 1000)}",
+            "name": target.get("client_name") or "Usta",
+            "phone": target.get("client_phone") or "",
+            "phone2": target.get("client_barcode") or "",
+            "value": new_bonus,
+            "operator": new_op,
+            "status": "client",
+            "category": "ustalar",
+            "company_id": company_id
+        }, company_id=company_id)
     
     # 4. Mark request completed
     target["status"] = "completed"

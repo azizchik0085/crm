@@ -1274,7 +1274,7 @@ window.MobileApp = {
 
     filterClients: function() {
         const query = (document.getElementById('m-clients-search')?.value || '').trim().toLowerCase();
-        const activePill = document.querySelector('.filter-pill.active')?.getAttribute('data-cat') || 'all';
+        const activePill = document.querySelector('#m-view-clients .filter-pill.active')?.getAttribute('data-cat') || 'all';
 
         let filtered = this.clientsCache.filter(c => {
             const cat = (c.category || (c.company ? 'qurilish' : 'ustalar')).toLowerCase();
@@ -1294,7 +1294,7 @@ window.MobileApp = {
     },
 
     setClientCategoryFilter: function(cat, btn) {
-        document.querySelectorAll('.filter-pill').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('#m-view-clients .filter-pill').forEach(el => el.classList.remove('active'));
         if (btn) btn.classList.add('active');
         this.filterClients();
     },
