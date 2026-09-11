@@ -2069,8 +2069,22 @@ window.MobileApp = {
         this._activeRegosTab = tab;
         const btnPartners = document.getElementById('m-tab-btn-partners');
         const btnCards = document.getElementById('m-tab-btn-cards');
+        const btnCreate = document.getElementById('m-tab-btn-create');
         const viewPartners = document.getElementById('m-regos-view-partners');
         const viewCards = document.getElementById('m-regos-view-cards');
+        const viewCreate = document.getElementById('m-regos-view-create');
+
+        // Reset all buttons
+        [btnPartners, btnCards, btnCreate].forEach(btn => {
+            if (btn) {
+                btn.style.color = 'var(--text-muted)';
+                btn.style.borderBottom = '2px solid transparent';
+                btn.style.fontWeight = '500';
+            }
+        });
+        if (viewPartners) viewPartners.style.display = 'none';
+        if (viewCards) viewCards.style.display = 'none';
+        if (viewCreate) viewCreate.style.display = 'none';
 
         if (tab === 'partners') {
             if (btnPartners) {
@@ -2078,16 +2092,18 @@ window.MobileApp = {
                 btnPartners.style.borderBottom = '2px solid #38bdf8';
                 btnPartners.style.fontWeight = '700';
             }
-            if (btnCards) {
-                btnCards.style.color = 'var(--text-muted)';
-                btnCards.style.borderBottom = '2px solid transparent';
-                btnCards.style.fontWeight = '500';
-            }
             if (viewPartners) viewPartners.style.display = 'block';
-            if (viewCards) viewCards.style.display = 'none';
-
             this.loadRegosPartnerGroups();
             const input = document.getElementById('m-regos-partner-search-input');
+            setTimeout(() => { if (input) input.focus(); }, 120);
+        } else if (tab === 'create') {
+            if (btnCreate) {
+                btnCreate.style.color = '#10b981';
+                btnCreate.style.borderBottom = '2px solid #10b981';
+                btnCreate.style.fontWeight = '700';
+            }
+            if (viewCreate) viewCreate.style.display = 'block';
+            const input = document.getElementById('m-new-client-name');
             setTimeout(() => { if (input) input.focus(); }, 120);
         } else {
             if (btnCards) {
@@ -2095,16 +2111,138 @@ window.MobileApp = {
                 btnCards.style.borderBottom = '2px solid #38bdf8';
                 btnCards.style.fontWeight = '700';
             }
-            if (btnPartners) {
-                btnPartners.style.color = 'var(--text-muted)';
-                btnPartners.style.borderBottom = '2px solid transparent';
-                btnPartners.style.fontWeight = '500';
-            }
             if (viewCards) viewCards.style.display = 'block';
-            if (viewPartners) viewPartners.style.display = 'none';
-
             const input = document.getElementById('m-regos-search-input');
             setTimeout(() => { if (input) input.focus(); }, 120);
+        }
+    },
+
+    calcEan13CheckDigit: function(digits12) {
+        try {
+            let total = 0;
+            for (let i = 0; i < 12; i++) {
+                const d = parseInt(digits12[i], 10) || 0;
+                total += (i % 2 === 0) ? d : d * 3;
+            }
+            return String((10 - (total % 10)) % 10);
+        } catch(e) {
+            return "0";
+        }
+    },
+
+    generateMobileBarcode: function() {
+        const phoneInput = document.getElementById('m-new-client-phone');
+        const barcodeInput = document.getElementById('m-new-client-barcode');
+        if (!barcodeInput) return;
+        const phone = (phoneInput?.value || '').replace(/\D/g, '');
+        if (!phone) {
+            alert("Iltimos, avval mijozning telefon raqamini kiriting!");
+            phoneInput?.focus();
+            return;
+        }
+        let fullPhone = phone.length === 9 ? '998' + phone : phone;
+        if (fullPhone.length >= 12) {
+            const prefix12 = fullPhone.slice(0, 12);
+            barcodeInput.value = prefix12 + this.calcEan13CheckDigit(prefix12);
+        } else {
+            barcodeInput.value = fullPhone;
+        }
+    },
+
+    autoSuggestMobileBarcode: function() {
+        const phoneInput = document.getElementById('m-new-client-phone');
+        const barcodeInput = document.getElementById('m-new-client-barcode');
+        if (!barcodeInput || barcodeInput.value) return;
+        const phone = (phoneInput?.value || '').replace(/\D/g, '');
+        if (phone.length === 9 || phone.length >= 12) {
+            let fullPhone = phone.length === 9 ? '998' + phone : phone;
+            if (fullPhone.length >= 12) {
+                const prefix12 = fullPhone.slice(0, 12);
+                barcodeInput.placeholder = prefix12 + this.calcEan13CheckDigit(prefix12) + " (avto)";
+            }
+        }
+    },
+
+    createNewRegosCustomerAndCard: async function(e) {
+        if (e) e.preventDefault();
+        const name = (document.getElementById('m-new-client-name')?.value || '').trim();
+        const phone = (document.getElementById('m-new-client-phone')?.value || '').trim();
+        const barcode = (document.getElementById('m-new-client-barcode')?.value || '').trim();
+        const category = document.getElementById('m-new-client-category')?.value || 'ustalar';
+        const company = (document.getElementById('m-new-client-company')?.value || '').trim();
+        const notes = (document.getElementById('m-new-client-notes')?.value || '').trim();
+
+        if (!name || !phone) {
+            alert("Iltimos, mijoz ismi va telefon raqamini to'liq kiriting!");
+            return;
+        }
+
+        const btn = document.getElementById('m-btn-create-regos-card');
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> REGOS Cloud-da yaratilmoqda...';
+        }
+
+        try {
+            const resp = await fetch('/api/clients/create-with-regos-card', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name,
+                    phone,
+                    barcode,
+                    category,
+                    company,
+                    notes,
+                    operator: (window.currentUser && (window.currentUser.name || window.currentUser.username)) || 'Mobil Xodim'
+                })
+            });
+
+            if (!resp.ok) {
+                const errData = await resp.json().catch(() => ({}));
+                throw new Error(errData.detail || "Serverdan xatolik qaytdi");
+            }
+
+            const data = await resp.json();
+            const client = data.client || {
+                id: 'regos_card_' + data.regos_card_id,
+                name,
+                phone,
+                phone2: data.barcode,
+                barcode: data.barcode,
+                category,
+                company,
+                bonus: 0,
+                debt: 0
+            };
+
+            // Add to cache & re-render
+            this.clientsCache.unshift(client);
+            this.renderClientsList(this.clientsCache);
+
+            // Close modal & reset inputs
+            this.closeAddCardModal();
+            document.getElementById('m-new-client-name').value = '';
+            document.getElementById('m-new-client-phone').value = '';
+            document.getElementById('m-new-client-barcode').value = '';
+            document.getElementById('m-new-client-company').value = '';
+            document.getElementById('m-new-client-notes').value = '';
+
+            const regosMsg = data.regos_synced 
+                ? `\n🪪 REGOS xaridor kartasi yaratildi: ${data.barcode}`
+                : (data.detail ? `\nℹ️ REGOS: ${data.detail}` : '');
+            alert(`✅ Mijoz muvaffaqiyatli saqlandi!${regosMsg}`);
+
+            // Open detail view for new client
+            this.openClientDetails(client);
+
+        } catch (err) {
+            alert("Xatolik: " + err.message);
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-id-card" style="margin-right: 6px;"></i> REGOS Kartasini Yaratish';
+            }
         }
     },
 

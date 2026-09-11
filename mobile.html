@@ -679,6 +679,9 @@
                 <button id="m-tab-btn-cards" type="button" onclick="MobileApp.switchRegosTab('cards')" style="flex: 1; padding: 10px 8px; font-size: 13px; font-weight: 500; border: none; background: transparent; color: var(--text-muted); border-bottom: 2px solid transparent; cursor: pointer; text-align: center;">
                     🪪 Xaridor Kartalari
                 </button>
+                <button id="m-tab-btn-create" type="button" onclick="MobileApp.switchRegosTab('create')" style="flex: 1; padding: 10px 8px; font-size: 13px; font-weight: 500; border: none; background: transparent; color: var(--text-muted); border-bottom: 2px solid transparent; cursor: pointer; text-align: center;">
+                    ✨ Yangi Karta
+                </button>
             </div>
 
             <div class="m-sheet-content" style="flex: 1; overflow-y: auto; padding: 14px;">
@@ -741,6 +744,56 @@
                     <div id="m-regos-search-results">
                         <!-- Search results render here -->
                     </div>
+                </div>
+
+                <!-- TAB 3: YANGI KARTA OCHISH (REGOS) -->
+                <div id="m-regos-view-create" style="display: none;">
+                    <p style="font-size: 12.5px; color: var(--text-muted); margin-bottom: 12px;">
+                        REGOS Cloud tizimida yangi mijoz va xaridor kartasini ochish:
+                    </p>
+
+                    <form onsubmit="MobileApp.createNewRegosCustomerAndCard(event)" style="display: flex; flex-direction: column; gap: 12px;">
+                        <div class="form-group">
+                            <label style="font-size: 12px; font-weight: 600; color: var(--text-main); margin-bottom: 4px; display: block;">Mijoz F.I.Sh <span style="color:var(--danger)">*</span></label>
+                            <input type="text" id="m-new-client-name" class="form-control" required placeholder="Masalan: Jamshid Aliyev" style="height: 42px; font-size: 13.5px;">
+                        </div>
+
+                        <div class="form-group">
+                            <label style="font-size: 12px; font-weight: 600; color: var(--text-main); margin-bottom: 4px; display: block;">Telefon Raqam <span style="color:var(--danger)">*</span></label>
+                            <input type="text" id="m-new-client-phone" class="form-control" required placeholder="+998 90 123 45 67" oninput="MobileApp.autoSuggestMobileBarcode()" style="height: 42px; font-size: 13.5px;">
+                        </div>
+
+                        <div class="form-group">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                                <label style="font-size: 12px; font-weight: 600; color: var(--text-main); margin: 0;"><i class="fas fa-barcode" style="color: #38bdf8;"></i> Karta Shtrix-kodi</label>
+                                <button type="button" onclick="MobileApp.generateMobileBarcode()" class="btn btn-sm" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: none; font-size: 11px; padding: 2px 8px; border-radius: 4px; cursor: pointer; font-weight: 600;"><i class="fas fa-magic"></i> EAN-13 Avto</button>
+                            </div>
+                            <input type="text" id="m-new-client-barcode" class="form-control" placeholder="Avtomatik (yoki plastik karta skanerlang)" style="height: 42px; font-size: 13.5px; font-family: monospace;">
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                            <div class="form-group">
+                                <label style="font-size: 12px; font-weight: 600; color: var(--text-main); margin-bottom: 4px; display: block;">Mijoz Toifasi</label>
+                                <select id="m-new-client-category" class="form-control" style="height: 42px; font-size: 13px;">
+                                    <option value="ustalar">🔨 Ustalar</option>
+                                    <option value="qurilish">🏢 Qurilish obyekti</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label style="font-size: 12px; font-weight: 600; color: var(--text-main); margin-bottom: 4px; display: block;">Kompaniya / Obyekt</label>
+                                <input type="text" id="m-new-client-company" class="form-control" placeholder="ixtiyoriy" style="height: 42px; font-size: 13px;">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label style="font-size: 12px; font-weight: 600; color: var(--text-main); margin-bottom: 4px; display: block;">Izoh / Manzil</label>
+                            <input type="text" id="m-new-client-notes" class="form-control" placeholder="Qo'shimcha eslatma..." style="height: 42px; font-size: 13px;">
+                        </div>
+
+                        <button type="submit" id="m-btn-create-regos-card" class="btn btn-primary" style="height: 46px; font-size: 14px; font-weight: 700; margin-top: 6px; border-radius: 10px; background: linear-gradient(135deg, #10b981, #059669); border: none; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3); color: #fff; cursor: pointer;">
+                            <i class="fas fa-id-card" style="margin-right: 6px;"></i> REGOS Kartasini Yaratish
+                        </button>
+                    </form>
                 </div>
             </div>
         </div>

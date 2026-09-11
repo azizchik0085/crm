@@ -328,6 +328,27 @@ def save_client(client_data: dict, request: Request):
     bonus_enabled = bool(client_data.get("bonus_enabled"))
     bonus_percent = float(client_data.get("bonus_percent") if client_data.get("bonus_percent") is not None else (2.0 if bonus_enabled else 0.0))
 
+    # Auto-create or link customer & retail card in REGOS Cloud if requested or if new client
+    create_regos = bool(client_data.get("create_regos_card", True))
+    is_new = not client_data.get("id") or str(client_data.get("id", "")).startswith("client_")
+    regos_res = None
+    if create_regos and (client_data.get("phone") or barcode):
+        try:
+            regos_res = create_regos_customer_and_card(
+                name=(client_data.get("name") or "").strip(),
+                phone=(client_data.get("phone") or "").strip(),
+                barcode=barcode,
+                address=address,
+                notes=notes,
+                company_id=company_id
+            )
+            if regos_res.get("ok"):
+                barcode = regos_res.get("barcode") or barcode
+                if regos_res.get("bonus") and not bonus:
+                    bonus = float(regos_res.get("bonus"))
+        except Exception as e_reg:
+            print(f"Notice: REGOS card creation error in save_client: {e_reg}")
+
     meta = {
         "op": operator,
         "barcode": barcode,
@@ -339,6 +360,10 @@ def save_client(client_data: dict, request: Request):
         "bonus_enabled": bonus_enabled,
         "bonus_percent": bonus_percent
     }
+    if regos_res and regos_res.get("ok"):
+        meta["regos_card_id"] = regos_res.get("regos_card_id")
+        meta["regos_customer_id"] = regos_res.get("regos_customer_id")
+
     op_val = json.dumps(meta, ensure_ascii=False)
 
     payload = {
@@ -358,7 +383,97 @@ def save_client(client_data: dict, request: Request):
         payload["created_at"] = client_data["created_at"]
     else:
         payload["created_at"] = datetime.now(timezone.utc).isoformat()
-    return supabase_req("POST", "customers?on_conflict=id", json_data=payload, company_id=company_id)
+    
+    db_res = supabase_req("POST", "customers?on_conflict=id", json_data=payload, company_id=company_id)
+    return {
+        "ok": True,
+        "result": db_res,
+        "barcode": barcode,
+        "regos_synced": bool(regos_res and regos_res.get("ok")),
+        "regos_card_id": regos_res.get("regos_card_id") if regos_res else None,
+        "regos_detail": regos_res.get("detail") if regos_res else ""
+    }
+
+@app.post("/api/clients/create-with-regos-card")
+def create_client_with_regos_card(payload: dict, request: Request):
+    company_id = get_company_id(request)
+    if not company_id:
+        raise HTTPException(status_code=400, detail="Company ID talab qilinadi")
+
+    name = str(payload.get("name") or "").strip()
+    phone = str(payload.get("phone") or "").strip()
+    if not name or not phone:
+        raise HTTPException(status_code=400, detail="Ism va telefon raqami talab qilinadi")
+
+    barcode = str(payload.get("barcode") or payload.get("phone2") or "").strip()
+    company = str(payload.get("company") or "").strip()
+    category = str(payload.get("category") or ("qurilish" if company else "ustalar")).strip().lower()
+    address = str(payload.get("address") or "").strip()
+    notes = str(payload.get("notes") or "").strip()
+    operator = str(payload.get("operator") or "").strip()
+    is_bonus2 = bool(payload.get("bonus_enabled", False))
+
+    # 1. Create in REGOS
+    regos_res = create_regos_customer_and_card(
+        name=name,
+        phone=phone,
+        barcode=barcode,
+        address=address,
+        notes=notes,
+        company_id=company_id
+    )
+
+    final_barcode = regos_res.get("barcode") or barcode
+    regos_card_id = regos_res.get("regos_card_id")
+    regos_customer_id = regos_res.get("regos_customer_id")
+    initial_bonus = float(regos_res.get("bonus") or 0.0)
+
+    # 2. Save in Supabase
+    client_id = payload.get("id") or (f"regos_card_{regos_card_id}" if regos_card_id else f"client_{int(time.time() * 1000)}")
+    
+    meta = {
+        "op": operator,
+        "barcode": final_barcode,
+        "regos_card_id": regos_card_id,
+        "regos_customer_id": regos_customer_id,
+        "bonus": initial_bonus,
+        "debt": 0.0,
+        "notes": notes,
+        "category": category,
+        "bonus_history": [],
+        "bonus_enabled": is_bonus2,
+        "bonus_percent": 2.0 if is_bonus2 else 0.0
+    }
+
+    db_payload = {
+        "id": client_id,
+        "name": name,
+        "company": company,
+        "phone": phone,
+        "phone2": final_barcode,
+        "email": address,
+        "operator": json.dumps(meta, ensure_ascii=False),
+        "status": "client",
+        "source": "client_directory",
+        "value": initial_bonus,
+        "company_id": company_id,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+
+    supabase_req("POST", "customers?on_conflict=id", json_data=db_payload, company_id=company_id)
+
+    return {
+        "ok": True,
+        "client": {
+            **db_payload,
+            **meta
+        },
+        "regos_synced": bool(regos_res.get("ok")),
+        "regos_card_id": regos_card_id,
+        "regos_customer_id": regos_customer_id,
+        "barcode": final_barcode,
+        "detail": regos_res.get("detail") or ""
+    }
 
 @app.patch("/api/clients/{client_id}/quick-update")
 def quick_update_client(client_id: str, payload: dict, request: Request):
@@ -452,6 +567,169 @@ def delete_client(id: str, request: Request):
     if company_id:
         path += f"&company_id=eq.{company_id}"
     return supabase_req("DELETE", path, company_id=company_id)
+
+# --- REGOS CUSTOMER & CARD CREATION HELPERS ---
+def calc_ean13_check_digit(digits12: str) -> str:
+    try:
+        total = sum(int(d) for d in digits12[0::2]) + sum(int(d) * 3 for d in digits12[1::2])
+        return str((10 - (total % 10)) % 10)
+    except Exception:
+        return "0"
+
+def create_regos_customer_and_card(
+    name: str,
+    phone: str,
+    barcode: str = None,
+    address: str = "",
+    notes: str = "",
+    company_id: str = None
+) -> dict:
+    try:
+        clean_name = str(name or "").strip()
+        if not clean_name:
+            return {"ok": False, "detail": "Mijoz ismi talab qilinadi"}
+
+        name_parts = clean_name.split(" ", 1)
+        first_name = name_parts[0]
+        last_name = name_parts[1] if len(name_parts) > 1 else ""
+
+        digits_phone = "".join(ch for ch in str(phone or "") if ch.isdigit())
+        if not digits_phone:
+            return {"ok": False, "detail": "Telefon raqam talab qilinadi"}
+
+        if len(digits_phone) == 9:
+            full_phone = "998" + digits_phone
+        else:
+            full_phone = digits_phone
+
+        clean_bc = str(barcode or "").strip()
+        if not clean_bc:
+            if len(full_phone) >= 12:
+                prefix12 = full_phone[:12]
+                clean_bc = prefix12 + calc_ean13_check_digit(prefix12)
+            else:
+                clean_bc = full_phone
+
+        barcode_type_id = 1 if (len(clean_bc) == 13 and clean_bc.isdigit()) else 3
+
+        settings = get_company_settings(company_id, bypass_cache=True) if company_id else settings_state
+        regos_endpoint = settings.get("regos_endpoint", "")
+        regos_token = settings.get("regos_token", "")
+
+        if not regos_endpoint or not regos_token:
+            return {"ok": False, "detail": "REGOS integratsiya sozlamalari (endpoint yoki token) mavjud emas"}
+
+        endpoint = regos_endpoint.strip().rstrip("/")
+        if not endpoint.startswith(("http://", "https://")):
+            endpoint = "https://" + endpoint
+
+        regos_headers = {
+            "Authorization": f"Bearer {regos_token}",
+            "Content-Type": "application/json"
+        }
+
+        get_card_url = f"{endpoint}/v1/retailcard/get" if "/v1" not in endpoint else f"{endpoint}/retailcard/get"
+
+        # 1. Check if card with this barcode already exists in REGOS
+        existing_card = None
+        try:
+            r_bc = requests.post(get_card_url, headers=regos_headers, json={"barcode_value": clean_bc, "limit": 1}, timeout=6)
+            if r_bc.status_code == 200 and r_bc.json().get("ok"):
+                res_cards = r_bc.json().get("result", [])
+                if res_cards:
+                    existing_card = res_cards[0]
+        except Exception as e_bc:
+            print(f"Error checking existing card by barcode: {e_bc}")
+
+        if existing_card:
+            card_id = existing_card.get("id")
+            cust_info = existing_card.get("customer") or {}
+            customer_id = cust_info.get("id")
+            return {
+                "ok": True,
+                "regos_card_id": card_id,
+                "regos_customer_id": customer_id,
+                "barcode": clean_bc,
+                "already_exists": True,
+                "bonus": float(existing_card.get("bonus_amount") or 0.0),
+                "detail": "Karta REGOS tizimida allaqachon mavjud, biriktirildi"
+            }
+
+        # 2. Check if customer already exists in REGOS by phone
+        get_cust_url = f"{endpoint}/v1/retailcustomer/get" if "/v1" not in endpoint else f"{endpoint}/retailcustomer/get"
+        existing_customer_id = None
+        try:
+            r_c = requests.post(get_cust_url, headers=regos_headers, json={"search": full_phone[-9:], "limit": 5}, timeout=6)
+            if r_c.status_code == 200 and r_c.json().get("ok"):
+                custs = r_c.json().get("result", [])
+                for c in custs:
+                    c_ph = "".join(ch for ch in str(c.get("main_phone") or "") if ch.isdigit())
+                    if c_ph.endswith(full_phone[-9:]):
+                        existing_customer_id = c.get("id")
+                        break
+        except Exception as e_c:
+            print(f"Error checking existing customer: {e_c}")
+
+        customer_id = existing_customer_id
+
+        # 3. Create customer in REGOS if not found
+        if not customer_id:
+            add_cust_url = f"{endpoint}/v1/retailcustomer/add" if "/v1" not in endpoint else f"{endpoint}/retailcustomer/add"
+            cust_payload = {
+                "group_id": 1,
+                "first_name": first_name,
+                "last_name": last_name,
+                "main_phone": full_phone,
+                "address": address or "",
+                "description": notes or f"Yaratildi: {datetime.now().strftime('%d.%m.%Y')}"
+            }
+            try:
+                r_add_c = requests.post(add_cust_url, headers=regos_headers, json=cust_payload, timeout=8)
+                if r_add_c.status_code == 200 and r_add_c.json().get("ok"):
+                    customer_id = r_add_c.json().get("result", {}).get("new_id")
+                else:
+                    err_desc = (r_add_c.json().get("result") or {}).get("description") or r_add_c.text
+                    return {"ok": False, "detail": f"REGOS xaridorni yaratishda xatolik: {err_desc}"}
+            except Exception as e_ac:
+                return {"ok": False, "detail": f"REGOS xaridorni yaratishda ulanish xatosi: {e_ac}"}
+
+        # 4. Create retail card in REGOS
+        add_card_url = f"{endpoint}/v1/retailcard/add" if "/v1" not in endpoint else f"{endpoint}/retailcard/add"
+        card_payload = {
+            "customer_id": int(customer_id),
+            "barcode_value": str(clean_bc),
+            "barcode_type_id": int(barcode_type_id),
+            "group_id": 1,
+            "promo_id": 1,
+            "unlimited": True
+        }
+        try:
+            r_add_card = requests.post(add_card_url, headers=regos_headers, json=card_payload, timeout=8)
+            if r_add_card.status_code == 200 and r_add_card.json().get("ok"):
+                card_id = r_add_card.json().get("result", {}).get("new_id")
+                return {
+                    "ok": True,
+                    "regos_card_id": card_id,
+                    "regos_customer_id": customer_id,
+                    "barcode": clean_bc,
+                    "already_exists": False,
+                    "bonus": 0.0,
+                    "detail": "REGOS tizimida yangi xaridor va karta muvaffaqiyatli yaratildi"
+                }
+            else:
+                err_desc = (r_add_card.json().get("result") or {}).get("description") or r_add_card.text
+                return {
+                    "ok": False,
+                    "regos_customer_id": customer_id,
+                    "barcode": clean_bc,
+                    "detail": f"REGOS kartasini yaratishda xatolik: {err_desc}"
+                }
+        except Exception as e_cd:
+            return {"ok": False, "detail": f"REGOS kartasini yaratishda ulanish xatosi: {e_cd}"}
+
+    except Exception as e:
+        print(f"Error in create_regos_customer_and_card: {e}")
+        return {"ok": False, "detail": f"Tizim xatoligi: {str(e)}"}
 
 # --- REGOS CARD BONUS OPERATIONS & SYNCHRONIZATION HELPERS ---
 def execute_regos_bonus_operation(
@@ -581,11 +859,13 @@ def execute_regos_bonus_operation(
         # Query updated card balance immediately from REGOS
         new_balance = None
         try:
-            r_bal = requests.post(get_card_url, headers=regos_headers, json={"id": actual_card_id, "limit": 1}, timeout=6)
-            if r_bal.status_code == 200 and r_bal.json().get("ok"):
-                bal_cards = r_bal.json().get("result", [])
-                if bal_cards:
-                    new_balance = float(bal_cards[0].get("bonus_amount") or 0.0)
+            bc_to_query = matched_card.get("barcode_value") or clean_bc
+            if bc_to_query:
+                r_bal = requests.post(get_card_url, headers=regos_headers, json={"barcode_value": str(bc_to_query).strip(), "limit": 1}, timeout=6)
+                if r_bal.status_code == 200 and r_bal.json().get("ok"):
+                    bal_cards = r_bal.json().get("result", [])
+                    if bal_cards:
+                        new_balance = float(bal_cards[0].get("bonus_amount") or 0.0)
         except Exception as e_nb:
             print(f"Error fetching updated REGOS card balance: {e_nb}")
 

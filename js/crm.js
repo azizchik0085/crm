@@ -3491,6 +3491,38 @@ window.CRM = {
         } catch(e) {}
     },
 
+    calcEan13CheckDigit: function(digits12) {
+        try {
+            let total = 0;
+            for (let i = 0; i < 12; i++) {
+                const d = parseInt(digits12[i], 10) || 0;
+                total += (i % 2 === 0) ? d : d * 3;
+            }
+            return String((10 - (total % 10)) % 10);
+        } catch(e) {
+            return "0";
+        }
+    },
+
+    generateClientBarcode: function() {
+        const phoneInput = document.getElementById('client-phone');
+        const barcodeInput = document.getElementById('client-barcode');
+        if (!barcodeInput) return;
+        const phone = (phoneInput?.value || '').replace(/\D/g, '');
+        if (!phone) {
+            alert("Iltimos, avval mijozning telefon raqamini kiriting!");
+            phoneInput?.focus();
+            return;
+        }
+        let fullPhone = phone.length === 9 ? '998' + phone : phone;
+        if (fullPhone.length >= 12) {
+            const prefix12 = fullPhone.slice(0, 12);
+            barcodeInput.value = prefix12 + this.calcEan13CheckDigit(prefix12);
+        } else {
+            barcodeInput.value = fullPhone;
+        }
+    },
+
     saveClientForm: async function(event) {
         if (event) event.preventDefault();
         const id = document.getElementById('client-id')?.value.trim();
@@ -3518,6 +3550,8 @@ window.CRM = {
 
         try {
             const isBonus2 = Boolean(document.getElementById('client-bonus-2percent')?.checked);
+            const createRegos = Boolean(document.getElementById('client-create-regos')?.checked ?? true);
+
             const clientData = {
                 name,
                 company,
@@ -3529,6 +3563,7 @@ window.CRM = {
                 value: bonus,
                 bonus_enabled: isBonus2,
                 bonus_percent: isBonus2 ? 2.0 : 0.0,
+                create_regos_card: createRegos,
                 email: address,
                 notes,
                 operator,
@@ -3548,7 +3583,23 @@ window.CRM = {
 
             closeModal('client-modal');
 
-            // Mahalliy keshni darhol yangilash (0ms kutish)
+            // Backend va REGOS-ga saqlash
+            const resp = await fetch('/api/clients', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(clientData)
+            });
+            const data = await resp.json();
+
+            if (data && data.barcode) {
+                clientData.barcode = data.barcode;
+                clientData.phone2 = data.barcode;
+                if (data.regos_card_id) {
+                    clientData.regos_card_id = data.regos_card_id;
+                }
+            }
+
+            // Mahalliy keshni yangilash
             if (!this._clientsCache) this._clientsCache = [];
             const exIdx = this._clientsCache.findIndex(c => c.id === clientData.id);
             if (exIdx > -1) {
@@ -3557,9 +3608,15 @@ window.CRM = {
                 this._clientsCache.unshift(clientData);
             }
             this.renderCustomersTable();
-
-            await DB.saveClient(clientData);
             await this.loadCustomersData(true);
+
+            if (data && data.regos_synced) {
+                alert(`✅ Mijoz muvaffaqiyatli saqlandi!\n🪪 REGOS Cloud tizimida xaridor kartasi ochildi: ${data.barcode}`);
+            } else if (data && data.regos_detail) {
+                alert(`✅ Mijoz saqlandi.\nℹ️ REGOS: ${data.regos_detail}`);
+            } else {
+                alert("✅ Mijoz muvaffaqiyatli saqlandi!");
+            }
         } catch(e) {
             alert("Mijozni saqlashda xatolik yuz berdi: " + e.message);
         } finally {
