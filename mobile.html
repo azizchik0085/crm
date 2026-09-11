@@ -214,18 +214,34 @@
                 </button>
             </div>
 
+            <!-- Yangi REGOS Karta Yaratish Card -->
+            <div class="m-card" id="m-card-create-regos-box" style="margin-top: 10px; background: linear-gradient(135deg, rgba(16, 185, 129, 0.18), rgba(5, 150, 105, 0.12)); border: 1.5px solid #10b981; display: flex; align-items: center; justify-content: space-between; padding: 16px; border-radius: 14px; box-shadow: 0 4px 14px rgba(16, 185, 129, 0.2);">
+                <div>
+                    <h4 style="font-size: 15px; font-weight: 800; color: #10b981; margin-bottom: 3px; display: flex; align-items: center; gap: 6px;">
+                        <i class="fas fa-id-card"></i> Yangi Karta Ochish (REGOS)
+                    </h4>
+                    <p style="font-size: 12px; color: var(--text-muted); margin: 0;">Yangi mijoz va unga avtomat REGOS xaridor kartasi yaratish</p>
+                </div>
+                <button class="btn btn-success" style="height: 42px; padding: 0 16px; font-size: 13.5px; font-weight: 700; border-radius: 10px; background: linear-gradient(135deg, #10b981, #059669); color: #fff; border: none; cursor: pointer; white-space: nowrap; box-shadow: 0 3px 10px rgba(16, 185, 129, 0.4);" onclick="MobileApp.openCreateCardModal()">
+                    <i class="fas fa-plus"></i> Yangi Karta
+                </button>
+            </div>
+
         </section>
 
         <!-- B. CLIENTS (MIJOZLAR) VIEW -->
         <section id="m-view-clients" class="view-container">
             <!-- Search Bar -->
-            <div class="m-search-box">
-                <div class="m-search-input-wrapper">
+            <div class="m-search-box" style="display: flex; gap: 8px; align-items: center;">
+                <div class="m-search-input-wrapper" style="flex: 1;">
                     <i class="fas fa-search m-search-icon"></i>
                     <input type="text" id="m-clients-search" class="m-search-input" placeholder="Mijoz ismi, telefon, shtrix-kod..." oninput="MobileApp.filterClients()">
                 </div>
                 <button class="m-search-scan-btn" title="Karta skaneri" onclick="MobileApp.openScanner()">
                     <i class="fas fa-barcode"></i>
+                </button>
+                <button class="btn btn-success" style="height: 42px; padding: 0 12px; font-size: 12px; font-weight: 700; border-radius: 10px; background: #10b981; color: #fff; border: none; cursor: pointer; white-space: nowrap; display: flex; align-items: center; gap: 5px; box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);" onclick="MobileApp.openCreateCardModal()">
+                    <i class="fas fa-user-plus"></i> Yangi Karta
                 </button>
             </div>
 
@@ -248,7 +264,7 @@
             </div>
 
             <!-- Floating Action Button to add REGOS card -->
-            <button class="m-fab" title="Yangi mijoz qo'shish" onclick="MobileApp.openAddCardModal()">
+            <button class="m-fab" title="Yangi REGOS karta ochish" onclick="MobileApp.openCreateCardModal()">
                 <i class="fas fa-plus"></i>
             </button>
         </section>
@@ -665,7 +681,7 @@
         <div class="m-sheet" style="max-height: 90vh; display: flex; flex-direction: column;">
             <div class="m-sheet-header">
                 <div class="m-sheet-drag-handle"></div>
-                <div class="m-sheet-title"><i class="fas fa-users-cog" style="color: #38bdf8; margin-right: 6px;"></i> REGOS-dan Qo'shish</div>
+                <div class="m-sheet-title" id="m-regos-modal-title"><i class="fas fa-users-cog" style="color: #38bdf8; margin-right: 6px;"></i> REGOS-dan Qo'shish</div>
                 <button class="m-sheet-close" onclick="MobileApp.closeAddCardModal()">
                     <i class="fas fa-times"></i>
                 </button>
@@ -921,18 +937,22 @@
     </script>
 
     <!-- Mobile App Main Script -->
-    <script src="/js/mobile-app.js?v=3.1"></script>
+    <script src="/js/mobile-app.js?v=3.5"></script>
 
     <!-- Register Service Worker for PWA Offline / Standalone Installation -->
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw-mobile.js?v=10')
+                navigator.serviceWorker.register('/sw-mobile.js?v=12')
                     .then(reg => {
                         reg.update();
                         console.log('Webzone Mobile SW registered');
                     })
                     .catch(err => console.log('Webzone Mobile SW registration failed:', err));
+            });
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                console.log('New Service Worker activated, reloading for fresh code...');
+                window.location.reload();
             });
         }
     </script>

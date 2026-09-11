@@ -1142,6 +1142,16 @@ window.MobileApp = {
                 </div>
             `;
         }
+        if (this.hasPermission('m_regos_cards') || this.hasPermission('m_crm')) {
+            html += `
+                <div class="action-btn" onclick="MobileApp.openCreateCardModal()" style="background: rgba(16, 185, 129, 0.12); border: 1.5px solid #10b981; border-radius: 12px;">
+                    <div class="action-icon-circle" style="background: linear-gradient(135deg, #10b981, #059669); color: #ffffff; box-shadow: 0 4px 10px rgba(16, 185, 129, 0.4);">
+                        <i class="fas fa-user-plus"></i>
+                    </div>
+                    <span style="color: #34d399; font-weight: 800;">Yangi Karta</span>
+                </div>
+            `;
+        }
         if (this.hasPermission('m_receipts')) {
             html += `
                 <div class="action-btn" onclick="MobileApp.switchView('receipts')">
@@ -2022,6 +2032,10 @@ window.MobileApp = {
     _regosPartnerGroups: null,
     _activeRegosTab: 'partners',
 
+    openCreateCardModal: function() {
+        this.openAddCardModal(null, 'create');
+    },
+
     openAddCardModal: function(presetQuery, defaultTab) {
         const modal = document.getElementById('m-add-card-modal');
         if (!modal) return;
@@ -2036,13 +2050,19 @@ window.MobileApp = {
             btnPartners.style.display = isAdminUser ? 'block' : 'none';
         }
         if (tabsBar) {
-            tabsBar.style.display = isAdminUser ? 'flex' : 'none';
+            tabsBar.style.display = 'flex';
         }
         if (titleEl) {
-            titleEl.innerText = isAdminUser ? 'REGOS Mijoz / Hamkorlar' : 'REGOS Xaridor Kartalari';
+            if (defaultTab === 'create') {
+                titleEl.innerHTML = '<i class="fas fa-id-card" style="color: #10b981; margin-right: 6px;"></i> Yangi REGOS Kartasi Ochish';
+            } else {
+                titleEl.innerHTML = isAdminUser 
+                    ? '<i class="fas fa-users-cog" style="color: #38bdf8; margin-right: 6px;"></i> REGOS Mijoz / Hamkorlar' 
+                    : '<i class="fas fa-id-card" style="color: #38bdf8; margin-right: 6px;"></i> REGOS Xaridor Kartalari';
+            }
         }
 
-        const tabToOpen = isAdminUser ? (defaultTab || 'partners') : 'cards';
+        const tabToOpen = defaultTab || (isAdminUser ? 'partners' : 'cards');
 
         if (presetQuery) {
             this.switchRegosTab('cards');
@@ -2136,8 +2156,9 @@ window.MobileApp = {
         if (!barcodeInput) return;
         const phone = (phoneInput?.value || '').replace(/\D/g, '');
         if (!phone) {
-            alert("Iltimos, avval mijozning telefon raqamini kiriting!");
-            phoneInput?.focus();
+            const random11 = '200' + String(Date.now()).slice(-8) + '0';
+            const prefix12 = random11.slice(0, 12);
+            barcodeInput.value = prefix12 + this.calcEan13CheckDigit(prefix12);
             return;
         }
         let fullPhone = phone.length === 9 ? '998' + phone : phone;
