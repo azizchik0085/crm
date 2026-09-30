@@ -1,4 +1,5 @@
 import os
+import html
 import time
 import uuid
 import json
@@ -125,7 +126,7 @@ def get_company_id(request: Request = None, company_id: str = None):
                             return local_cid
         except Exception:
             pass
-    return None
+    return "giperbrendstroy"
 
 # Helper to proxy requests to Supabase REST API
 def supabase_req(method, path, json_data=None, params=None, company_id=None, use_central=False):
@@ -2732,6 +2733,18 @@ def get_company_settings(company_id: str, use_central: bool = False, bypass_cach
                 for k, v in default_keys.items():
                     if k not in db_settings:
                         db_settings[k] = v
+                # Auto-heal missing credentials from local file if empty in database
+                local_file = os.path.join(os.path.dirname(__file__), f"settings_{company_id}.json")
+                fallback_file = local_file if os.path.exists(local_file) else os.path.join(os.path.dirname(__file__), "settings.json")
+                if os.path.exists(fallback_file):
+                    try:
+                        with open(fallback_file, "r") as f:
+                            local_data = json.load(f)
+                            for crit in ["amocrm_subdomain", "amocrm_token", "supabase_url", "supabase_key", "regos_endpoint", "regos_token", "telegram_token", "gemini_api_key"]:
+                                if not db_settings.get(crit) and local_data.get(crit):
+                                    db_settings[crit] = local_data[crit]
+                    except Exception:
+                        pass
                 if not use_central:
                     _settings_cache[company_id] = db_settings
                 return db_settings
@@ -3180,23 +3193,42 @@ def update_settings(settings: dict, request: Request):
     company_settings["sip_password"] = settings.get("sip_password", "")
     company_settings["sip_wss"] = settings.get("sip_wss", "")
     
-    company_settings["telegram_token"] = settings.get("telegram_token", "")
-    company_settings["instagram_token"] = settings.get("instagram_token", "")
-    company_settings["ai_provider"] = settings.get("ai_provider", "local")
-    company_settings["telephony_provider"] = settings.get("telephony_provider", "sarkor")
-    company_settings["gemini_api_key"] = settings.get("gemini_api_key", "")
-    company_settings["openai_api_key"] = settings.get("openai_api_key", "")
-    company_settings["groq_api_key"] = settings.get("groq_api_key", "")
-    company_settings["ai_auto_reply"] = settings.get("ai_auto_reply", False)
-    company_settings["regos_endpoint"] = settings.get("regos_endpoint", "")
-    company_settings["regos_token"] = settings.get("regos_token", "")
-    company_settings["amocrm_subdomain"] = settings.get("amocrm_subdomain", "")
-    company_settings["amocrm_token"] = settings.get("amocrm_token", "")
-    company_settings["amocrm_lead_creation"] = settings.get("amocrm_lead_creation", False)
-    company_settings["supabase_url"] = settings.get("supabase_url", "")
-    company_settings["supabase_key"] = settings.get("supabase_key", "")
-    company_settings["meta_access_token"] = settings.get("meta_access_token", "")
-    company_settings["meta_ad_account_id"] = settings.get("meta_ad_account_id", "")
+    if "telegram_token" in settings:
+        if settings["telegram_token"] or not company_settings.get("telegram_token"):
+            company_settings["telegram_token"] = settings.get("telegram_token", "")
+    if "instagram_token" in settings: company_settings["instagram_token"] = settings.get("instagram_token", "")
+    if "ai_provider" in settings: company_settings["ai_provider"] = settings.get("ai_provider", "local")
+    if "telephony_provider" in settings: company_settings["telephony_provider"] = settings.get("telephony_provider", "sarkor")
+    if "gemini_api_key" in settings:
+        if settings["gemini_api_key"] or not company_settings.get("gemini_api_key"):
+            company_settings["gemini_api_key"] = settings.get("gemini_api_key", "")
+    if "openai_api_key" in settings: company_settings["openai_api_key"] = settings.get("openai_api_key", "")
+    if "groq_api_key" in settings: company_settings["groq_api_key"] = settings.get("groq_api_key", "")
+    if "ai_auto_reply" in settings: company_settings["ai_auto_reply"] = settings.get("ai_auto_reply", False)
+    if "regos_endpoint" in settings:
+        if settings["regos_endpoint"] or not company_settings.get("regos_endpoint"):
+            company_settings["regos_endpoint"] = settings.get("regos_endpoint", "")
+    if "regos_token" in settings:
+        if settings["regos_token"] or not company_settings.get("regos_token"):
+            company_settings["regos_token"] = settings.get("regos_token", "")
+            
+    # Protect amoCRM credentials from being erased by empty string submissions
+    if "amocrm_subdomain" in settings:
+        if settings["amocrm_subdomain"] or not company_settings.get("amocrm_subdomain"):
+            company_settings["amocrm_subdomain"] = str(settings.get("amocrm_subdomain", "")).strip()
+    if "amocrm_token" in settings:
+        if settings["amocrm_token"] or not company_settings.get("amocrm_token"):
+            company_settings["amocrm_token"] = str(settings.get("amocrm_token", "")).strip()
+
+    if "amocrm_lead_creation" in settings: company_settings["amocrm_lead_creation"] = settings.get("amocrm_lead_creation", False)
+    if "supabase_url" in settings:
+        if settings["supabase_url"] or not company_settings.get("supabase_url"):
+            company_settings["supabase_url"] = settings.get("supabase_url", "")
+    if "supabase_key" in settings:
+        if settings["supabase_key"] or not company_settings.get("supabase_key"):
+            company_settings["supabase_key"] = settings.get("supabase_key", "")
+    if "meta_access_token" in settings: company_settings["meta_access_token"] = settings.get("meta_access_token", "")
+    if "meta_ad_account_id" in settings: company_settings["meta_ad_account_id"] = settings.get("meta_ad_account_id", "")
     if "roles" in settings:
         company_settings["roles"] = settings.get("roles")
     if "amocrm_operators_map" in settings:
@@ -3224,7 +3256,10 @@ def update_settings(settings: dict, request: Request):
         try:
             requests.post(
                 f"https://api.telegram.org/bot{tg_token}/setWebhook",
-                json={"url": "https://protech.up.railway.app/api/telegram/webhook"},
+                json={
+                    "url": "https://protech.up.railway.app/api/telegram/webhook",
+                    "allowed_updates": ["message", "edited_message", "callback_query"]
+                },
                 timeout=5
             )
         except Exception:
@@ -6955,10 +6990,21 @@ def create_amocrm_deals_for_receipts(receipts, company_id, force=False):
 
 @app.post("/api/integration/amocrm/sync")
 def sync_amocrm_leads(background_tasks: BackgroundTasks, request: Request):
-    company_id = get_company_id(request)
-    settings = get_company_settings(company_id, bypass_cache=True) if company_id else settings_state
+    company_id = get_company_id(request) or "giperbrendstroy"
+    settings = get_company_settings(company_id, bypass_cache=True)
     subdomain = settings.get("amocrm_subdomain", "")
     token = settings.get("amocrm_token", "")
+    if not subdomain or not token:
+        local_file = os.path.join(os.path.dirname(__file__), f"settings_{company_id}.json")
+        fallback_file = local_file if os.path.exists(local_file) else os.path.join(os.path.dirname(__file__), "settings.json")
+        if os.path.exists(fallback_file):
+            try:
+                with open(fallback_file, "r") as f:
+                    local_data = json.load(f)
+                    subdomain = subdomain or local_data.get("amocrm_subdomain", "")
+                    token = token or local_data.get("amocrm_token", "")
+            except Exception:
+                pass
     if not subdomain or not token:
         raise HTTPException(status_code=400, detail="amoCRM sozlanmagan. Iltimos, sozlamalar sahifasida Subdomain va Tokenni saqlang.")
         
@@ -7638,12 +7684,15 @@ async def telegram_webhook(request: Request):
                         "text": "Muvaffaqiyatli! Bonus hisobdan yechildi.",
                         "show_alert": True
                     }, timeout=5)
+                    safe_name = html.escape(str(req_obj.get('client_name') or 'Usta'))
+                    safe_card = html.escape(str(req_obj.get('card_number') or '-'))
+                    safe_user = html.escape(str(user_name or 'Buxgalter'))
                     edited_text = (
                         f"✅ <b>TO'LANDI VA BONUSDAN YECHILDI!</b>\n\n"
-                        f"👷 <b>Usta:</b> {req_obj.get('client_name')}\n"
+                        f"👷 <b>Usta:</b> {safe_name}\n"
                         f"💰 <b>Summa:</b> {int(req_obj.get('amount', 0)):,} so'm\n"
-                        f"💳 <b>Karta:</b> <code>{req_obj.get('card_number')}</code>\n"
-                        f"👤 <b>Tasdiqladi:</b> {user_name}\n"
+                        f"💳 <b>Karta:</b> <code>{safe_card}</code>\n"
+                        f"👤 <b>Tasdiqladi:</b> {safe_user}\n"
                         f"🕒 <b>Vaqt:</b> {datetime.now().strftime('%d.%m.%Y %H:%M')}"
                     )
                     requests.post(f"https://api.telegram.org/bot{token}/editMessageText", json={
@@ -7655,7 +7704,7 @@ async def telegram_webhook(request: Request):
                 except Exception as e_app:
                     requests.post(f"https://api.telegram.org/bot{token}/answerCallbackQuery", json={
                         "callback_query_id": cb_id,
-                        "text": f"Xatolik: {e_app}",
+                        "text": f"Xatolik: {str(e_app)[:180]}",
                         "show_alert": True
                     }, timeout=5)
                     
@@ -7668,10 +7717,11 @@ async def telegram_webhook(request: Request):
                         "text": "So'rov rad etildi.",
                         "show_alert": True
                     }, timeout=5)
+                    safe_user = html.escape(str(user_name or 'Buxgalter'))
                     requests.post(f"https://api.telegram.org/bot{token}/editMessageText", json={
                         "chat_id": chat_id,
                         "message_id": msg_id,
-                        "text": f"❌ <b>SO'ROV RAD ETILDI!</b>\nTasdiqladi: {user_name}",
+                        "text": f"❌ <b>SO'ROV RAD ETILDI!</b>\nTasdiqladi: {safe_user}",
                         "parse_mode": "HTML"
                     }, timeout=5)
                 except Exception as e_rej:

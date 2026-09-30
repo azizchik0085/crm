@@ -1156,8 +1156,12 @@ window.CRM = {
         }
         
         try {
+            const compId = localStorage.getItem('company_id') || localStorage.getItem('activeCompanyId') || 'giperbrendstroy';
             const response = await fetch('/api/integration/amocrm/sync', {
-                method: 'POST'
+                method: 'POST',
+                headers: {
+                    'x-company-id': compId
+                }
             });
             if (!response.ok) {
                 const result = await response.json();
