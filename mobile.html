@@ -1022,7 +1022,7 @@
                         <label id="m-debt-amount-label" style="font-size: 12px; font-weight: 700; color: var(--text-main); margin-bottom: 4px; display: block;">
                             Qarzga beriladigan summa (so'm) <span style="color: var(--danger);">*</span>
                         </label>
-                        <input type="number" id="m-debt-amount" class="form-control" placeholder="Masalan: 1500000" required inputmode="numeric" style="height: 46px; font-size: 16px; font-weight: 700;">
+                        <input type="number" id="m-debt-amount" class="form-control" placeholder="Masalan: 1500000" required inputmode="numeric" oninput="MobileApp.updateDebtContractPreview()" style="height: 46px; font-size: 16px; font-weight: 700;">
 
                         <!-- Tezkor summa tugmalari -->
                         <div style="display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap;">
@@ -1037,29 +1037,124 @@
                     <!-- 3. Olingan mahsulotlar / Izoh -->
                     <div class="form-group" style="margin-bottom: 12px;">
                         <label id="m-debt-note-label" style="font-size: 12px; font-weight: 700; color: var(--text-main); margin-bottom: 4px; display: block;">
-                            Olingan mahsulotlar yoki izoh
+                            Olingan mahsulotlar ro'yxati yoki izoh <span style="color: var(--danger);">*</span>
                         </label>
-                        <input type="text" id="m-debt-note" class="form-control" placeholder="Masalan: Sement 20 qop, shpaklyovka, yuk xati #..." style="height: 42px; font-size: 13.5px;">
+                        <input type="text" id="m-debt-note" class="form-control" placeholder="Masalan: Sement 20 qop, shpaklyovka, yuk xati #..." oninput="MobileApp.updateDebtContractPreview()" style="height: 42px; font-size: 13.5px;">
                     </div>
 
-                    <!-- 4. Qaytarish muddati (Faqat qarzga berishda ko'rinadi) -->
-                    <div class="form-group" id="m-debt-due-date-group" style="margin-bottom: 16px;">
-                        <label style="font-size: 12px; font-weight: 700; color: var(--text-main); margin-bottom: 4px; display: block;">
-                            <i class="far fa-calendar-alt" style="color: #f59e0b; margin-right: 4px;"></i> Qaytarish muddati (ixtiyoriy)
-                        </label>
-                        <input type="date" id="m-debt-due-date" class="form-control" style="height: 42px; font-size: 13.5px; color-scheme: dark;">
+                    <!-- 4. Qaytarish muddati va Pasport (Faqat qarzga berishda ko'rinadi) -->
+                    <div id="m-debt-due-date-group">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label style="font-size: 12px; font-weight: 700; color: #fbbf24; margin-bottom: 4px; display: block;">
+                                    <i class="far fa-calendar-check" style="margin-right: 4px;"></i> Qaytarish muddati (Sana) <span style="color: var(--danger);">*</span>
+                                </label>
+                                <input type="date" id="m-debt-due-date" class="form-control" onchange="MobileApp.updateDebtContractPreview()" style="height: 42px; font-size: 13.5px; color-scheme: dark; border-color: rgba(245, 158, 11, 0.4);">
+                            </div>
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label style="font-size: 12px; font-weight: 700; color: var(--text-main); margin-bottom: 4px; display: block;">
+                                    <i class="fas fa-id-card" style="color: #38bdf8; margin-right: 4px;"></i> Pasport / JSHSHIR (ixtiyoriy)
+                                </label>
+                                <input type="text" id="m-debt-passport" class="form-control" placeholder="Masalan: AD 1234567" oninput="MobileApp.updateDebtContractPreview()" style="height: 42px; font-size: 13.5px; text-transform: uppercase;">
+                            </div>
+                        </div>
+
+                        <!-- Tezkor qaytarish muddati tugmalari -->
+                        <div style="display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; align-items: center;">
+                            <span style="font-size: 11px; color: var(--text-muted);">Tezkor muddat:</span>
+                            <button type="button" class="btn btn-secondary" style="height: 26px; font-size: 11px; padding: 0 8px; border-radius: 6px;" onclick="MobileApp.setDebtDueDateDays(3)">3 kun</button>
+                            <button type="button" class="btn btn-secondary" style="height: 26px; font-size: 11px; padding: 0 8px; border-radius: 6px;" onclick="MobileApp.setDebtDueDateDays(7)">7 kun</button>
+                            <button type="button" class="btn btn-secondary" style="height: 26px; font-size: 11px; padding: 0 8px; border-radius: 6px;" onclick="MobileApp.setDebtDueDateDays(15)">15 kun</button>
+                            <button type="button" class="btn btn-secondary" style="height: 26px; font-size: 11px; padding: 0 8px; border-radius: 6px;" onclick="MobileApp.setDebtDueDateDays(30)">1 oy (30 kun)</button>
+                        </div>
+
+                        <!-- 5. SHARTNOMA BANDI VA JINOIY JAVOBGARLIK ROZILIGI -->
+                        <div style="background: rgba(15, 23, 42, 0.85); border: 1.5px solid rgba(239, 68, 68, 0.45); border-radius: 14px; padding: 14px; margin-bottom: 14px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 6px;">
+                                <div style="font-size: 13px; font-weight: 800; color: #f87171; display: flex; align-items: center; gap: 6px;">
+                                    <i class="fas fa-gavel"></i> QARZ SHARTNOMASI VA JAVOBGARLIK BANDI
+                                </div>
+                                <span id="m-debt-contract-no" style="background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.35); color: #fbbf24; font-family: monospace; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 6px;">
+                                    SH-000000
+                                </span>
+                            </div>
+
+                            <textarea id="m-debt-contract-text" class="form-control" rows="7" style="font-size: 12px; line-height: 1.5; color: #f8fafc; background: rgba(0, 0, 0, 0.35); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 10px; padding: 10px; resize: vertical; margin-bottom: 10px;"></textarea>
+
+                            <label for="m-debt-agree-checkbox" style="display: flex; align-items: flex-start; gap: 10px; cursor: pointer; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); padding: 10px 12px; border-radius: 10px; margin: 0;">
+                                <input type="checkbox" id="m-debt-agree-checkbox" style="width: 18px; height: 18px; margin-top: 2px; accent-color: #ef4444; flex-shrink: 0;">
+                                <span style="font-size: 12px; font-weight: 700; color: #fca5a5; line-height: 1.4;">
+                                    Mijoz shartnoma shartlari bilan to'liq tanishdi hamda qarz belgilangan muddatda qaytarilmasa, O'zR qonunchiligiga binoan <u style="color: #ef4444;">JINOIY JAVOBGARLIKKA</u> tortilishiga roziligini bildirdi.
+                                </span>
+                            </label>
+                        </div>
+
+                        <!-- 6. FACE ID TASDIQLASH VA SURATGA OLISH -->
+                        <div style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(56, 189, 248, 0.08)); border: 1.5px solid rgba(16, 185, 129, 0.4); border-radius: 14px; padding: 14px; margin-bottom: 16px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 6px;">
+                                <div style="font-size: 13.5px; font-weight: 800; color: #10b981; display: flex; align-items: center; gap: 6px;">
+                                    <i class="fas fa-user-check"></i> FACE ID ORQALI TASDIQLASH <span style="color: var(--danger);">*</span>
+                                </div>
+                                <span id="m-faceid-status-badge" style="background: rgba(239, 68, 68, 0.2); color: #f87171; font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 8px;">
+                                    <i class="fas fa-exclamation-circle"></i> Tasdiqlanmagan
+                                </span>
+                            </div>
+
+                            <p style="font-size: 11.5px; color: var(--text-muted); margin: 0 0 10px;">
+                                Mijozning roziligini tasdiqlash uchun Face ID kamerani yoqib, mijozning yuz tasvirini (va zarurat bo'lsa hujjat/mahsulotni) suratga oling:
+                            </p>
+
+                            <!-- Live Face ID Camera Box -->
+                            <div id="m-faceid-camera-container" style="display: none; text-align: center; margin-bottom: 12px;">
+                                <div style="position: relative; width: 250px; height: 290px; margin: 0 auto 10px; border-radius: 24px; overflow: hidden; border: 3px solid #10b981; box-shadow: 0 0 25px rgba(16, 185, 129, 0.35); background: #000;">
+                                    <video id="m-faceid-video" autoplay playsinline muted style="width: 100%; height: 100%; object-fit: cover;"></video>
+                                    <!-- Biometric Oval Overlay -->
+                                    <div style="position: absolute; inset: 18px 30px; border: 2px dashed rgba(16, 185, 129, 0.75); border-radius: 50%; pointer-events: none; box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.35);"></div>
+                                    <div style="position: absolute; bottom: 8px; left: 0; right: 0; text-align: center; font-size: 11px; font-weight: 700; color: #10b981; text-shadow: 0 1px 3px #000; pointer-events: none;">
+                                        <i class="fas fa-expand"></i> FACE ID BIOMETRIC SCAN
+                                    </div>
+                                </div>
+
+                                <div style="display: flex; justify-content: center; gap: 8px; flex-wrap: wrap;">
+                                    <button type="button" onclick="MobileApp.captureFaceIdPhoto()" class="btn btn-success" style="height: 40px; padding: 0 16px; font-size: 13px; font-weight: 700; border-radius: 10px; background: linear-gradient(135deg, #10b981, #059669); border: none; color: #fff; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);">
+                                        <i class="fas fa-camera"></i> Tasdiqlash va Suratga Olish
+                                    </button>
+                                    <button type="button" onclick="MobileApp.switchFaceIdCamera()" class="btn btn-secondary" style="height: 40px; padding: 0 12px; font-size: 12px; border-radius: 10px;" title="Old/Orqa kamerani almashtirish">
+                                        <i class="fas fa-sync-alt"></i> Kamera
+                                    </button>
+                                    <button type="button" onclick="MobileApp.stopFaceIdCamera()" class="btn btn-danger" style="height: 40px; padding: 0 12px; font-size: 12px; border-radius: 10px;">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Start Face ID Camera / Upload Photo Buttons -->
+                            <div id="m-faceid-start-controls" style="display: flex; gap: 8px; flex-wrap: wrap;">
+                                <button type="button" onclick="MobileApp.startFaceIdCamera('user')" class="btn btn-primary" style="flex: 1; height: 42px; font-size: 13px; font-weight: 700; border-radius: 10px; background: linear-gradient(135deg, #0ea5e9, #2563eb); border: none; color: #fff; display: inline-flex; align-items: center; justify-content: center; gap: 6px;">
+                                    <i class="fas fa-id-badge"></i> Face ID Kamerani Yoqish
+                                </button>
+                                <label style="height: 42px; padding: 0 12px; font-size: 12px; font-weight: 700; border-radius: 10px; background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); color: var(--text-main); display: inline-flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; margin: 0;">
+                                    <i class="fas fa-image" style="color: #38bdf8;"></i> Rasm yuklash
+                                    <input type="file" accept="image/*" capture="user" onchange="MobileApp.handleFaceIdFileInput(event)" style="display: none;">
+                                </label>
+                            </div>
+
+                            <!-- Captured Face ID Photos Preview -->
+                            <div id="m-faceid-photos-list" style="display: none; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; margin-top: 12px;"></div>
+                        </div>
                     </div>
 
-                    <button type="submit" id="m-btn-debt-submit" class="btn btn-primary btn-block" style="height: 48px; font-size: 14.5px; font-weight: 700; border-radius: 12px; background: linear-gradient(135deg, #f59e0b, #ea580c); border: none; color: #fff; box-shadow: 0 4px 15px rgba(245, 158, 11, 0.35);">
-                        <i class="fas fa-file-signature" style="margin-right: 6px;"></i> Qarzni Rasmiylashtirish
+                    <button type="submit" id="m-btn-debt-submit" class="btn btn-primary btn-block" style="height: 50px; font-size: 14.5px; font-weight: 800; border-radius: 12px; background: linear-gradient(135deg, #f59e0b, #ea580c); border: none; color: #fff; box-shadow: 0 4px 15px rgba(245, 158, 11, 0.35);">
+                        <i class="fas fa-file-pdf" style="margin-right: 6px;"></i> Tasdiqlash va Shartnomani (PDF) Yuborish
                     </button>
                 </form>
             </div>
         </div>
     </div>
 
-    <!-- Html5Qrcode Library for Camera Barcode Scanning -->
+    <!-- Html5Qrcode & jsPDF Libraries -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
     <!-- Global fetch interceptor to append x-company-id header automatically -->
     <script>
@@ -1089,13 +1184,13 @@
     </script>
 
     <!-- Mobile App Main Script -->
-    <script src="/js/mobile-app.js?v=3.6"></script>
+    <script src="/js/mobile-app.js?v=3.7"></script>
 
     <!-- Register Service Worker for PWA Offline / Standalone Installation -->
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw-mobile.js?v=14')
+                navigator.serviceWorker.register('/sw-mobile.js?v=15')
                     .then(reg => {
                         reg.update();
                         console.log('Webzone Mobile SW registered');

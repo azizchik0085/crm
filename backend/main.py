@@ -1526,6 +1526,244 @@ def adjust_client_bonus(client_id: str, payload: dict, request: Request):
         "record": rec
     }
 
+DEBT_CONTRACT_BOT_TOKEN = "9071675725:AAFHR4pgiQ5OC7eXkIj_oLhBrvc7qOoNN9g"
+DEFAULT_DEBT_CONTRACT_CHAT_IDS = ["8712573826"]
+
+
+def _get_jpeg_dimensions(jpeg_bytes: bytes):
+    """Extract (width, height) from JPEG header without external libraries."""
+    try:
+        i = 2
+        n = len(jpeg_bytes)
+        while i < n - 8:
+            if jpeg_bytes[i] != 0xFF:
+                i += 1
+                continue
+            marker = jpeg_bytes[i + 1]
+            while marker == 0xFF and i + 2 < n:
+                i += 1
+                marker = jpeg_bytes[i + 1]
+            if marker in (0xD8, 0xD9) or (0xD0 <= marker <= 0xD7):
+                i += 2
+                continue
+            seg_len = (jpeg_bytes[i + 2] << 8) + jpeg_bytes[i + 3]
+            if marker in (0xC0, 0xC1, 0xC2):
+                h = (jpeg_bytes[i + 5] << 8) + jpeg_bytes[i + 6]
+                w = (jpeg_bytes[i + 7] << 8) + jpeg_bytes[i + 8]
+                if w > 0 and h > 0:
+                    return w, h
+            i += 2 + seg_len
+    except Exception:
+        pass
+    return 1240, 1754
+
+
+def build_pdf_from_jpeg_bytes(jpeg_bytes: bytes) -> bytes:
+    """Wrap raw JPEG bytes into a single-page A4 PDF 1.4 document (zero external dependencies)."""
+    img_w, img_h = _get_jpeg_dimensions(jpeg_bytes)
+    page_w, page_h = 595.28, 841.89  # A4 in PDF points
+
+    objs = []
+    objs.append(b"1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n")
+    objs.append(b"2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n")
+    page_obj = (
+        f"3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {page_w:.2f} {page_h:.2f}] "
+        f"/Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>\nendobj\n"
+    ).encode("ascii")
+    objs.append(page_obj)
+
+    img_header = (
+        f"4 0 obj\n<< /Type /XObject /Subtype /Image /Width {img_w} /Height {img_h} "
+        f"/ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length {len(jpeg_bytes)} >>\nstream\n"
+    ).encode("ascii")
+    img_footer = b"\nendstream\nendobj\n"
+    objs.append(img_header + jpeg_bytes + img_footer)
+
+    content_stream = f"q\n{page_w:.2f} 0 0 {page_h:.2f} 0 0 cm\n/Im0 Do\nQ\n".encode("ascii")
+    content_obj = (
+        f"5 0 obj\n<< /Length {len(content_stream)} >>\nstream\n".encode("ascii")
+        + content_stream
+        + b"\nendstream\nendobj\n"
+    )
+    objs.append(content_obj)
+
+    out = bytearray(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
+    offsets = []
+    for o in objs:
+        offsets.append(len(out))
+        out.extend(o)
+
+    xref_pos = len(out)
+    out.extend(f"xref\n0 {len(objs) + 1}\n0000000000 65535 f \n".encode("ascii"))
+    for off in offsets:
+        out.extend(f"{off:010d} 00000 n \n".encode("ascii"))
+
+    out.extend(
+        f"trailer\n<< /Size {len(objs) + 1} /Root 1 0 R >>\nstartxref\n{xref_pos}\n%%EOF\n".encode("ascii")
+    )
+    return bytes(out)
+
+
+def _strip_data_url_b64(b64_str: str) -> bytes:
+    import base64
+    if not b64_str:
+        return b""
+    clean = b64_str.split(",", 1)[1] if "," in b64_str else b64_str
+    try:
+        return base64.b64decode(clean)
+    except Exception:
+        return b""
+
+
+def send_debt_contract_to_telegram(
+    company_id: str,
+    contract_no: str,
+    client_name: str,
+    client_phone: str,
+    client_barcode: str,
+    passport: str,
+    amount: float,
+    prev_debt: float,
+    new_debt: float,
+    due_date: str,
+    note: str,
+    user_name: str,
+    pdf_bytes: bytes,
+    face_photos_bytes: list,
+):
+    """Sync bot subscribers and send confirmed PDF contract + Face ID photos to 9071675725:AAFHR4pgiQ5OC7eXkIj_oLhBrvc7qOoNN9g."""
+    bot_token = DEBT_CONTRACT_BOT_TOKEN
+    chat_ids = list(DEFAULT_DEBT_CONTRACT_CHAT_IDS)
+
+    # Load saved chat IDs and check getUpdates for any new subscribers on @Qarzdorlik01_bot
+    try:
+        settings = get_company_settings(company_id) or {}
+        saved_ids = settings.get("debt_contract_chat_ids") or []
+        if isinstance(saved_ids, list):
+            for cid in saved_ids:
+                scid = str(cid).strip()
+                if scid and scid not in chat_ids:
+                    chat_ids.append(scid)
+
+        upd_resp = requests.get(
+            f"https://api.telegram.org/bot{bot_token}/getUpdates",
+            params={"limit": 50, "timeout": 1},
+            timeout=5,
+        )
+        if upd_resp.status_code == 200:
+            upd_data = upd_resp.json()
+            new_found = False
+            max_update_id = None
+            for item in upd_data.get("result") or []:
+                uid = item.get("update_id")
+                if uid is not None:
+                    max_update_id = max(max_update_id or uid, uid)
+                msg = item.get("message") or item.get("channel_post") or item.get("my_chat_member") or {}
+                chat_obj = msg.get("chat") or {}
+                cid = chat_obj.get("id")
+                if cid:
+                    scid = str(cid)
+                    if scid not in chat_ids:
+                        chat_ids.append(scid)
+                        new_found = True
+                    text_in = str(msg.get("text") or "").strip()
+                    if text_in.startswith("/start"):
+                        try:
+                            requests.post(
+                                f"https://api.telegram.org/bot{bot_token}/sendMessage",
+                                json={
+                                    "chat_id": scid,
+                                    "text": "✅ <b>Qarzdorlik shartnomalar boti faollashtirildi!</b>\nFace ID orqali tasdiqlangan barcha qarz shartnomalari (PDF va rasmlar) shu yerga yuboriladi.",
+                                    "parse_mode": "HTML",
+                                },
+                                timeout=5,
+                            )
+                        except Exception:
+                            pass
+            if max_update_id is not None:
+                try:
+                    requests.get(
+                        f"https://api.telegram.org/bot{bot_token}/getUpdates",
+                        params={"offset": max_update_id + 1, "limit": 1},
+                        timeout=3,
+                    )
+                except Exception:
+                    pass
+            if new_found:
+                settings["debt_contract_chat_ids"] = chat_ids
+                save_company_settings(settings, company_id)
+    except Exception as e_sync:
+        print(f"Notice: debt bot getUpdates sync error: {e_sync}")
+
+    now_tashkent = (datetime.now(timezone.utc) + timedelta(hours=5)).strftime("%d.%m.%Y %H:%M")
+    due_fmt = due_date
+    if due_date and len(due_date.split("-")) == 3:
+        p = due_date.split("-")
+        due_fmt = f"{p[2]}.{p[1]}.{p[0]} yil"
+
+    caption = (
+        f"📑 <b>TASDIQLANGAN QARZ SHARTNOMASI № {contract_no}</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"👤 <b>Mijoz:</b> {client_name}\n"
+        f"📞 <b>Telefon:</b> {client_phone}\n"
+        f"🪪 <b>Pasport / JSHSHIR:</b> {passport or 'Kiritilmagan'}\n"
+        f"🏷 <b>Karta / Shtrix-kod:</b> <code>{client_barcode or '-'}</code>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"💵 <b>Qarzga berilgan summa:</b> <b>{amount:,.0f} so'm</b>\n"
+        f"📊 <b>Avvalgi qarz:</b> {prev_debt:,.0f} so'm\n"
+        f"💰 <b>Jami qarz qoldig'i:</b> <b>{new_debt:,.0f} so'm</b>\n"
+        f"📦 <b>Mahsulotlar / Izoh:</b> {note or '-'}\n"
+        f"⏳ <b>Qaytarish muddati:</b> 🔴 <b>{due_fmt or '-'} gacha</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"⚖️ <b>Javobgarlik bandi:</b> Belgilangan muddatda qaytarilmasa, jinoiy javobgarlikka tortilishiga <b>ROZI BO'LDI</b> ✅\n"
+        f"🤳 <b>Biometrik tasdiq:</b> <b>FACE ID ORQALI TASDIQLANDI</b> ✅\n"
+        f"👨‍💼 <b>Rasmiylashtirdi:</b> {user_name}\n"
+        f"🕒 <b>Vaqt:</b> {now_tashkent}"
+    )
+
+    safe_name = "".join(ch if ch.isalnum() else "_" for ch in (client_name or "Mijoz")).strip("_") or "Mijoz"
+    pdf_filename = f"Shartnoma_{contract_no}_{safe_name}.pdf"
+
+    sent_any = False
+    errors = []
+
+    for cid in chat_ids:
+        try:
+            # 1. Send Face ID photo(s) first if available
+            for idx, p_bytes in enumerate(face_photos_bytes[:3]):
+                if not p_bytes:
+                    continue
+                photo_caption = (
+                    f"🤳 <b>FACE ID TASDIQ SURATI #{idx + 1}</b>\n"
+                    f"📄 Shartnoma: <b>№ {contract_no}</b>\n"
+                    f"👤 Mijoz: <b>{client_name}</b> ({client_phone})\n"
+                    f"💵 Summa: <b>{amount:,.0f} so'm</b> (Muddat: {due_fmt})"
+                )
+                requests.post(
+                    f"https://api.telegram.org/bot{bot_token}/sendPhoto",
+                    data={"chat_id": cid, "caption": photo_caption, "parse_mode": "HTML"},
+                    files={"photo": (f"FaceID_{contract_no}_{idx + 1}.jpg", p_bytes, "image/jpeg")},
+                    timeout=15,
+                )
+
+            # 2. Send the official PDF Contract document
+            if pdf_bytes:
+                doc_resp = requests.post(
+                    f"https://api.telegram.org/bot{bot_token}/sendDocument",
+                    data={"chat_id": cid, "caption": caption, "parse_mode": "HTML"},
+                    files={"document": (pdf_filename, pdf_bytes, "application/pdf")},
+                    timeout=20,
+                )
+                if doc_resp.status_code == 200 and doc_resp.json().get("ok"):
+                    sent_any = True
+                else:
+                    errors.append(f"chat {cid}: {doc_resp.text[:120]}")
+        except Exception as ex:
+            errors.append(f"chat {cid}: {str(ex)}")
+
+    return sent_any, "; ".join(errors) if errors else "OK"
+
+
 @app.post("/api/clients/{client_id}/adjust-debt")
 def adjust_client_debt(client_id: str, payload: dict, request: Request):
     import time
@@ -1537,6 +1775,9 @@ def adjust_client_debt(client_id: str, payload: dict, request: Request):
     amount = float(payload.get("amount") or 0.0)
     note = str(payload.get("note") or "").strip()
     due_date = str(payload.get("due_date") or "").strip()
+    passport = str(payload.get("passport") or "").strip()
+    contract_no = str(payload.get("contract_no") or "").strip()
+    contract_text = str(payload.get("contract_text") or "").strip()
     user_name = str(payload.get("user") or "Xodim").strip()
 
     if amount <= 0 and action_type != "set":
@@ -1568,9 +1809,13 @@ def adjust_client_debt(client_id: str, payload: dict, request: Request):
 
     meta["debt"] = new_debt
     meta["manual_debt"] = new_manual_debt
+    if passport:
+        meta["passport"] = passport
 
     now_iso = datetime.now(timezone.utc).isoformat()
     ts_ms = int(time.time() * 1000)
+    if not contract_no:
+        contract_no = f"SH-{str(ts_ms)[-6:]}"
 
     debt_history = meta.get("debt_history")
     if not isinstance(debt_history, list):
@@ -1585,6 +1830,9 @@ def adjust_client_debt(client_id: str, payload: dict, request: Request):
         "new_debt": new_debt,
         "note": note,
         "due_date": due_date,
+        "passport": passport,
+        "contract_no": contract_no,
+        "face_id_verified": action_type == "add",
         "user": user_name
     }
     debt_history.insert(0, rec)
@@ -1594,14 +1842,15 @@ def adjust_client_debt(client_id: str, payload: dict, request: Request):
         "operator": json.dumps(meta, ensure_ascii=False)
     }, company_id=company_id)
 
+    barcode = meta.get("barcode") or client.get("phone2") or ""
+
     # Also create a receipt/payment record in receipts table so it appears in client history & Usta cabinet
     try:
-        barcode = meta.get("barcode") or client.get("phone2") or ""
         is_pay = action_type in ("pay", "subtract", "deduct")
         short_code = str(ts_ms)[-6:]
-        doc_code = f"TOLOV-{short_code}" if is_pay else f"QARZ-{short_code}"
-        pay_type = "Qarz to'lovi (Kirim)" if is_pay else "Qarzga (Nasiya)"
-        item_title = note if note else ("Qarz to'lovi qabul qilindi" if is_pay else "Qarzga (Nasiya) rasmiylashtirildi")
+        doc_code = f"TOLOV-{short_code}" if is_pay else contract_no
+        pay_type = "Qarz to'lovi (Kirim)" if is_pay else "Qarzga (Nasiya Shartnoma)"
+        item_title = note if note else ("Qarz to'lovi qabul qilindi" if is_pay else f"Qarz shartnomasi {contract_no}")
         if due_date and not is_pay:
             item_title += f" (Muddat: {due_date})"
 
@@ -1622,6 +1871,9 @@ def adjust_client_debt(client_id: str, payload: dict, request: Request):
                 "is_payment": is_pay,
                 "is_debt": not is_pay,
                 "due_date": due_date,
+                "contract_no": contract_no,
+                "passport": passport,
+                "face_id_verified": not is_pay,
                 "note": note,
                 "products": [
                     {
@@ -1637,10 +1889,58 @@ def adjust_client_debt(client_id: str, payload: dict, request: Request):
     except Exception as e_rec:
         print(f"Notice: could not insert debt receipt record: {e_rec}")
 
+    # Send confirmed PDF contract & Face ID photos to Telegram Bot 9071675725:AAFHR4pgiQ5OC7eXkIj_oLhBrvc7qOoNN9g
+    telegram_sent = False
+    telegram_detail = ""
+    if action_type == "add":
+        try:
+            pdf_b64 = str(payload.get("pdf_base64") or "")
+            contract_jpeg_b64 = str(payload.get("contract_jpeg_base64") or "")
+            raw_face_photos = payload.get("face_photos") or []
+
+            face_photos_bytes = []
+            if isinstance(raw_face_photos, list):
+                for fp in raw_face_photos[:3]:
+                    b = _strip_data_url_b64(str(fp or ""))
+                    if b:
+                        face_photos_bytes.append(b)
+
+            pdf_bytes = _strip_data_url_b64(pdf_b64)
+            if not pdf_bytes or not pdf_bytes.startswith(b"%PDF"):
+                # Fallback: build native A4 PDF from contract JPEG or primary Face ID JPEG
+                contract_jpeg_bytes = _strip_data_url_b64(contract_jpeg_b64)
+                if contract_jpeg_bytes:
+                    pdf_bytes = build_pdf_from_jpeg_bytes(contract_jpeg_bytes)
+                elif face_photos_bytes:
+                    pdf_bytes = build_pdf_from_jpeg_bytes(face_photos_bytes[0])
+
+            telegram_sent, telegram_detail = send_debt_contract_to_telegram(
+                company_id=company_id,
+                contract_no=contract_no,
+                client_name=client.get("name") or "Mijoz",
+                client_phone=client.get("phone") or "-",
+                client_barcode=barcode,
+                passport=passport,
+                amount=amount,
+                prev_debt=old_debt,
+                new_debt=new_debt,
+                due_date=due_date,
+                note=note,
+                user_name=user_name,
+                pdf_bytes=pdf_bytes,
+                face_photos_bytes=face_photos_bytes,
+            )
+        except Exception as e_tg:
+            telegram_detail = str(e_tg)
+            print(f"Error sending debt contract to Telegram: {e_tg}")
+
     return {
         "ok": True,
         "debt": new_debt,
         "prev_debt": old_debt,
+        "contract_no": contract_no,
+        "telegram_sent": telegram_sent,
+        "telegram_detail": telegram_detail,
         "record": rec
     }
 

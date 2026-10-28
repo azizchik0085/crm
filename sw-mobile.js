@@ -1,4 +1,4 @@
-const CACHE_NAME = 'webzone-mobile-v14';
+const CACHE_NAME = 'webzone-mobile-v15';
 const ASSETS_TO_CACHE = [
   '/mobile.html',
   '/css/mobile-app.css',
@@ -6,7 +6,8 @@ const ASSETS_TO_CACHE = [
   '/assets/icon-192.png',
   '/assets/icon-512.png',
   'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css',
-  'https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js'
+  'https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'
 ];
 
 self.addEventListener('install', event => {

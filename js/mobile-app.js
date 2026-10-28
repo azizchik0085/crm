@@ -2069,6 +2069,10 @@ window.MobileApp = {
 
     // --- QARZ RASMIYLASHTIRISH VA QARZ TO'LOVI MANTIQI ---
     _selectedDebtClient: null,
+    _faceIdStream: null,
+    _faceIdFacingMode: 'user',
+    _faceIdPhotos: [],
+    _currentContractNo: '',
 
     openDebtModal: async function(clientOrId, defaultAction) {
         const modal = document.getElementById('m-debt-modal');
@@ -2085,13 +2089,26 @@ window.MobileApp = {
             } catch(e) {}
         }
 
+        this.stopFaceIdCamera();
+        this._faceIdPhotos = [];
+        this.renderFaceIdPhotos();
+
+        this._currentContractNo = 'SH-' + Date.now().toString().slice(-6);
+        const contractNoEl = document.getElementById('m-debt-contract-no');
+        if (contractNoEl) contractNoEl.textContent = this._currentContractNo;
+
         const action = defaultAction || 'add';
         this.switchDebtTab(action);
 
         document.getElementById('m-debt-amount').value = '';
         document.getElementById('m-debt-note').value = '';
-        const dueDateEl = document.getElementById('m-debt-due-date');
-        if (dueDateEl) dueDateEl.value = '';
+        const passportEl = document.getElementById('m-debt-passport');
+        if (passportEl) passportEl.value = '';
+        const agreeEl = document.getElementById('m-debt-agree-checkbox');
+        if (agreeEl) agreeEl.checked = false;
+
+        // Default due date: +7 days
+        this.setDebtDueDateDays(7);
 
         let targetClient = null;
         if (clientOrId) {
@@ -2108,10 +2125,12 @@ window.MobileApp = {
             this.clearDebtSelectedClient();
         }
 
+        this.updateDebtContractPreview();
         modal.classList.add('active');
     },
 
     closeDebtModal: function() {
+        this.stopFaceIdCamera();
         const modal = document.getElementById('m-debt-modal');
         if (modal) modal.classList.remove('active');
         const dropdown = document.getElementById('m-debt-client-dropdown');
@@ -2144,19 +2163,21 @@ window.MobileApp = {
                 tabPay.style.fontWeight = '500';
             }
             if (titleEl) {
-                titleEl.innerHTML = '<i class="fas fa-hand-holding-usd" style="color: #f59e0b; margin-right: 6px;"></i> Qarzga Berish / Rasmiylashtirish';
+                titleEl.innerHTML = '<i class="fas fa-hand-holding-usd" style="color: #f59e0b; margin-right: 6px;"></i> Qarzga Berish / Shartnoma';
             }
             if (amountLabel) amountLabel.innerHTML = 'Qarzga beriladigan summa (so\'m) <span style="color: var(--danger);">*</span>';
-            if (noteLabel) noteLabel.textContent = 'Olingan mahsulotlar yoki izoh';
+            if (noteLabel) noteLabel.innerHTML = 'Olingan mahsulotlar ro\'yxati yoki izoh <span style="color: var(--danger);">*</span>';
             if (noteInput) noteInput.placeholder = 'Masalan: Sement 20 qop, shpaklyovka, yuk xati...';
             if (dueGroup) dueGroup.style.display = 'block';
             if (fullBtn) fullBtn.style.display = 'none';
             if (submitBtn) {
                 submitBtn.style.background = 'linear-gradient(135deg, #f59e0b, #ea580c)';
                 submitBtn.style.boxShadow = '0 4px 15px rgba(245, 158, 11, 0.35)';
-                submitBtn.innerHTML = '<i class="fas fa-file-signature" style="margin-right: 6px;"></i> Qarzni Rasmiylashtirish';
+                submitBtn.innerHTML = '<i class="fas fa-file-pdf" style="margin-right: 6px;"></i> Tasdiqlash va Shartnomani (PDF) Yuborish';
             }
+            this.updateDebtContractPreview();
         } else {
+            this.stopFaceIdCamera();
             if (tabPay) {
                 tabPay.style.color = '#10b981';
                 tabPay.style.borderBottom = '2px solid #10b981';
@@ -2265,6 +2286,8 @@ window.MobileApp = {
             fullBtn.style.display = (actionType === 'pay' && debtVal > 0) ? 'inline-flex' : 'none';
         }
 
+        this.updateDebtContractPreview();
+
         setTimeout(() => {
             const amtEl = document.getElementById('m-debt-amount');
             if (amtEl) amtEl.focus();
@@ -2281,6 +2304,7 @@ window.MobileApp = {
         if (selCard) selCard.style.display = 'none';
         if (searchInput) searchInput.value = '';
         if (dropdown) dropdown.style.display = 'none';
+        this.updateDebtContractPreview();
     },
 
     setDebtQuickAmount: function(val) {
@@ -2292,6 +2316,481 @@ window.MobileApp = {
         } else {
             amtInput.value = val;
         }
+        this.updateDebtContractPreview();
+    },
+
+    setDebtDueDateDays: function(days) {
+        const dueDateEl = document.getElementById('m-debt-due-date');
+        if (!dueDateEl) return;
+        const d = new Date();
+        d.setDate(d.getDate() + Number(days || 7));
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        dueDateEl.value = `${yyyy}-${mm}-${dd}`;
+        this.updateDebtContractPreview();
+    },
+
+    formatDateUz: function(dateStr) {
+        if (!dateStr) return '___.___.2026 yil';
+        const parts = dateStr.split('-');
+        if (parts.length === 3) {
+            return `${parts[2]}.${parts[1]}.${parts[0]} yil`;
+        }
+        return dateStr;
+    },
+
+    updateDebtContractPreview: function() {
+        const textEl = document.getElementById('m-debt-contract-text');
+        if (!textEl) return;
+
+        const c = this._selectedDebtClient;
+        const clientName = c ? (c.name || 'Mijoz') : '[MIJOZ F.I.SH.]';
+        const clientPhone = c ? (c.phone || '-') : '[TELEFON RAQAM]';
+        const clientCard = c ? (c.barcode || c.phone2 || '-') : '-';
+        const prevDebt = c ? Number(c.debt || 0) : 0;
+
+        const amountRaw = parseFloat(document.getElementById('m-debt-amount')?.value || 0);
+        const amountFormatted = amountRaw > 0 ? `${amountRaw.toLocaleString('uz-UZ')} so'm` : '[SUMMA] so\'m';
+        const totalDebtFormatted = `${(prevDebt + (amountRaw > 0 ? amountRaw : 0)).toLocaleString('uz-UZ')} so'm`;
+
+        const note = (document.getElementById('m-debt-note')?.value || '').trim() || 'Qurilish mollari (ro\'yxat asosida)';
+        const dueDateRaw = (document.getElementById('m-debt-due-date')?.value || '').trim();
+        const dueDateFormatted = this.formatDateUz(dueDateRaw);
+        const passport = (document.getElementById('m-debt-passport')?.value || '').trim();
+        const contractNo = this._currentContractNo || 'SH-000001';
+        const nowStr = new Date().toLocaleString('uz-UZ');
+
+        const text = `NASIYA (QARZ) SHARTNOMASI № ${contractNo}\n` +
+            `Tuzilgan vaqt: ${nowStr}\n\n` +
+            `1. TOMONLAR: «GIPER BREND STROY» savdo markazi (keyingi o'rinlarda «Do'kon») hamda fuqaro ${clientName} (Tel: ${clientPhone}${passport ? `, Pasport/JSHSHIR: ${passport}` : ''}, Karta: ${clientCard}).\n` +
+            `2. SHARTNOMA PREDMETI: Mijoz Do'kondan jami ${amountFormatted} qiymatidagi mahsulotlarni (${note}) qarzga (nasiyaga) qabul qilib oldi. (Avvalgi qarz: ${prevDebt.toLocaleString('uz-UZ')} so'm, Jami to'lanadigan qarz: ${totalDebtFormatted}).\n` +
+            `3. QAYTARISH MUDDATI: Mijoz ushbu qarz summasini kechi bilan ${dueDateFormatted} sanasiga qadar to'liq qaytarish majburiyatini oladi.\n` +
+            `4. JAVOBGARLIK BANDI: Agar qarz ushbu shartnomada ko'rsatilgan muddatda (${dueDateFormatted}) qaytarilmasa, Mijoz O'zbekiston Respublikasi qonunchiligiga (shu jumladan O'zR Jinoyat kodeksining tegishli moddalari hamda Fuqarolik kodeksiga) muvofiq majburiy tartibda undirilishiga va JINOIY JAVOBGARLIKKA tortilishiga o'z roziligini bildiradi hamda buni Face ID biometrik tasviri orqali tasdiqlaydi.`;
+
+        textEl.value = text;
+    },
+
+    // --- FACE ID CAMERA & BIOMETRIC PHOTO VERIFICATION ---
+    startFaceIdCamera: async function(facingMode) {
+        const mode = facingMode || this._faceIdFacingMode || 'user';
+        this._faceIdFacingMode = mode;
+
+        this.stopFaceIdCamera();
+
+        const container = document.getElementById('m-faceid-camera-container');
+        const startControls = document.getElementById('m-faceid-start-controls');
+        const video = document.getElementById('m-faceid-video');
+
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            alert("Qurilmangizda kamera brauzer orqali qo'llab-quvvatlanmaydi. «Rasm yuklash» tugmasi orqali suratga oling.");
+            return;
+        }
+
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: {
+                    facingMode: { ideal: mode },
+                    width: { ideal: 720 },
+                    height: { ideal: 960 }
+                },
+                audio: false
+            });
+            this._faceIdStream = stream;
+            if (video) {
+                video.srcObject = stream;
+                video.style.transform = mode === 'user' ? 'scaleX(-1)' : 'none';
+                await video.play().catch(() => {});
+            }
+            if (container) container.style.display = 'block';
+            if (startControls) startControls.style.display = 'none';
+        } catch (err) {
+            alert("Kamerani yoqib bo'lmadi: " + err.message + "\nIltimos, kamera ruxsatini bering yoki «Rasm yuklash» tugmasidan foydalaning.");
+        }
+    },
+
+    switchFaceIdCamera: function() {
+        const nextMode = this._faceIdFacingMode === 'user' ? 'environment' : 'user';
+        this.startFaceIdCamera(nextMode);
+    },
+
+    stopFaceIdCamera: function() {
+        if (this._faceIdStream) {
+            try {
+                this._faceIdStream.getTracks().forEach(t => t.stop());
+            } catch (e) {}
+            this._faceIdStream = null;
+        }
+        const video = document.getElementById('m-faceid-video');
+        if (video) video.srcObject = null;
+        const container = document.getElementById('m-faceid-camera-container');
+        if (container) container.style.display = 'none';
+        const startControls = document.getElementById('m-faceid-start-controls');
+        if (startControls) startControls.style.display = 'flex';
+    },
+
+    captureFaceIdPhoto: function() {
+        const video = document.getElementById('m-faceid-video');
+        if (!video || !this._faceIdStream) {
+            alert("Kamera yoqilmagan!");
+            return;
+        }
+
+        const vw = video.videoWidth || 600;
+        const vh = video.videoHeight || 720;
+        const canvas = document.createElement('canvas');
+        const targetW = 640;
+        const targetH = Math.round((vh / vw) * targetW) || 760;
+        canvas.width = targetW;
+        canvas.height = targetH;
+
+        const ctx = canvas.getContext('2d');
+        if (this._faceIdFacingMode === 'user') {
+            ctx.save();
+            ctx.translate(targetW, 0);
+            ctx.scale(-1, 1);
+            ctx.drawImage(video, 0, 0, targetW, targetH);
+            ctx.restore();
+        } else {
+            ctx.drawImage(video, 0, 0, targetW, targetH);
+        }
+
+        this._stampFaceIdWatermark(ctx, targetW, targetH);
+
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.86);
+        this._faceIdPhotos.push(dataUrl);
+        this.renderFaceIdPhotos();
+        this.stopFaceIdCamera();
+    },
+
+    handleFaceIdFileInput: function(event) {
+        const file = event?.target?.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const targetW = 640;
+                const targetH = Math.round((img.height / img.width) * targetW) || 760;
+                canvas.width = targetW;
+                canvas.height = targetH;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, targetW, targetH);
+                this._stampFaceIdWatermark(ctx, targetW, targetH);
+                const dataUrl = canvas.toDataURL('image/jpeg', 0.86);
+                this._faceIdPhotos.push(dataUrl);
+                this.renderFaceIdPhotos();
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+        event.target.value = '';
+    },
+
+    _stampFaceIdWatermark: function(ctx, w, h) {
+        const clientName = this._selectedDebtClient?.name || 'Mijoz';
+        const nowStr = new Date().toLocaleString('uz-UZ');
+        const contractNo = this._currentContractNo || 'SH';
+
+        // Corner brackets for biometric look
+        ctx.strokeStyle = '#10b981';
+        ctx.lineWidth = 4;
+        const m = 18, len = 32;
+        // Top-left
+        ctx.beginPath(); ctx.moveTo(m, m + len); ctx.lineTo(m, m); ctx.lineTo(m + len, m); ctx.stroke();
+        // Top-right
+        ctx.beginPath(); ctx.moveTo(w - m - len, m); ctx.lineTo(w - m, m); ctx.lineTo(w - m, m + len); ctx.stroke();
+        // Bottom-left
+        ctx.beginPath(); ctx.moveTo(m, h - m - 58 - len); ctx.lineTo(m, h - m - 58); ctx.lineTo(m + len, h - m - 58); ctx.stroke();
+        // Bottom-right
+        ctx.beginPath(); ctx.moveTo(w - m - len, h - m - 58); ctx.lineTo(w - m, h - m - 58); ctx.lineTo(w - m, h - m - 58 - len); ctx.stroke();
+
+        // Bottom verification bar
+        ctx.fillStyle = 'rgba(6, 78, 59, 0.88)';
+        ctx.fillRect(0, h - 58, w, 58);
+        ctx.fillStyle = '#10b981';
+        ctx.fillRect(0, h - 58, w, 3);
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 16px sans-serif';
+        ctx.fillText(`✓ FACE ID TASDIQLANDI • ${contractNo}`, 14, h - 34);
+
+        ctx.fillStyle = '#a7f3d0';
+        ctx.font = '13px sans-serif';
+        ctx.fillText(`${clientName} • ${nowStr}`, 14, h - 13);
+    },
+
+    removeFaceIdPhoto: function(idx) {
+        this._faceIdPhotos.splice(idx, 1);
+        this.renderFaceIdPhotos();
+    },
+
+    renderFaceIdPhotos: function() {
+        const listEl = document.getElementById('m-faceid-photos-list');
+        const badgeEl = document.getElementById('m-faceid-status-badge');
+        if (!listEl) return;
+
+        if (!this._faceIdPhotos || this._faceIdPhotos.length === 0) {
+            listEl.style.display = 'none';
+            listEl.innerHTML = '';
+            if (badgeEl) {
+                badgeEl.style.background = 'rgba(239, 68, 68, 0.2)';
+                badgeEl.style.color = '#f87171';
+                badgeEl.innerHTML = '<i class="fas fa-exclamation-circle"></i> Tasdiqlanmagan';
+            }
+            return;
+        }
+
+        if (badgeEl) {
+            badgeEl.style.background = 'rgba(16, 185, 129, 0.2)';
+            badgeEl.style.color = '#10b981';
+            badgeEl.innerHTML = `<i class="fas fa-check-circle"></i> Face ID Tasdiqlandi (${this._faceIdPhotos.length} ta rasm)`;
+        }
+
+        let html = '';
+        this._faceIdPhotos.forEach((src, i) => {
+            html += `
+                <div style="position: relative; border-radius: 12px; overflow: hidden; border: 2px solid #10b981; background: #000; aspect-ratio: 4/5;">
+                    <img src="${src}" style="width: 100%; height: 100%; object-fit: cover; display: block;">
+                    <button type="button" onclick="MobileApp.removeFaceIdPhoto(${i})" style="position: absolute; top: 6px; right: 6px; width: 26px; height: 26px; border-radius: 50%; background: rgba(239, 68, 68, 0.9); color: #fff; border: none; font-size: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                    <div style="position: absolute; top: 6px; left: 6px; background: rgba(16, 185, 129, 0.9); color: #fff; font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 6px;">
+                        #${i + 1} FACE ID
+                    </div>
+                </div>
+            `;
+        });
+        listEl.innerHTML = html;
+        listEl.style.display = 'grid';
+    },
+
+    _wrapCanvasText: function(ctx, text, x, y, maxWidth, lineHeight) {
+        const paragraphs = String(text || '').split('\n');
+        let curY = y;
+        for (let p = 0; p < paragraphs.length; p++) {
+            const words = paragraphs[p].split(' ');
+            let line = '';
+            for (let n = 0; n < words.length; n++) {
+                const testLine = line + words[n] + ' ';
+                const metrics = ctx.measureText(testLine);
+                if (metrics.width > maxWidth && n > 0) {
+                    ctx.fillText(line.trim(), x, curY);
+                    line = words[n] + ' ';
+                    curY += lineHeight;
+                } else {
+                    line = testLine;
+                }
+            }
+            if (line.trim()) {
+                ctx.fillText(line.trim(), x, curY);
+                curY += lineHeight;
+            } else {
+                curY += lineHeight * 0.45;
+            }
+        }
+        return curY;
+    },
+
+    _loadImageElement: function(src) {
+        return new Promise((resolve) => {
+            const img = new Image();
+            img.onload = () => resolve(img);
+            img.onerror = () => resolve(null);
+            img.src = src;
+        });
+    },
+
+    generateContractCanvasAndPdf: async function(info) {
+        const W = 1240;
+        const H = 1754; // Standard A4 @ 150 DPI
+        const canvas = document.createElement('canvas');
+        canvas.width = W;
+        canvas.height = H;
+        const ctx = canvas.getContext('2d');
+
+        // 1. White paper background & double official border
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, W, H);
+
+        ctx.strokeStyle = '#1e293b';
+        ctx.lineWidth = 4;
+        ctx.strokeRect(36, 36, W - 72, H - 72);
+        ctx.strokeStyle = '#94a3b8';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(46, 46, W - 92, H - 92);
+
+        // 2. Top Header Banner
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(46, 46, W - 92, 130);
+
+        ctx.fillStyle = '#f59e0b';
+        ctx.font = 'bold 34px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('«GIPER BREND STROY» SAVDO MARKAZI', W / 2, 102);
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 24px sans-serif';
+        ctx.fillText(`QARZ (NASIYA) SHARTNOMASI VA KAFOLAT XATI № ${info.contractNo}`, W / 2, 148);
+
+        // 3. Date & Metadata Bar
+        ctx.textAlign = 'left';
+        ctx.fillStyle = '#f1f5f9';
+        ctx.fillRect(70, 196, W - 140, 54);
+        ctx.strokeStyle = '#cbd5e1';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(70, 196, W - 140, 54);
+
+        ctx.fillStyle = '#0f172a';
+        ctx.font = 'bold 19px sans-serif';
+        ctx.fillText(`Rasmiylashtirilgan vaqt: ${info.dateStr}`, 90, 230);
+        ctx.textAlign = 'right';
+        ctx.fillText(`Mas'ul xodim: ${info.user}`, W - 90, 230);
+
+        // 4. Client & Debt Details Table
+        ctx.textAlign = 'left';
+        let y = 285;
+        const rowH = 48;
+        const rows = [
+            ['Mijoz F.I.Sh.:', info.clientName],
+            ['Telefon raqami / Karta:', `${info.clientPhone}   |   Shtrix-kod: ${info.clientBarcode || '-'}`],
+            ['Pasport / JSHSHIR:', info.passport || 'Kiritilmagan'],
+            ['Qarzga olingan mahsulotlar:', info.note || 'Qurilish mollari'],
+            ['Avvalgi qarz qoldig\'i:', `${Number(info.prevDebt || 0).toLocaleString('uz-UZ')} so'm`],
+            ['YANGI QARZ SUMMASI:', `${Number(info.amount || 0).toLocaleString('uz-UZ')} so'm`],
+            ['JAMI TO\'LANADIGAN QARZ:', `${Number(info.newDebt || 0).toLocaleString('uz-UZ')} so'm`],
+            ['QAYTARISH MUDDATI (OXIRGI SANA):', `${info.dueDateFormatted} gacha`]
+        ];
+
+        rows.forEach((r, idx) => {
+            const isHighlight = idx >= 5;
+            ctx.fillStyle = isHighlight ? (idx === 7 ? '#fef2f2' : '#fffbeb') : (idx % 2 === 0 ? '#ffffff' : '#f8fafc');
+            ctx.fillRect(70, y, W - 140, rowH);
+            ctx.strokeStyle = '#cbd5e1';
+            ctx.strokeRect(70, y, W - 140, rowH);
+
+            // Divider
+            ctx.beginPath();
+            ctx.moveTo(430, y);
+            ctx.lineTo(430, y + rowH);
+            ctx.stroke();
+
+            ctx.fillStyle = isHighlight ? '#991b1b' : '#334155';
+            ctx.font = isHighlight ? 'bold 19px sans-serif' : 'bold 18px sans-serif';
+            ctx.fillText(r[0], 86, y + 31);
+
+            ctx.fillStyle = idx === 7 ? '#dc2626' : (isHighlight ? '#b45309' : '#0f172a');
+            ctx.font = isHighlight ? 'bold 21px sans-serif' : '19px sans-serif';
+            ctx.fillText(String(r[1]).slice(0, 68), 450, y + 31);
+
+            y += rowH;
+        });
+
+        // 5. Contract Clauses & Criminal Liability Warning Box
+        y += 26;
+        ctx.fillStyle = '#fef2f2';
+        ctx.fillRect(70, y, W - 140, 340);
+        ctx.strokeStyle = '#ef4444';
+        ctx.lineWidth = 2.5;
+        ctx.strokeRect(70, y, W - 140, 340);
+
+        ctx.fillStyle = '#b91c1c';
+        ctx.font = 'bold 22px sans-serif';
+        ctx.fillText('SHARTNOMA SHARTLARI VA JINOIY JAVOBGARLIK HAQIDA OGOHLANTIRISH:', 92, y + 38);
+
+        ctx.fillStyle = '#1e293b';
+        ctx.font = '18px sans-serif';
+        this._wrapCanvasText(ctx, info.contractText, 92, y + 74, W - 184, 27);
+
+        y += 365;
+
+        // 6. Face ID Biometric Photos Section
+        ctx.fillStyle = '#ecfdf5';
+        ctx.fillRect(70, y, W - 140, 520);
+        ctx.strokeStyle = '#10b981';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(70, y, W - 140, 520);
+
+        ctx.fillStyle = '#065f46';
+        ctx.font = 'bold 22px sans-serif';
+        ctx.fillText('✓ FACE ID BIOMETRIK TASDIQLASH VA FOTODALolatnoma:', 92, y + 38);
+
+        const photosToDraw = (this._faceIdPhotos || []).slice(0, 3);
+        const slotW = 320;
+        const slotH = 380;
+        let photoX = 95;
+        const photoY = y + 58;
+
+        for (let i = 0; i < photosToDraw.length; i++) {
+            const imgEl = await this._loadImageElement(photosToDraw[i]);
+            if (imgEl) {
+                ctx.fillStyle = '#000';
+                ctx.fillRect(photoX, photoY, slotW, slotH);
+                ctx.drawImage(imgEl, photoX, photoY, slotW, slotH);
+                ctx.strokeStyle = '#059669';
+                ctx.lineWidth = 3;
+                ctx.strokeRect(photoX, photoY, slotW, slotH);
+                photoX += slotW + 25;
+            }
+        }
+
+        // Official Digital Verification Stamp on the right
+        const stampX = W - 360;
+        const stampY = y + 120;
+        ctx.save();
+        ctx.strokeStyle = '#059669';
+        ctx.lineWidth = 4;
+        ctx.strokeRect(stampX, stampY, 260, 175);
+        ctx.strokeStyle = '#10b981';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(stampX + 6, stampY + 6, 248, 163);
+
+        ctx.fillStyle = '#065f46';
+        ctx.font = 'bold 18px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('GIPER BREND STROY', stampX + 130, stampY + 36);
+        ctx.fillStyle = '#059669';
+        ctx.font = 'bold 20px sans-serif';
+        ctx.fillText('FACE ID TASDIQLANDI', stampX + 130, stampY + 68);
+        ctx.fillStyle = '#047857';
+        ctx.font = '15px sans-serif';
+        ctx.fillText(`Hujjat: ${info.contractNo}`, stampX + 130, stampY + 98);
+        ctx.fillText(`Sana: ${info.dateStr}`, stampX + 130, stampY + 122);
+        ctx.fillStyle = '#dc2626';
+        ctx.font = 'bold 14px sans-serif';
+        ctx.fillText('JINOIY JAVOBGARLIKKA ROZI', stampX + 130, stampY + 150);
+        ctx.restore();
+
+        // Footer
+        ctx.textAlign = 'left';
+        ctx.fillStyle = '#475569';
+        ctx.font = '16px sans-serif';
+        ctx.fillText(`Aloqa: +998 99 626 24 62  |  +998 91 447 42 40   •   Elektron tasdiqlangan shartnoma yuridik kuchga ega.`, 70, H - 58);
+
+        const contractJpegDataUrl = canvas.toDataURL('image/jpeg', 0.88);
+        let pdfBase64 = '';
+
+        try {
+            if (window.jspdf && window.jspdf.jsPDF) {
+                const doc = new window.jspdf.jsPDF({
+                    orientation: 'portrait',
+                    unit: 'mm',
+                    format: 'a4'
+                });
+                doc.addImage(contractJpegDataUrl, 'JPEG', 0, 0, 210, 297);
+                const dataUri = doc.output('datauristring');
+                pdfBase64 = dataUri.split(',')[1] || '';
+            }
+        } catch (pdfErr) {
+            console.warn('jsPDF fallback to backend PDF builder:', pdfErr);
+        }
+
+        return {
+            contractJpegBase64: contractJpegDataUrl.split(',')[1] || '',
+            pdfBase64: pdfBase64
+        };
     },
 
     openDebtBarcodeScanner: function() {
@@ -2312,20 +2811,70 @@ window.MobileApp = {
         const amount = parseFloat(document.getElementById('m-debt-amount')?.value || 0);
         const note = (document.getElementById('m-debt-note')?.value || '').trim();
         const dueDate = (document.getElementById('m-debt-due-date')?.value || '').trim();
+        const passport = (document.getElementById('m-debt-passport')?.value || '').trim();
+        const contractText = (document.getElementById('m-debt-contract-text')?.value || '').trim();
+        const agreeChecked = document.getElementById('m-debt-agree-checkbox')?.checked;
 
         if (isNaN(amount) || amount <= 0) {
             alert("Iltimos, to'g'ri summa kiriting!");
             return;
         }
 
+        if (actionType === 'add') {
+            if (!note) {
+                alert("Iltimos, qarzga olinayotgan mahsulotlar ro'yxati yoki izohni kiriting!");
+                document.getElementById('m-debt-note')?.focus();
+                return;
+            }
+            if (!dueDate) {
+                alert("Iltimos, qarz qachon qaytarilishini (Qaytarish muddatini) ko'rsating!");
+                document.getElementById('m-debt-due-date')?.focus();
+                return;
+            }
+            if (!agreeChecked) {
+                alert("Shartnoma bandi: Mijoz belgilangan vaqtda qarzni qaytarmasa jinoiy javobgarlikka tortilishiga rozi bo'lishi katakchasini belgilang!");
+                return;
+            }
+            if (!this._faceIdPhotos || this._faceIdPhotos.length === 0) {
+                alert("Iltimos, mijozning roziligini Face ID orqali suratga olib tasdiqlang!");
+                return;
+            }
+        }
+
         const client = this._selectedDebtClient;
+        const userName = (this.currentUser && (this.currentUser.name || this.currentUser.username || this.currentUser.id)) || 'Xodim';
         const btn = document.getElementById('m-btn-debt-submit');
         if (btn) {
             btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saqlanmoqda...';
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Shartnoma PDF tayyorlanmoqda va yuborilmoqda...';
         }
 
         try {
+            let contractJpegBase64 = '';
+            let pdfBase64 = '';
+            const contractNo = this._currentContractNo || ('SH-' + Date.now().toString().slice(-6));
+
+            if (actionType === 'add') {
+                const prevDebt = Number(client.debt || 0);
+                const generated = await this.generateContractCanvasAndPdf({
+                    contractNo: contractNo,
+                    dateStr: new Date().toLocaleString('uz-UZ'),
+                    user: userName,
+                    clientName: client.name || 'Mijoz',
+                    clientPhone: client.phone || '-',
+                    clientBarcode: client.barcode || client.phone2 || '-',
+                    passport: passport,
+                    note: note,
+                    prevDebt: prevDebt,
+                    amount: amount,
+                    newDebt: prevDebt + amount,
+                    dueDateFormatted: this.formatDateUz(dueDate),
+                    contractText: contractText
+                });
+                contractJpegBase64 = generated.contractJpegBase64;
+                pdfBase64 = generated.pdfBase64;
+            }
+
             const resp = await fetch(`/api/clients/${encodeURIComponent(client.id)}/adjust-debt`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -2334,7 +2883,13 @@ window.MobileApp = {
                     amount: amount,
                     note: note,
                     due_date: dueDate,
-                    user: (this.currentUser && (this.currentUser.name || this.currentUser.username || this.currentUser.id)) || 'Xodim'
+                    passport: passport,
+                    contract_no: contractNo,
+                    contract_text: contractText,
+                    face_photos: actionType === 'add' ? this._faceIdPhotos : [],
+                    contract_jpeg_base64: contractJpegBase64,
+                    pdf_base64: pdfBase64,
+                    user: userName
                 })
             });
 
@@ -2366,10 +2921,14 @@ window.MobileApp = {
             this.filterClients();
             this.closeDebtModal();
 
-            const msgTitle = actionType === 'pay'
-                ? `✅ ${client.name} dan ${amount.toLocaleString('uz-UZ')} so'm qarz to'lovi qabul qilindi!`
-                : `✅ ${client.name} nomiga ${amount.toLocaleString('uz-UZ')} so'm qarz (nasiya) rasmiylashtirildi!`;
-            alert(`${msgTitle}\nJoriy qarz balansi: ${newDebt.toLocaleString('uz-UZ')} so'm`);
+            if (actionType === 'pay') {
+                alert(`✅ ${client.name} dan ${amount.toLocaleString('uz-UZ')} so'm qarz to'lovi qabul qilindi!\nJoriy qarz balansi: ${newDebt.toLocaleString('uz-UZ')} so'm`);
+            } else {
+                const tgNote = data.telegram_sent
+                    ? `📄 Tasdiqlangan PDF shartnoma (${contractNo}) va Face ID rasm Telegram botga (@Qarzdorlik01_bot) muvaffaqiyatli yuborildi!`
+                    : `⚠️ Qarz saqlandi (Telegram yuborish holati: ${data.telegram_detail || 'kutilmoqda'})`;
+                alert(`✅ ${client.name} nomiga ${amount.toLocaleString('uz-UZ')} so'm qarz shartnomasi rasmiylashtirildi!\nQaytarish muddati: ${this.formatDateUz(dueDate)}\nJoriy qarz balansi: ${newDebt.toLocaleString('uz-UZ')} so'm\n\n${tgNote}`);
+            }
 
         } catch (err) {
             alert("Xatolik: " + err.message);
