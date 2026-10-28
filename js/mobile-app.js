@@ -1090,6 +1090,9 @@ window.MobileApp = {
                     if (document.getElementById('m-kpi-qurilish')) {
                         document.getElementById('m-kpi-qurilish').textContent = `${data.qurilish_count || 0} ta`;
                     }
+                    if (document.getElementById('m-kpi-debt-badge')) {
+                        document.getElementById('m-kpi-debt-badge').textContent = `Qarzdorlar: ${data.debt_clients_count || 0} ta`;
+                    }
                 }
             }
         } catch(e) {
@@ -1151,6 +1154,14 @@ window.MobileApp = {
                     <span style="color: #34d399; font-weight: 800;">Yangi Karta</span>
                 </div>
             `;
+            html += `
+                <div class="action-btn" onclick="MobileApp.openDebtModal(null, 'add')" style="background: rgba(245, 158, 11, 0.12); border: 1.5px solid #f59e0b; border-radius: 12px;">
+                    <div class="action-icon-circle" style="background: linear-gradient(135deg, #f59e0b, #ea580c); color: #ffffff; box-shadow: 0 4px 10px rgba(245, 158, 11, 0.4);">
+                        <i class="fas fa-hand-holding-usd"></i>
+                    </div>
+                    <span style="color: #fbbf24; font-weight: 800;">Qarz Berish</span>
+                </div>
+            `;
         }
         if (this.hasPermission('m_receipts')) {
             html += `
@@ -1207,11 +1218,16 @@ window.MobileApp = {
                 const cat = (c.category || (c.company ? 'qurilish' : 'ustalar')).toLowerCase();
                 return cat === 'qurilish';
             }).length;
+            const dCount = this.clientsCache.filter(c => Number(c.debt || 0) > 0).length;
+
             if (document.getElementById('m-kpi-ustalar')) {
                 document.getElementById('m-kpi-ustalar').textContent = `${uCount} ta`;
             }
             if (document.getElementById('m-kpi-qurilish')) {
                 document.getElementById('m-kpi-qurilish').textContent = `${qCount} ta`;
+            }
+            if (document.getElementById('m-kpi-debt-badge')) {
+                document.getElementById('m-kpi-debt-badge').textContent = `Qarzdorlar: ${dCount} ta`;
             }
         } catch (err) {
             listEl.innerHTML = `<div style="text-align: center; padding: 24px; color: var(--danger); font-size: 13px;">${err.message}</div>`;
@@ -1239,6 +1255,7 @@ window.MobileApp = {
             const isQurilish = cat === 'qurilish';
             const barcodeVal = c.barcode || c.phone2 || '';
             const bonusVal = Number(c.bonus || c.value || 0);
+            const debtVal = Number(c.debt || 0);
 
             html += `
                 <div class="client-card" onclick="MobileApp.openClientDetail('${c.id}')">
@@ -1252,14 +1269,20 @@ window.MobileApp = {
                                         <i class="fas ${isQurilish ? 'fa-building' : 'fa-hammer'}"></i> ${isQurilish ? 'Qurilish' : 'Ustalar'}
                                     </span>
                                     ${barcodeVal ? `<span class="badge-barcode"><i class="fas fa-barcode"></i> ${barcodeVal}</span>` : ''}
+                                    ${debtVal > 0 ? `<span class="badge" style="background: rgba(239, 68, 68, 0.18); color: #f87171; font-size: 10.5px; padding: 2px 6px; border-radius: 6px; font-weight: 700;"><i class="fas fa-hand-holding-usd"></i> Qarz: ${debtVal.toLocaleString('uz-UZ')} so'm</span>` : ''}
                                 </div>
                             </div>
                         </div>
-                        ${c.phone ? `
-                            <a href="tel:${c.phone}" onclick="event.stopPropagation()" style="width: 36px; height: 36px; border-radius: 10px; background: rgba(16, 185, 129, 0.15); color: #10b981; display: flex; align-items: center; justify-content: center; text-decoration: none; font-size: 14px;">
-                                <i class="fas fa-phone-alt"></i>
-                            </a>
-                        ` : ''}
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <button type="button" title="Qarz rasmiylashtirish" onclick="event.stopPropagation(); MobileApp.openDebtModal('${c.id}', 'add')" style="width: 36px; height: 36px; border-radius: 10px; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.35); color: #f59e0b; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 14px;">
+                                <i class="fas fa-hand-holding-usd"></i>
+                            </button>
+                            ${c.phone ? `
+                                <a href="tel:${c.phone}" onclick="event.stopPropagation()" style="width: 36px; height: 36px; border-radius: 10px; background: rgba(16, 185, 129, 0.15); color: #10b981; display: flex; align-items: center; justify-content: center; text-decoration: none; font-size: 14px;">
+                                    <i class="fas fa-phone-alt"></i>
+                                </a>
+                            ` : ''}
+                        </div>
                     </div>
                     <div class="client-card-meta">
                         <span><i class="fas fa-phone-alt" style="font-size: 10px; margin-right: 4px;"></i> ${c.phone || '-'}</span>
@@ -1278,7 +1301,11 @@ window.MobileApp = {
 
         let filtered = this.clientsCache.filter(c => {
             const cat = (c.category || (c.company ? 'qurilish' : 'ustalar')).toLowerCase();
-            if (activePill !== 'all' && cat !== activePill) return false;
+            if (activePill === 'qarzdorlar') {
+                if (Number(c.debt || 0) <= 0) return false;
+            } else if (activePill !== 'all' && cat !== activePill) {
+                return false;
+            }
 
             if (query) {
                 const name = (c.name || '').toLowerCase();
@@ -1991,6 +2018,9 @@ window.MobileApp = {
         this.closeScanner();
 
         const cleanB = String(barcode).trim();
+        const isForDebt = this._scannerTarget === 'debt';
+        this._scannerTarget = null;
+
         // Look up barcode in backend
         try {
             const resp = await fetch(`/api/mobile/barcode-lookup?barcode=${encodeURIComponent(cleanB)}`);
@@ -2003,9 +2033,20 @@ window.MobileApp = {
                     if (!this.clientsCache.some(c => c.id === client.id)) {
                         this.clientsCache.unshift(client);
                     }
-                    this.openClientDetail(client.id);
+                    if (isForDebt) {
+                        this.selectDebtClient(client.id);
+                    } else {
+                        this.openClientDetail(client.id);
+                    }
                 } else if (res.type === 'product') {
-                    this.showProductDetail(res.data);
+                    if (isForDebt) {
+                        const noteEl = document.getElementById('m-debt-note');
+                        if (noteEl && res.data && res.data.name) {
+                            noteEl.value = noteEl.value ? `${noteEl.value}, ${res.data.name}` : res.data.name;
+                        }
+                    } else {
+                        this.showProductDetail(res.data);
+                    }
                 }
             } else {
                 // Not found locally or in regos: prompt to add REGOS card
@@ -2024,6 +2065,320 @@ window.MobileApp = {
         const code = (input ? input.value : '').trim();
         if (!code) return;
         this.onBarcodeScanned(code);
+    },
+
+    // --- QARZ RASMIYLASHTIRISH VA QARZ TO'LOVI MANTIQI ---
+    _selectedDebtClient: null,
+
+    openDebtModal: async function(clientOrId, defaultAction) {
+        const modal = document.getElementById('m-debt-modal');
+        if (!modal) return;
+
+        // Ensure clients cache is loaded
+        if (!this.clientsCache || this.clientsCache.length === 0) {
+            try {
+                const resp = await fetch('/api/clients');
+                if (resp.ok) {
+                    const list = await resp.json();
+                    if (Array.isArray(list)) this.clientsCache = list;
+                }
+            } catch(e) {}
+        }
+
+        const action = defaultAction || 'add';
+        this.switchDebtTab(action);
+
+        document.getElementById('m-debt-amount').value = '';
+        document.getElementById('m-debt-note').value = '';
+        const dueDateEl = document.getElementById('m-debt-due-date');
+        if (dueDateEl) dueDateEl.value = '';
+
+        let targetClient = null;
+        if (clientOrId) {
+            if (typeof clientOrId === 'object' && clientOrId.id) {
+                targetClient = clientOrId;
+            } else if (typeof clientOrId === 'string') {
+                targetClient = this.clientsCache.find(c => c.id === clientOrId) || null;
+            }
+        }
+
+        if (targetClient) {
+            this.selectDebtClient(targetClient);
+        } else {
+            this.clearDebtSelectedClient();
+        }
+
+        modal.classList.add('active');
+    },
+
+    closeDebtModal: function() {
+        const modal = document.getElementById('m-debt-modal');
+        if (modal) modal.classList.remove('active');
+        const dropdown = document.getElementById('m-debt-client-dropdown');
+        if (dropdown) dropdown.style.display = 'none';
+    },
+
+    switchDebtTab: function(type) {
+        const actionType = type === 'pay' ? 'pay' : 'add';
+        document.getElementById('m-debt-action-type').value = actionType;
+
+        const tabAdd = document.getElementById('m-debt-tab-add');
+        const tabPay = document.getElementById('m-debt-tab-pay');
+        const titleEl = document.getElementById('m-debt-modal-title');
+        const amountLabel = document.getElementById('m-debt-amount-label');
+        const noteLabel = document.getElementById('m-debt-note-label');
+        const noteInput = document.getElementById('m-debt-note');
+        const dueGroup = document.getElementById('m-debt-due-date-group');
+        const submitBtn = document.getElementById('m-btn-debt-submit');
+        const fullBtn = document.getElementById('m-debt-quick-full-btn');
+
+        if (actionType === 'add') {
+            if (tabAdd) {
+                tabAdd.style.color = '#f59e0b';
+                tabAdd.style.borderBottom = '2px solid #f59e0b';
+                tabAdd.style.fontWeight = '700';
+            }
+            if (tabPay) {
+                tabPay.style.color = 'var(--text-muted)';
+                tabPay.style.borderBottom = '2px solid transparent';
+                tabPay.style.fontWeight = '500';
+            }
+            if (titleEl) {
+                titleEl.innerHTML = '<i class="fas fa-hand-holding-usd" style="color: #f59e0b; margin-right: 6px;"></i> Qarzga Berish / Rasmiylashtirish';
+            }
+            if (amountLabel) amountLabel.innerHTML = 'Qarzga beriladigan summa (so\'m) <span style="color: var(--danger);">*</span>';
+            if (noteLabel) noteLabel.textContent = 'Olingan mahsulotlar yoki izoh';
+            if (noteInput) noteInput.placeholder = 'Masalan: Sement 20 qop, shpaklyovka, yuk xati...';
+            if (dueGroup) dueGroup.style.display = 'block';
+            if (fullBtn) fullBtn.style.display = 'none';
+            if (submitBtn) {
+                submitBtn.style.background = 'linear-gradient(135deg, #f59e0b, #ea580c)';
+                submitBtn.style.boxShadow = '0 4px 15px rgba(245, 158, 11, 0.35)';
+                submitBtn.innerHTML = '<i class="fas fa-file-signature" style="margin-right: 6px;"></i> Qarzni Rasmiylashtirish';
+            }
+        } else {
+            if (tabPay) {
+                tabPay.style.color = '#10b981';
+                tabPay.style.borderBottom = '2px solid #10b981';
+                tabPay.style.fontWeight = '700';
+            }
+            if (tabAdd) {
+                tabAdd.style.color = 'var(--text-muted)';
+                tabAdd.style.borderBottom = '2px solid transparent';
+                tabAdd.style.fontWeight = '500';
+            }
+            if (titleEl) {
+                titleEl.innerHTML = '<i class="fas fa-money-bill-wave" style="color: #10b981; margin-right: 6px;"></i> Qarz To\'lovi (Kirim)';
+            }
+            if (amountLabel) amountLabel.innerHTML = 'Qabul qilingan to\'lov summasi (so\'m) <span style="color: var(--danger);">*</span>';
+            if (noteLabel) noteLabel.textContent = 'To\'lov turi / Izoh';
+            if (noteInput) noteInput.placeholder = 'Masalan: Naqd to\'lov, Karta orqali o\'tkazma...';
+            if (dueGroup) dueGroup.style.display = 'none';
+            if (fullBtn) {
+                const curDebt = Number(this._selectedDebtClient?.debt || 0);
+                fullBtn.style.display = curDebt > 0 ? 'inline-flex' : 'none';
+            }
+            if (submitBtn) {
+                submitBtn.style.background = 'linear-gradient(135deg, #10b981, #059669)';
+                submitBtn.style.boxShadow = '0 4px 15px rgba(16, 185, 129, 0.35)';
+                submitBtn.innerHTML = '<i class="fas fa-check-circle" style="margin-right: 6px;"></i> Qarz To\'lovini Tasdiqlash';
+            }
+        }
+    },
+
+    filterDebtClientsList: function() {
+        const searchInput = document.getElementById('m-debt-client-search');
+        const dropdown = document.getElementById('m-debt-client-dropdown');
+        if (!searchInput || !dropdown) return;
+
+        const q = (searchInput.value || '').trim().toLowerCase();
+        const cleanQ = q.replace(/\D/g, '');
+
+        let matches = (this.clientsCache || []).filter(c => {
+            if (!q) return true;
+            const name = (c.name || '').toLowerCase();
+            const phone = (c.phone || '').replace(/\D/g, '');
+            const bc = (c.barcode || c.phone2 || '').toLowerCase();
+            return name.includes(q) || bc.includes(q) || (cleanQ && phone.includes(cleanQ));
+        }).slice(0, 25);
+
+        if (matches.length === 0) {
+            dropdown.innerHTML = `<div style="padding: 12px; text-align: center; font-size: 12.5px; color: var(--text-muted);">Mijoz topilmadi</div>`;
+            dropdown.style.display = 'block';
+            return;
+        }
+
+        let html = '';
+        matches.forEach(c => {
+            const debtVal = Number(c.debt || 0);
+            const bc = c.barcode || c.phone2 || '';
+            html += `
+                <div onclick="MobileApp.selectDebtClient('${c.id}')" style="padding: 10px 12px; border-bottom: 1px solid rgba(255,255,255,0.06); cursor: pointer; display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <div style="font-size: 13.5px; font-weight: 700; color: #fff;">${c.name || 'Mijoz'}</div>
+                        <div style="font-size: 11.5px; color: var(--text-muted);">${c.phone || '-'} ${bc ? `&bull; <i class="fas fa-barcode"></i> ${bc}` : ''}</div>
+                    </div>
+                    <div style="text-align: right; font-size: 12px; font-weight: 700; color: ${debtVal > 0 ? '#ef4444' : '#10b981'};">
+                        ${debtVal > 0 ? `Qarz: ${debtVal.toLocaleString('uz-UZ')}` : '0 so\'m'}
+                    </div>
+                </div>
+            `;
+        });
+        dropdown.innerHTML = html;
+        dropdown.style.display = 'block';
+    },
+
+    selectDebtClient: function(clientOrId) {
+        let client = null;
+        if (typeof clientOrId === 'object' && clientOrId !== null) {
+            client = clientOrId;
+        } else {
+            client = (this.clientsCache || []).find(c => c.id === clientOrId) || null;
+        }
+        if (!client) return;
+
+        this._selectedDebtClient = client;
+
+        const pickerBox = document.getElementById('m-debt-client-picker-box');
+        const selCard = document.getElementById('m-debt-selected-client-card');
+        const dropdown = document.getElementById('m-debt-client-dropdown');
+        if (dropdown) dropdown.style.display = 'none';
+        if (pickerBox) pickerBox.style.display = 'none';
+        if (selCard) selCard.style.display = 'block';
+
+        const initial = (client.name || 'M').trim().charAt(0).toUpperCase();
+        const debtVal = Number(client.debt || 0);
+
+        document.getElementById('m-debt-sel-avatar').textContent = initial;
+        document.getElementById('m-debt-sel-name').textContent = client.name || 'Mijoz';
+        document.getElementById('m-debt-sel-phone').textContent = `${client.phone || '-'} ${client.barcode ? `• ${client.barcode}` : ''}`;
+
+        const curDebtEl = document.getElementById('m-debt-sel-current-debt');
+        if (curDebtEl) {
+            curDebtEl.textContent = `${debtVal.toLocaleString('uz-UZ')} so'm`;
+            curDebtEl.style.color = debtVal > 0 ? '#ef4444' : '#10b981';
+        }
+
+        const fullBtn = document.getElementById('m-debt-quick-full-btn');
+        const actionType = document.getElementById('m-debt-action-type')?.value || 'add';
+        if (fullBtn) {
+            fullBtn.style.display = (actionType === 'pay' && debtVal > 0) ? 'inline-flex' : 'none';
+        }
+
+        setTimeout(() => {
+            const amtEl = document.getElementById('m-debt-amount');
+            if (amtEl) amtEl.focus();
+        }, 100);
+    },
+
+    clearDebtSelectedClient: function() {
+        this._selectedDebtClient = null;
+        const pickerBox = document.getElementById('m-debt-client-picker-box');
+        const selCard = document.getElementById('m-debt-selected-client-card');
+        const searchInput = document.getElementById('m-debt-client-search');
+        const dropdown = document.getElementById('m-debt-client-dropdown');
+        if (pickerBox) pickerBox.style.display = 'block';
+        if (selCard) selCard.style.display = 'none';
+        if (searchInput) searchInput.value = '';
+        if (dropdown) dropdown.style.display = 'none';
+    },
+
+    setDebtQuickAmount: function(val) {
+        const amtInput = document.getElementById('m-debt-amount');
+        if (!amtInput) return;
+        if (val === 'full') {
+            const curDebt = Number(this._selectedDebtClient?.debt || 0);
+            if (curDebt > 0) amtInput.value = Math.round(curDebt);
+        } else {
+            amtInput.value = val;
+        }
+    },
+
+    openDebtBarcodeScanner: function() {
+        this._scannerTarget = 'debt';
+        this.openScanner();
+    },
+
+    submitDebtAdjustment: async function(e) {
+        if (e) e.preventDefault();
+        if (!this._selectedDebtClient || !this._selectedDebtClient.id) {
+            alert("Iltimos, avval mijozni tanlang yoki kartasini skanerlang!");
+            const searchEl = document.getElementById('m-debt-client-search');
+            if (searchEl) searchEl.focus();
+            return;
+        }
+
+        const actionType = document.getElementById('m-debt-action-type')?.value || 'add';
+        const amount = parseFloat(document.getElementById('m-debt-amount')?.value || 0);
+        const note = (document.getElementById('m-debt-note')?.value || '').trim();
+        const dueDate = (document.getElementById('m-debt-due-date')?.value || '').trim();
+
+        if (isNaN(amount) || amount <= 0) {
+            alert("Iltimos, to'g'ri summa kiriting!");
+            return;
+        }
+
+        const client = this._selectedDebtClient;
+        const btn = document.getElementById('m-btn-debt-submit');
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saqlanmoqda...';
+        }
+
+        try {
+            const resp = await fetch(`/api/clients/${encodeURIComponent(client.id)}/adjust-debt`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    type: actionType,
+                    amount: amount,
+                    note: note,
+                    due_date: dueDate,
+                    user: (this.currentUser && (this.currentUser.name || this.currentUser.username || this.currentUser.id)) || 'Xodim'
+                })
+            });
+
+            const data = await resp.json();
+            if (!resp.ok || !data.ok) {
+                throw new Error(data.detail || "Qarz ma'lumotini saqlab bo'lmadi");
+            }
+
+            const newDebt = Number(data.debt || 0);
+            client.debt = newDebt;
+
+            const idx = this.clientsCache.findIndex(c => c.id === client.id);
+            if (idx !== -1) {
+                this.clientsCache[idx].debt = newDebt;
+            }
+
+            // Update dashboard badge & active client sheet if open
+            const dCount = this.clientsCache.filter(c => Number(c.debt || 0) > 0).length;
+            if (document.getElementById('m-kpi-debt-badge')) {
+                document.getElementById('m-kpi-debt-badge').textContent = `Qarzdorlar: ${dCount} ta`;
+            }
+
+            if (this._activeDetailClient && this._activeDetailClient.id === client.id) {
+                this._activeDetailClient.debt = newDebt;
+                this._updateDebtUI(newDebt, this._activeDetailClient);
+                this.loadClientReceiptsInSheet(this._activeDetailClient);
+            }
+
+            this.filterClients();
+            this.closeDebtModal();
+
+            const msgTitle = actionType === 'pay'
+                ? `✅ ${client.name} dan ${amount.toLocaleString('uz-UZ')} so'm qarz to'lovi qabul qilindi!`
+                : `✅ ${client.name} nomiga ${amount.toLocaleString('uz-UZ')} so'm qarz (nasiya) rasmiylashtirildi!`;
+            alert(`${msgTitle}\nJoriy qarz balansi: ${newDebt.toLocaleString('uz-UZ')} so'm`);
+
+        } catch (err) {
+            alert("Xatolik: " + err.message);
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                this.switchDebtTab(actionType);
+            }
+        }
     },
 
     // --- REGOS PARTNER & CARD MANAGEMENT ---

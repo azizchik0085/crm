@@ -1354,7 +1354,18 @@ def get_client_receipts(
         if live_bonus is None:
             live_bonus = current_stored_value
 
-    final_debt = partner_debt if partner_debt is not None else client_debt
+    for r in receipts_list:
+        it = r.get("items")
+        if isinstance(it, str) and it.startswith("{"):
+            try:
+                it = json.loads(it)
+            except Exception:
+                it = {}
+        if isinstance(it, dict) and it.get("is_payment"):
+            r["is_payment"] = True
+
+    manual_debt_delta = float(client_meta.get("manual_debt") or 0.0)
+    final_debt = (partner_debt + manual_debt_delta) if partner_debt is not None else client_debt
 
     return {
         "ok": True, 
@@ -1512,6 +1523,124 @@ def adjust_client_bonus(client_id: str, payload: dict, request: Request):
         "prev_bonus": old_bonus,
         "regos_synced": regos_synced,
         "regos_detail": regos_res.get("detail") or "",
+        "record": rec
+    }
+
+@app.post("/api/clients/{client_id}/adjust-debt")
+def adjust_client_debt(client_id: str, payload: dict, request: Request):
+    import time
+    company_id = get_company_id(request)
+    if not company_id:
+        raise HTTPException(status_code=400, detail="Company ID talab qilinadi")
+
+    action_type = str(payload.get("type") or payload.get("action") or "add").lower()
+    amount = float(payload.get("amount") or 0.0)
+    note = str(payload.get("note") or "").strip()
+    due_date = str(payload.get("due_date") or "").strip()
+    user_name = str(payload.get("user") or "Xodim").strip()
+
+    if amount <= 0 and action_type != "set":
+        raise HTTPException(status_code=400, detail="Summa 0 dan katta bo'lishi kerak")
+
+    c_res = supabase_req("GET", f"customers?id=eq.{client_id}", company_id=company_id)
+    if not c_res or not isinstance(c_res, list) or len(c_res) == 0:
+        c_res = supabase_req("GET", f"customers?phone2=eq.{client_id}", company_id=company_id)
+    if not c_res or not isinstance(c_res, list) or len(c_res) == 0:
+        raise HTTPException(status_code=404, detail="Mijoz topilmadi")
+
+    client = c_res[0]
+    actual_id = client.get("id") or client_id
+    op_raw = client.get("operator") or "{}"
+    meta = json.loads(op_raw) if op_raw.startswith("{") else {}
+
+    old_debt = float(meta.get("debt") or 0.0)
+    old_manual_debt = float(meta.get("manual_debt") or 0.0)
+
+    if action_type == "add":
+        new_debt = round(old_debt + amount, 2)
+        new_manual_debt = round(old_manual_debt + amount, 2)
+    elif action_type in ("pay", "subtract", "deduct"):
+        new_debt = round(old_debt - amount, 2)
+        new_manual_debt = round(old_manual_debt - amount, 2)
+    else:
+        new_debt = round(amount, 2)
+        new_manual_debt = round(old_manual_debt + (new_debt - old_debt), 2)
+
+    meta["debt"] = new_debt
+    meta["manual_debt"] = new_manual_debt
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    ts_ms = int(time.time() * 1000)
+
+    debt_history = meta.get("debt_history")
+    if not isinstance(debt_history, list):
+        debt_history = []
+
+    rec = {
+        "id": f"dh_{ts_ms}",
+        "date": now_iso,
+        "type": action_type,
+        "amount": amount,
+        "prev_debt": old_debt,
+        "new_debt": new_debt,
+        "note": note,
+        "due_date": due_date,
+        "user": user_name
+    }
+    debt_history.insert(0, rec)
+    meta["debt_history"] = debt_history[:100]
+
+    supabase_req("PATCH", f"customers?id=eq.{actual_id}", json_data={
+        "operator": json.dumps(meta, ensure_ascii=False)
+    }, company_id=company_id)
+
+    # Also create a receipt/payment record in receipts table so it appears in client history & Usta cabinet
+    try:
+        barcode = meta.get("barcode") or client.get("phone2") or ""
+        is_pay = action_type in ("pay", "subtract", "deduct")
+        short_code = str(ts_ms)[-6:]
+        doc_code = f"TOLOV-{short_code}" if is_pay else f"QARZ-{short_code}"
+        pay_type = "Qarz to'lovi (Kirim)" if is_pay else "Qarzga (Nasiya)"
+        item_title = note if note else ("Qarz to'lovi qabul qilindi" if is_pay else "Qarzga (Nasiya) rasmiylashtirildi")
+        if due_date and not is_pay:
+            item_title += f" (Muddat: {due_date})"
+
+        receipt_payload = {
+            "id": f"debt_rec_{ts_ms}",
+            "code": doc_code,
+            "cashier_name": user_name,
+            "total_amount": float(amount if action_type != "set" else abs(new_debt - old_debt)),
+            "discount": 0.0,
+            "payment_type": pay_type,
+            "created_at": now_iso,
+            "company_id": company_id,
+            "items": {
+                "customer_id": actual_id,
+                "customer_name": client.get("name") or "",
+                "customer_phone": client.get("phone") or "",
+                "card_barcode": barcode,
+                "is_payment": is_pay,
+                "is_debt": not is_pay,
+                "due_date": due_date,
+                "note": note,
+                "products": [
+                    {
+                        "name": item_title,
+                        "quantity": 1,
+                        "price": float(amount if action_type != "set" else abs(new_debt - old_debt)),
+                        "total": float(amount if action_type != "set" else abs(new_debt - old_debt))
+                    }
+                ]
+            }
+        }
+        supabase_req("POST", "receipts?on_conflict=id", json_data=receipt_payload, company_id=company_id)
+    except Exception as e_rec:
+        print(f"Notice: could not insert debt receipt record: {e_rec}")
+
+    return {
+        "ok": True,
+        "debt": new_debt,
+        "prev_debt": old_debt,
         "record": rec
     }
 
@@ -6067,17 +6196,25 @@ def get_mobile_dashboard(request: Request):
         clients = get_clients(request) or []
         ustalar_count = 0
         qurilish_count = 0
+        debt_clients_count = 0
+        total_debt_sum = 0.0
         for c in clients:
             cat = str(c.get("category") or ("qurilish" if c.get("company") else "ustalar")).lower()
             if "qurilish" in cat:
                 qurilish_count += 1
             else:
                 ustalar_count += 1
+            d_val = float(c.get("debt") or 0.0)
+            if d_val > 0:
+                debt_clients_count += 1
+                total_debt_sum += d_val
 
         return {
             "ok": True,
             "ustalar_count": ustalar_count,
             "qurilish_count": qurilish_count,
+            "debt_clients_count": debt_clients_count,
+            "total_debt_sum": round(total_debt_sum, 2),
             "clients_count": len(clients),
             "company_id": company_id
         }

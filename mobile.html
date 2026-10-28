@@ -180,6 +180,38 @@
                 </div>
             </div>
 
+            <!-- MIJOZGA QARZGA BERISH / QARZ RASMIYLASHTIRISH BANNER -->
+            <div class="m-card" id="m-home-debt-banner" style="margin-bottom: 16px; background: linear-gradient(135deg, rgba(245, 158, 11, 0.16), rgba(239, 68, 68, 0.12)); border: 1.5px solid rgba(245, 158, 11, 0.5); border-radius: 16px; padding: 16px; box-shadow: 0 6px 20px rgba(245, 158, 11, 0.15);">
+                <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <div style="width: 44px; height: 44px; border-radius: 12px; background: linear-gradient(135deg, #f59e0b, #ef4444); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; box-shadow: 0 4px 12px rgba(239, 68, 68, 0.35);">
+                            <i class="fas fa-hand-holding-usd"></i>
+                        </div>
+                        <div>
+                            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 3px;">
+                                <h4 style="font-size: 15px; font-weight: 800; color: #fbbf24; margin: 0;">
+                                    Mijozga Qarzga Berish / Qarz Rasmiylashtirish
+                                </h4>
+                                <span id="m-kpi-debt-badge" onclick="MobileApp.openCategory('qarzdorlar')" style="cursor: pointer; background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4); color: #f87171; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 8px;">
+                                    Qarzdorlar: 0 ta
+                                </span>
+                            </div>
+                            <p style="font-size: 12px; color: var(--text-muted); margin: 0;">
+                                Mijozga nasiya (qarz) rasmiylashtirish yoki qarz to'lovini qabul qilish
+                            </p>
+                        </div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                        <button type="button" class="btn btn-primary" style="height: 42px; padding: 0 16px; font-size: 13.5px; font-weight: 700; border-radius: 10px; background: linear-gradient(135deg, #f59e0b, #ea580c); color: #fff; border: none; cursor: pointer; white-space: nowrap; box-shadow: 0 4px 12px rgba(245, 158, 11, 0.35); display: inline-flex; align-items: center; gap: 6px;" onclick="MobileApp.openDebtModal(null, 'add')">
+                            <i class="fas fa-file-signature"></i> Qarz Rasmiylashtirish
+                        </button>
+                        <button type="button" class="btn btn-secondary" style="height: 42px; padding: 0 14px; font-size: 13px; font-weight: 700; border-radius: 10px; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.4); color: #10b981; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px;" onclick="MobileApp.openDebtModal(null, 'pay')">
+                            <i class="fas fa-money-bill-wave"></i> Qarz To'lovi
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             <!-- Quick Action Grid (Admin-controlled permissions) -->
             <h3 style="font-size: 13px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin: 16px 0 10px;">
                 Tezkor Amallar
@@ -245,7 +277,7 @@
                 </button>
             </div>
 
-            <!-- Filter Pills (Barchasi, Ustalar, Qurilish obyekti) -->
+            <!-- Filter Pills (Barchasi, Ustalar, Qurilish obyekti, Qarzdorlar) -->
             <div class="filter-pills">
                 <button class="filter-pill active" data-cat="all" onclick="MobileApp.setClientCategoryFilter('all', this)">
                     <i class="fas fa-list" style="margin-right: 4px;"></i> Barchasi
@@ -255,6 +287,9 @@
                 </button>
                 <button class="filter-pill" data-cat="qurilish" onclick="MobileApp.setClientCategoryFilter('qurilish', this)">
                     <i class="fas fa-building" style="margin-right: 4px;"></i> Qurilish Obyekti
+                </button>
+                <button class="filter-pill" data-cat="qarzdorlar" onclick="MobileApp.setClientCategoryFilter('qarzdorlar', this)">
+                    <i class="fas fa-hand-holding-usd" style="margin-right: 4px; color: #f59e0b;"></i> Qarzdorlar
                 </button>
             </div>
 
@@ -430,16 +465,21 @@
 
             <!-- 4. DO'KON BILAN ALOQA -->
             <div class="m-card" style="margin-top: 16px; background: rgba(255,255,255,0.02); border-color: var(--border-color);">
-                <div style="display: flex; align-items: center; justify-content: space-between;">
+                <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
                     <div>
                         <h4 style="font-size: 13.5px; font-weight: 700; color: #fff; margin-bottom: 2px;">
                             <i class="fas fa-phone-volume" style="color: #10b981; margin-right: 6px;"></i> Do'kon Bilan Aloqa
                         </h4>
                         <p style="font-size: 11.5px; color: var(--text-muted); margin: 0;">Savollaringiz bo'yicha menejerga qo'ng'iroq qiling</p>
                     </div>
-                    <a href="tel:+998906112666" class="btn btn-primary" style="height: 38px; padding: 0 14px; font-size: 12.5px; background: #10b981; border: none; border-radius: 10px; display: inline-flex; align-items: center; gap: 6px; text-decoration: none;">
-                        <i class="fas fa-phone-alt"></i> Aloqa
-                    </a>
+                    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                        <a href="tel:+998996262462" class="btn btn-primary" style="height: 38px; padding: 0 12px; font-size: 12.5px; font-weight: 700; background: #10b981; border: none; border-radius: 10px; display: inline-flex; align-items: center; gap: 6px; text-decoration: none;">
+                            <i class="fas fa-phone-alt"></i> +998 99 626 24 62
+                        </a>
+                        <a href="tel:+998914474240" class="btn btn-primary" style="height: 38px; padding: 0 12px; font-size: 12.5px; font-weight: 700; background: #059669; border: none; border-radius: 10px; display: inline-flex; align-items: center; gap: 6px; text-decoration: none;">
+                            <i class="fas fa-phone-alt"></i> +998 91 447 42 40
+                        </a>
+                    </div>
                 </div>
             </div>
 
@@ -555,6 +595,14 @@
                         <div id="m-sheet-debt-sub" style="font-size: 11px; color: var(--text-muted);">
                             -
                         </div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px dashed rgba(255,255,255,0.08);">
+                        <button type="button" class="btn btn-primary" style="height: 36px; font-size: 12px; font-weight: 700; padding: 0 10px; border-radius: 8px; background: linear-gradient(135deg, #f59e0b, #ea580c); border: none; color: #fff; display: flex; align-items: center; justify-content: center; gap: 6px;" onclick="MobileApp.openDebtModal(MobileApp._activeDetailClient, 'add')">
+                            <i class="fas fa-plus-circle"></i> Qarzga Berish
+                        </button>
+                        <button type="button" class="btn btn-secondary" style="height: 36px; font-size: 12px; font-weight: 700; padding: 0 10px; border-radius: 8px; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.35); color: #10b981; display: flex; align-items: center; justify-content: center; gap: 6px;" onclick="MobileApp.openDebtModal(MobileApp._activeDetailClient, 'pay')">
+                            <i class="fas fa-check-circle"></i> Qarz To'lovi
+                        </button>
                     </div>
                 </div>
 
@@ -906,6 +954,110 @@
         </div>
     </div>
 
+    <!-- ========================================== -->
+    <!-- 9. QARZ RASMIYLASHTIRISH / TO'LOV MODAL    -->
+    <!-- ========================================== -->
+    <div id="m-debt-modal" class="m-modal" onclick="if(event.target === this) MobileApp.closeDebtModal()">
+        <div class="m-sheet" style="max-height: 92vh; display: flex; flex-direction: column;">
+            <div class="m-sheet-header">
+                <div class="m-sheet-drag-handle"></div>
+                <div class="m-sheet-title" id="m-debt-modal-title">
+                    <i class="fas fa-hand-holding-usd" style="color: #f59e0b; margin-right: 6px;"></i> Qarz Rasmiylashtirish
+                </div>
+                <button class="m-sheet-close" onclick="MobileApp.closeDebtModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <!-- Operation Type Switcher Tabs -->
+            <div style="display: flex; border-bottom: 1px solid var(--border-color); background: rgba(0,0,0,0.2); padding: 0 14px;">
+                <button id="m-debt-tab-add" type="button" onclick="MobileApp.switchDebtTab('add')" style="flex: 1; padding: 11px 8px; font-size: 13px; font-weight: 700; border: none; background: transparent; color: #f59e0b; border-bottom: 2px solid #f59e0b; cursor: pointer; text-align: center;">
+                    <i class="fas fa-file-signature" style="margin-right: 4px;"></i> Qarzga Berish (Nasiya)
+                </button>
+                <button id="m-debt-tab-pay" type="button" onclick="MobileApp.switchDebtTab('pay')" style="flex: 1; padding: 11px 8px; font-size: 13px; font-weight: 500; border: none; background: transparent; color: var(--text-muted); border-bottom: 2px solid transparent; cursor: pointer; text-align: center;">
+                    <i class="fas fa-money-bill-wave" style="margin-right: 4px;"></i> Qarz To'lovi (Kirim)
+                </button>
+            </div>
+
+            <div class="m-sheet-content" style="flex: 1; overflow-y: auto; padding: 14px;">
+                <form onsubmit="MobileApp.submitDebtAdjustment(event)">
+                    <input type="hidden" id="m-debt-action-type" value="add">
+
+                    <!-- 1. Mijozni tanlash / qidirish -->
+                    <div id="m-debt-client-picker-box" style="margin-bottom: 12px;">
+                        <label style="font-size: 12px; font-weight: 700; color: var(--text-main); margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center;">
+                            <span><i class="fas fa-user" style="color: #38bdf8; margin-right: 4px;"></i> Mijozni tanlang <span style="color: var(--danger);">*</span></span>
+                            <button type="button" onclick="MobileApp.openDebtBarcodeScanner()" style="background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.35); color: #38bdf8; font-size: 11px; font-weight: 700; border-radius: 6px; padding: 3px 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+                                <i class="fas fa-camera"></i> Karta Skanerlash
+                            </button>
+                        </label>
+                        <div style="position: relative;">
+                            <input type="text" id="m-debt-client-search" class="form-control" placeholder="Mijoz ismi, telefon yoki shtrix-kodni yozing..." oninput="MobileApp.filterDebtClientsList()" onfocus="MobileApp.filterDebtClientsList()" autocomplete="off" style="height: 42px; font-size: 13.5px;">
+                            <div id="m-debt-client-dropdown" style="display: none; max-height: 200px; overflow-y: auto; background: #0f172a; border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 10px; margin-top: 4px; box-shadow: 0 10px 25px rgba(0,0,0,0.6);"></div>
+                        </div>
+                    </div>
+
+                    <!-- Tanlangan Mijoz Kartasi -->
+                    <div id="m-debt-selected-client-card" style="display: none; background: rgba(255,255,255,0.03); border: 1px solid rgba(245, 158, 11, 0.35); border-radius: 12px; padding: 12px; margin-bottom: 14px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <div id="m-debt-sel-avatar" class="client-avatar" style="width: 40px; height: 40px; font-size: 16px;">M</div>
+                                <div>
+                                    <div id="m-debt-sel-name" style="font-size: 14.5px; font-weight: 800; color: #fff;">Mijoz Ismi</div>
+                                    <div id="m-debt-sel-phone" style="font-size: 12px; color: var(--text-muted);">+998 -- --- -- --</div>
+                                </div>
+                            </div>
+                            <button type="button" onclick="MobileApp.clearDebtSelectedClient()" style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #ef4444; border-radius: 8px; padding: 5px 10px; font-size: 11.5px; font-weight: 600; cursor: pointer;">
+                                <i class="fas fa-exchange-alt"></i> O'zgartirish
+                            </button>
+                        </div>
+                        <div style="margin-top: 10px; padding-top: 8px; border-top: 1px dashed rgba(255,255,255,0.08); display: flex; justify-content: space-between; align-items: center;">
+                            <span style="font-size: 12px; color: var(--text-muted);">Joriy qarz balansi:</span>
+                            <span id="m-debt-sel-current-debt" style="font-size: 15px; font-weight: 800; font-family: monospace; color: #ef4444;">0 so'm</span>
+                        </div>
+                    </div>
+
+                    <!-- 2. Qarz / To'lov Summasi -->
+                    <div class="form-group" style="margin-bottom: 12px;">
+                        <label id="m-debt-amount-label" style="font-size: 12px; font-weight: 700; color: var(--text-main); margin-bottom: 4px; display: block;">
+                            Qarzga beriladigan summa (so'm) <span style="color: var(--danger);">*</span>
+                        </label>
+                        <input type="number" id="m-debt-amount" class="form-control" placeholder="Masalan: 1500000" required inputmode="numeric" style="height: 46px; font-size: 16px; font-weight: 700;">
+
+                        <!-- Tezkor summa tugmalari -->
+                        <div style="display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap;">
+                            <button type="button" class="btn btn-secondary" style="height: 30px; font-size: 11px; padding: 0 8px; border-radius: 8px;" onclick="MobileApp.setDebtQuickAmount(100000)">100 000</button>
+                            <button type="button" class="btn btn-secondary" style="height: 30px; font-size: 11px; padding: 0 8px; border-radius: 8px;" onclick="MobileApp.setDebtQuickAmount(500000)">500 000</button>
+                            <button type="button" class="btn btn-secondary" style="height: 30px; font-size: 11px; padding: 0 8px; border-radius: 8px;" onclick="MobileApp.setDebtQuickAmount(1000000)">1 000 000</button>
+                            <button type="button" class="btn btn-secondary" style="height: 30px; font-size: 11px; padding: 0 8px; border-radius: 8px;" onclick="MobileApp.setDebtQuickAmount(5000000)">5 000 000</button>
+                            <button type="button" id="m-debt-quick-full-btn" class="btn btn-secondary" style="display: none; height: 30px; font-size: 11px; padding: 0 8px; border-radius: 8px; color: #10b981; border-color: rgba(16, 185, 129, 0.4);" onclick="MobileApp.setDebtQuickAmount('full')">To'liq qarzni yopish</button>
+                        </div>
+                    </div>
+
+                    <!-- 3. Olingan mahsulotlar / Izoh -->
+                    <div class="form-group" style="margin-bottom: 12px;">
+                        <label id="m-debt-note-label" style="font-size: 12px; font-weight: 700; color: var(--text-main); margin-bottom: 4px; display: block;">
+                            Olingan mahsulotlar yoki izoh
+                        </label>
+                        <input type="text" id="m-debt-note" class="form-control" placeholder="Masalan: Sement 20 qop, shpaklyovka, yuk xati #..." style="height: 42px; font-size: 13.5px;">
+                    </div>
+
+                    <!-- 4. Qaytarish muddati (Faqat qarzga berishda ko'rinadi) -->
+                    <div class="form-group" id="m-debt-due-date-group" style="margin-bottom: 16px;">
+                        <label style="font-size: 12px; font-weight: 700; color: var(--text-main); margin-bottom: 4px; display: block;">
+                            <i class="far fa-calendar-alt" style="color: #f59e0b; margin-right: 4px;"></i> Qaytarish muddati (ixtiyoriy)
+                        </label>
+                        <input type="date" id="m-debt-due-date" class="form-control" style="height: 42px; font-size: 13.5px; color-scheme: dark;">
+                    </div>
+
+                    <button type="submit" id="m-btn-debt-submit" class="btn btn-primary btn-block" style="height: 48px; font-size: 14.5px; font-weight: 700; border-radius: 12px; background: linear-gradient(135deg, #f59e0b, #ea580c); border: none; color: #fff; box-shadow: 0 4px 15px rgba(245, 158, 11, 0.35);">
+                        <i class="fas fa-file-signature" style="margin-right: 6px;"></i> Qarzni Rasmiylashtirish
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <!-- Html5Qrcode Library for Camera Barcode Scanning -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
 
@@ -937,13 +1089,13 @@
     </script>
 
     <!-- Mobile App Main Script -->
-    <script src="/js/mobile-app.js?v=3.5"></script>
+    <script src="/js/mobile-app.js?v=3.6"></script>
 
     <!-- Register Service Worker for PWA Offline / Standalone Installation -->
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw-mobile.js?v=12')
+                navigator.serviceWorker.register('/sw-mobile.js?v=14')
                     .then(reg => {
                         reg.update();
                         console.log('Webzone Mobile SW registered');
