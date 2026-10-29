@@ -1079,6 +1079,14 @@ window.MobileApp = {
     },
 
     loadDashboardData: async function() {
+        this.loadDebtApplications();
+        if (!this._debtAppsPollTimer) {
+            this._debtAppsPollTimer = setInterval(() => {
+                if (this.activeView === 'home' || document.getElementById('m-debt-apps-modal')?.classList.contains('active')) {
+                    this.loadDebtApplications(false);
+                }
+            }, 8000);
+        }
         try {
             const resp = await fetch('/api/mobile/dashboard');
             if (resp.ok) {
@@ -2937,6 +2945,381 @@ window.MobileApp = {
                 btn.disabled = false;
                 this.switchDebtTab(actionType);
             }
+        }
+    },
+
+    // --- KELIB TUSHGAN ARIZALAR (@Qarzdorlik01_bot) VA TASDIQLASH MANTIQI ---
+    _debtApplicationsCache: [],
+    _debtAppsFilter: 'all',
+    _activeApproveApp: null,
+
+    loadDebtApplications: async function(manualRefresh) {
+        const syncIcon = document.getElementById('m-home-apps-sync-icon');
+        if (manualRefresh && syncIcon) {
+            syncIcon.classList.add('fa-spin');
+        }
+        try {
+            const resp = await fetch('/api/debt-applications', { cache: 'no-store' });
+            if (resp.ok) {
+                const data = await resp.json();
+                if (data && data.ok && Array.isArray(data.applications)) {
+                    this._debtApplicationsCache = data.applications;
+                    this.renderDebtApplicationsUI();
+                }
+            }
+        } catch (err) {
+            console.warn('Could not load debt applications:', err);
+        } finally {
+            if (syncIcon) {
+                setTimeout(() => syncIcon.classList.remove('fa-spin'), 350);
+            }
+        }
+    },
+
+    renderDebtApplicationsUI: function() {
+        const apps = this._debtApplicationsCache || [];
+        const pendingCount = apps.filter(a => a.status === 'pending_admin').length;
+        const faceIdWaitCount = apps.filter(a => a.status === 'awaiting_client_faceid').length;
+        const verifiedCount = apps.filter(a => a.status === 'approved_verified').length;
+
+        // Update badges & counters
+        const kpiBadge = document.getElementById('m-kpi-apps-badge');
+        if (kpiBadge) {
+            kpiBadge.innerHTML = `<i class="fab fa-telegram-plane"></i> Kelib tushgan arizalar: ${apps.length} ta${pendingCount > 0 ? ` (${pendingCount} ta yangi)` : ''}`;
+        }
+        const btnPill = document.getElementById('m-btn-apps-count-pill');
+        if (btnPill) {
+            btnPill.textContent = pendingCount > 0 ? pendingCount : apps.length;
+            btnPill.style.background = pendingCount > 0 ? '#ef4444' : 'rgba(255,255,255,0.22)';
+        }
+
+        const pChip = document.getElementById('m-home-apps-pending-chip');
+        if (pChip) pChip.textContent = `Tasdiq kutmoqda: ${pendingCount}`;
+        const fChip = document.getElementById('m-home-apps-faceid-chip');
+        if (fChip) fChip.textContent = `Face ID kutmoqda: ${faceIdWaitCount}`;
+        const vChip = document.getElementById('m-home-apps-verified-chip');
+        if (vChip) vChip.textContent = `Tasdiqlangan: ${verifiedCount}`;
+
+        const cntAll = document.getElementById('m-apps-cnt-all');
+        if (cntAll) cntAll.textContent = apps.length;
+        const cntPend = document.getElementById('m-apps-cnt-pending');
+        if (cntPend) cntPend.textContent = pendingCount;
+        const cntFace = document.getElementById('m-apps-cnt-faceid');
+        if (cntFace) cntFace.textContent = faceIdWaitCount;
+        const cntVer = document.getElementById('m-apps-cnt-verified');
+        if (cntVer) cntVer.textContent = verifiedCount;
+
+        // 1. Render Home Inline List (top 5 active or recent applications)
+        const homeListEl = document.getElementById('m-home-debt-apps-list');
+        if (homeListEl) {
+            if (apps.length === 0) {
+                homeListEl.innerHTML = `
+                    <div style="padding: 14px; text-align: center; background: rgba(15, 23, 42, 0.65); border: 1px dashed rgba(56, 189, 248, 0.3); border-radius: 12px; font-size: 12.5px; color: var(--text-muted);">
+                        <i class="fab fa-telegram" style="color: #38bdf8; font-size: 18px; margin-bottom: 4px; display: block;"></i>
+                        Hozircha <b>@Qarzdorlik01_bot</b> orqali yangi arizalar kelib tushmagan.<br>
+                        <span style="font-size: 11.5px;">Mijoz botga kirib telefon raqami, F.I.Sh. va pasport ma'lumotini kiritishi bilan shu yerda avtomatik paydo bo'ladi.</span>
+                    </div>
+                `;
+            } else {
+                const topApps = apps.slice(0, 5);
+                homeListEl.innerHTML = topApps.map(a => this._buildDebtAppCardHtml(a, true)).join('');
+            }
+        }
+
+        // 2. Render Modal List if present
+        this.renderDebtAppsModalList();
+    },
+
+    _buildDebtAppCardHtml: function(a, isCompact) {
+        const status = a.status || 'pending_admin';
+        let statusBadge = '';
+        let borderColor = 'rgba(245, 158, 11, 0.45)';
+        let cardBg = 'rgba(15, 23, 42, 0.85)';
+
+        if (status === 'pending_admin') {
+            statusBadge = `<span style="background: rgba(245, 158, 11, 0.2); border: 1px solid rgba(245, 158, 11, 0.45); color: #fbbf24; font-size: 11px; font-weight: 800; padding: 3px 8px; border-radius: 6px;"><i class="fas fa-clock"></i> Tasdiq kutmoqda</span>`;
+            borderColor = 'rgba(245, 158, 11, 0.55)';
+        } else if (status === 'awaiting_client_faceid') {
+            statusBadge = `<span style="background: rgba(56, 189, 248, 0.2); border: 1px solid rgba(56, 189, 248, 0.45); color: #38bdf8; font-size: 11px; font-weight: 800; padding: 3px 8px; border-radius: 6px;"><i class="fas fa-id-badge"></i> Mijozga shartnoma yuborildi (Face ID kutilmoqda)</span>`;
+            borderColor = 'rgba(56, 189, 248, 0.5)';
+        } else if (status === 'approved_verified') {
+            statusBadge = `<span style="background: rgba(16, 185, 129, 0.2); border: 1px solid rgba(16, 185, 129, 0.45); color: #10b981; font-size: 11px; font-weight: 800; padding: 3px 8px; border-radius: 6px;"><i class="fas fa-check-circle"></i> Mijoz Face ID bilan tasdiqladi</span>`;
+            borderColor = 'rgba(16, 185, 129, 0.5)';
+            cardBg = 'rgba(6, 78, 59, 0.25)';
+        } else {
+            statusBadge = `<span style="background: rgba(239, 68, 68, 0.2); color: #f87171; font-size: 11px; font-weight: 800; padding: 3px 8px; border-radius: 6px;"><i class="fas fa-times-circle"></i> Rad etilgan</span>`;
+            borderColor = 'rgba(239, 68, 68, 0.35)';
+        }
+
+        const phones = `${a.phone || '-'}${a.phone2 ? ' / ' + a.phone2 : ''}`;
+        const amountVal = Number(a.amount || 0);
+        const facePhotos = Array.isArray(a.face_id_photos) ? a.face_id_photos : [];
+
+        let actionsHtml = '';
+        if (status === 'pending_admin') {
+            actionsHtml = `
+                <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; padding-top: 10px; border-top: 1px dashed rgba(255,255,255,0.1);">
+                    <button type="button" onclick="MobileApp.openApproveAppModal('${a.id}')" class="btn btn-success" style="flex: 1; height: 38px; font-size: 12.5px; font-weight: 800; border-radius: 9px; background: linear-gradient(135deg, #10b981, #059669); border: none; color: #fff; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);">
+                        <i class="fas fa-check-circle"></i> Tasdiqlash va Shartnoma Yuborish
+                    </button>
+                    <button type="button" onclick="MobileApp.rejectDebtApplication('${a.id}')" style="height: 38px; padding: 0 12px; font-size: 12px; font-weight: 700; border-radius: 9px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.35); color: #f87171; cursor: pointer;">
+                        <i class="fas fa-times"></i> Rad etish
+                    </button>
+                </div>
+            `;
+        } else if (status === 'awaiting_client_faceid') {
+            const verifyLink = `${window.location.origin}/debt-verify.html?app_id=${encodeURIComponent(a.id)}&company=${encodeURIComponent(this.currentCompany || 'giperbrendstroy')}`;
+            actionsHtml = `
+                <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; padding-top: 10px; border-top: 1px dashed rgba(255,255,255,0.1); align-items: center;">
+                    <button type="button" onclick="MobileApp.openApproveAppModal('${a.id}')" style="height: 34px; padding: 0 12px; font-size: 11.5px; font-weight: 700; border-radius: 8px; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.4); color: #38bdf8; cursor: pointer; display: inline-flex; align-items: center; gap: 5px;">
+                        <i class="fas fa-paper-plane"></i> Shartnomani qayta yuborish / Tahrirlash
+                    </button>
+                    <a href="${verifyLink}" target="_blank" style="height: 34px; padding: 0 12px; font-size: 11.5px; font-weight: 700; border-radius: 8px; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.4); color: #10b981; text-decoration: none; display: inline-flex; align-items: center; gap: 5px;">
+                        <i class="fas fa-external-link-alt"></i> Face ID sahifasini ochish
+                    </a>
+                </div>
+            `;
+        } else if (status === 'approved_verified') {
+            const photoThumb = facePhotos.length > 0
+                ? `<img src="${facePhotos[0]}" style="width: 54px; height: 64px; object-fit: cover; border-radius: 8px; border: 2px solid #10b981; flex-shrink: 0;">`
+                : '';
+            actionsHtml = `
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; padding-top: 10px; border-top: 1px dashed rgba(16, 185, 129, 0.3);">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        ${photoThumb}
+                        <div style="font-size: 11.5px; color: #d1fae5;">
+                            <div><b>Shartnoma:</b> ${a.contract_no || '-'} | <b>Summa:</b> ${amountVal.toLocaleString('uz-UZ')} so'm</div>
+                            <div><b>Muddat:</b> ${a.due_date_fmt || a.due_date || '-'} | <b>Tasdiqlandi:</b> ${a.verified_at_fmt || '-'}</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        return `
+            <div style="background: ${cardBg}; border: 1.5px solid ${borderColor}; border-radius: 12px; padding: 12px; margin-bottom: 10px;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; flex-wrap: wrap; margin-bottom: 6px;">
+                    <div>
+                        <div style="font-size: 14.5px; font-weight: 800; color: #fff; display: flex; align-items: center; gap: 6px;">
+                            <i class="fas fa-user-Check" style="color: #fbbf24;"></i> ${a.full_name || 'Mijoz'}
+                            <span style="font-family: monospace; font-size: 11px; color: var(--text-muted); background: rgba(255,255,255,0.06); padding: 1px 6px; border-radius: 5px;">#${a.app_no || ''}</span>
+                        </div>
+                        <div style="font-size: 12px; color: #e2e8f0; margin-top: 3px; display: flex; flex-wrap: wrap; gap: 10px;">
+                            <span><i class="fas fa-phone-alt" style="color: #38bdf8;"></i> <b>${phones}</b></span>
+                            <span><i class="fas fa-id-card" style="color: #f59e0b;"></i> Pasport: <b>${a.passport || '-'}</b></span>
+                            <span style="color: var(--text-muted);"><i class="far fa-clock"></i> ${a.created_at_fmt || ''}</span>
+                        </div>
+                    </div>
+                    <div>${statusBadge}</div>
+                </div>
+                ${amountVal > 0 && status !== 'approved_verified' ? `
+                    <div style="font-size: 12px; color: #fbbf24; margin-top: 4px;">
+                        💵 Shartnoma summasi: <b>${amountVal.toLocaleString('uz-UZ')} so'm</b> &bull; Muddat: <b>${a.due_date_fmt || a.due_date || '-'}</b> &bull; Izoh: ${a.note || '-'}
+                    </div>
+                ` : ''}
+                ${actionsHtml}
+            </div>
+        `;
+    },
+
+    openDebtApplicationsModal: function(defaultFilter) {
+        if (defaultFilter) {
+            this._debtAppsFilter = defaultFilter;
+        }
+        const modal = document.getElementById('m-debt-apps-modal');
+        if (modal) modal.classList.add('active');
+        this.setDebtAppsFilter(this._debtAppsFilter || 'all');
+        this.loadDebtApplications(true);
+    },
+
+    closeDebtApplicationsModal: function() {
+        const modal = document.getElementById('m-debt-apps-modal');
+        if (modal) modal.classList.remove('active');
+    },
+
+    setDebtAppsFilter: function(filterKey) {
+        this._debtAppsFilter = filterKey || 'all';
+        const map = {
+            'all': 'm-apps-tab-all',
+            'pending_admin': 'm-apps-tab-pending',
+            'awaiting_client_faceid': 'm-apps-tab-faceid',
+            'approved_verified': 'm-apps-tab-verified'
+        };
+        Object.keys(map).forEach(k => {
+            const btn = document.getElementById(map[k]);
+            if (!btn) return;
+            if (k === this._debtAppsFilter) {
+                btn.style.border = '1px solid #38bdf8';
+                btn.style.background = 'rgba(56, 189, 248, 0.2)';
+                btn.style.color = '#38bdf8';
+            } else {
+                btn.style.border = '1px solid rgba(255,255,255,0.12)';
+                btn.style.background = 'rgba(255,255,255,0.04)';
+                btn.style.color = 'var(--text-muted)';
+            }
+        });
+        this.renderDebtAppsModalList();
+    },
+
+    renderDebtAppsModalList: function() {
+        const listEl = document.getElementById('m-debt-apps-modal-list');
+        if (!listEl) return;
+
+        const all = this._debtApplicationsCache || [];
+        const filtered = this._debtAppsFilter === 'all'
+            ? all
+            : all.filter(a => a.status === this._debtAppsFilter);
+
+        if (filtered.length === 0) {
+            listEl.innerHTML = `
+                <div style="text-align: center; padding: 36px 16px; color: var(--text-muted); font-size: 13px;">
+                    <i class="fas fa-inbox" style="font-size: 32px; margin-bottom: 10px; opacity: 0.5; display: block;"></i>
+                    Ushbu bo'limda hozircha arizalar yo'q.
+                </div>
+            `;
+            return;
+        }
+
+        listEl.innerHTML = filtered.map(a => this._buildDebtAppCardHtml(a, false)).join('');
+    },
+
+    openApproveAppModal: function(appId) {
+        const appObj = (this._debtApplicationsCache || []).find(a => a.id === appId);
+        if (!appObj) return;
+
+        this._activeApproveApp = appObj;
+        document.getElementById('m-approve-app-id').value = appObj.id;
+        document.getElementById('m-approve-full-name').value = appObj.full_name || '';
+        document.getElementById('m-approve-phone').value = `${appObj.phone || ''}${appObj.phone2 ? ', ' + appObj.phone2 : ''}`;
+        document.getElementById('m-approve-passport').value = appObj.passport || '';
+        document.getElementById('m-approve-amount').value = appObj.amount && appObj.amount > 0 ? appObj.amount : '';
+        document.getElementById('m-approve-note').value = appObj.note || '';
+
+        const dueEl = document.getElementById('m-approve-due-date');
+        if (dueEl) {
+            if (appObj.due_date) {
+                dueEl.value = appObj.due_date;
+            } else {
+                const d = new Date();
+                d.setDate(d.getDate() + 7);
+                dueEl.value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+            }
+        }
+
+        const cNo = appObj.contract_no || ('SH-' + Date.now().toString().slice(-6));
+        document.getElementById('m-approve-contract-no').textContent = cNo;
+
+        this.updateApproveContractPreview();
+
+        const modal = document.getElementById('m-approve-app-modal');
+        if (modal) modal.classList.add('active');
+    },
+
+    closeApproveAppModal: function() {
+        const modal = document.getElementById('m-approve-app-modal');
+        if (modal) modal.classList.remove('active');
+        this._activeApproveApp = null;
+    },
+
+    updateApproveContractPreview: function() {
+        const textEl = document.getElementById('m-approve-contract-text');
+        if (!textEl) return;
+
+        const fullName = (document.getElementById('m-approve-full-name')?.value || 'Mijoz').trim();
+        const phone = (document.getElementById('m-approve-phone')?.value || '-').trim();
+        const passport = (document.getElementById('m-approve-passport')?.value || '-').trim().toUpperCase();
+        const amountRaw = parseFloat(document.getElementById('m-approve-amount')?.value || 0);
+        const amountFormatted = amountRaw > 0 ? `${amountRaw.toLocaleString('uz-UZ')} so'm` : 'kelishilgan summa';
+        const note = (document.getElementById('m-approve-note')?.value || '').trim() || 'Qurilish mollari (ro\'yxat asosida)';
+        const dueDateRaw = (document.getElementById('m-approve-due-date')?.value || '').trim();
+        const dueDateFormatted = this.formatDateUz(dueDateRaw);
+        const contractNo = document.getElementById('m-approve-contract-no')?.textContent || 'SH-000001';
+        const nowStr = new Date().toLocaleString('uz-UZ');
+
+        textEl.value =
+            `NASIYA (QARZ) SHARTNOMASI № ${contractNo}\n` +
+            `Tuzilgan vaqt: ${nowStr}\n\n` +
+            `1. TOMONLAR: «GIPER BREND STROY» savdo markazi (keyingi o'rinlarda «Do'kon») hamda fuqaro ${fullName} (Tel: ${phone}, Pasport/JSHSHIR: ${passport}).\n` +
+            `2. SHARTNOMA PREDMETI: Mijoz Do'kondan jami ${amountFormatted} qiymatidagi mahsulotlarni (${note}) qarzga (nasiyaga) qabul qilib oladi.\n` +
+            `3. QAYTARISH MUDDATI: Mijoz ushbu qarz summasini kechi bilan ${dueDateFormatted} sanasiga qadar to'liq qaytarish majburiyatini oladi.\n` +
+            `4. JAVOBGARLIK BANDI: Agar qarz ushbu shartnomada ko'rsatilgan muddatda (${dueDateFormatted}) qaytarilmasa, Mijoz O'zbekiston Respublikasi qonunchiligiga muvofiq majburiy tartibda undirilishiga va JINOIY JAVOBGARLIKKA tortilishiga o'z roziligini bildiradi hamda buni Face ID biometrik tasviri orqali tasdiqlaydi.`;
+    },
+
+    submitApproveApplication: async function(e) {
+        if (e) e.preventDefault();
+        const appId = document.getElementById('m-approve-app-id')?.value;
+        if (!appId) return;
+
+        const fullName = (document.getElementById('m-approve-full-name')?.value || '').trim();
+        const phone = (document.getElementById('m-approve-phone')?.value || '').trim();
+        const passport = (document.getElementById('m-approve-passport')?.value || '').trim().toUpperCase();
+        const amount = parseFloat(document.getElementById('m-approve-amount')?.value || 0);
+        const note = (document.getElementById('m-approve-note')?.value || '').trim() || "Qurilish mollari (ro'yxat asosida)";
+        const dueDate = (document.getElementById('m-approve-due-date')?.value || '').trim();
+        const contractNo = (document.getElementById('m-approve-contract-no')?.textContent || '').trim();
+        const contractText = (document.getElementById('m-approve-contract-text')?.value || '').trim();
+        const userName = (this.currentUser && (this.currentUser.name || this.currentUser.username || this.currentUser.id)) || 'Admin';
+
+        const btn = document.getElementById('m-btn-approve-app-submit');
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Shartnoma mijozga (@Qarzdorlik01_bot) yuborilmoqda...';
+        }
+
+        try {
+            const resp = await fetch(`/api/debt-applications/${encodeURIComponent(appId)}/approve`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    full_name: fullName,
+                    phone: phone,
+                    passport: passport,
+                    amount: isNaN(amount) ? 0 : amount,
+                    note: note,
+                    due_date: dueDate,
+                    contract_no: contractNo,
+                    contract_text: contractText,
+                    user: userName,
+                    base_url: window.location.origin
+                })
+            });
+
+            const data = await resp.json();
+            if (!resp.ok || !data.ok) {
+                throw new Error(data.detail || "Arizani tasdiqlashda xatolik yuz berdi");
+            }
+
+            this.closeApproveAppModal();
+            await this.loadDebtApplications(true);
+
+            if (data.telegram_sent) {
+                alert(`✅ Ariza tasdiqlandi!\n\n📄 Shartnoma (${contractNo}) avtomatik ravishda ${fullName} ning Telegramiga (@Qarzdorlik01_bot) yuborildi.\n\nEndi mijoz shartnomani o'qib chiqib, Face ID kamera orqali tasdiqlaydi!`);
+            } else {
+                alert(`✅ Ariza tasdiqlandi va shartnoma tayyorlandi!\n(Izoh: Telegram yuborish holati: ${data.telegram_error || 'Mijoz havola orqali tasdiqlashi mumkin'})`);
+            }
+        } catch (err) {
+            alert("Xatolik: " + err.message);
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-paper-plane" style="margin-right: 6px;"></i> Tasdiqlash va Arizachiga Shartnoma Yuborish (Face ID uchun)';
+            }
+        }
+    },
+
+    rejectDebtApplication: async function(appId) {
+        if (!confirm("Haqiqatan ham ushbu arizani rad etmoqchimisiz?")) return;
+        try {
+            const resp = await fetch(`/api/debt-applications/${encodeURIComponent(appId)}/reject`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ reason: "Admin tomonidan rad etildi" })
+            });
+            if (resp.ok) {
+                await this.loadDebtApplications(true);
+            }
+        } catch (e) {
+            alert("Xatolik: " + e.message);
         }
     },
 

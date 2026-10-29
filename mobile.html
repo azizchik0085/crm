@@ -195,19 +195,60 @@
                                 <span id="m-kpi-debt-badge" onclick="MobileApp.openCategory('qarzdorlar')" style="cursor: pointer; background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4); color: #f87171; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 8px;">
                                     Qarzdorlar: 0 ta
                                 </span>
+                                <span id="m-kpi-apps-badge" onclick="MobileApp.openDebtApplicationsModal('pending_admin')" style="cursor: pointer; background: rgba(56, 189, 248, 0.2); border: 1px solid rgba(56, 189, 248, 0.45); color: #38bdf8; font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 8px;">
+                                    <i class="fab fa-telegram-plane"></i> Kelib tushgan arizalar: 0 ta
+                                </span>
                             </div>
                             <p style="font-size: 12px; color: var(--text-muted); margin: 0;">
-                                Mijozga nasiya (qarz) rasmiylashtirish yoki qarz to'lovini qabul qilish
+                                @Qarzdorlik01_bot orqali kelgan arizalarni tasdiqlash, shartnoma yuborish va qarz rasmiylashtirish
                             </p>
                         </div>
                     </div>
                     <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                        <button type="button" class="btn btn-primary" style="height: 42px; padding: 0 15px; font-size: 13px; font-weight: 800; border-radius: 10px; background: linear-gradient(135deg, #0ea5e9, #2563eb); color: #fff; border: none; cursor: pointer; white-space: nowrap; box-shadow: 0 4px 12px rgba(14, 165, 233, 0.35); display: inline-flex; align-items: center; gap: 6px; position: relative;" onclick="MobileApp.openDebtApplicationsModal('all')">
+                            <i class="fas fa-inbox"></i> Kelib tushgan arizalar
+                            <span id="m-btn-apps-count-pill" style="background: #ef4444; color: #fff; font-size: 11px; font-weight: 800; padding: 1px 7px; border-radius: 999px; margin-left: 2px;">0</span>
+                        </button>
                         <button type="button" class="btn btn-primary" style="height: 42px; padding: 0 16px; font-size: 13.5px; font-weight: 700; border-radius: 10px; background: linear-gradient(135deg, #f59e0b, #ea580c); color: #fff; border: none; cursor: pointer; white-space: nowrap; box-shadow: 0 4px 12px rgba(245, 158, 11, 0.35); display: inline-flex; align-items: center; gap: 6px;" onclick="MobileApp.openDebtModal(null, 'add')">
                             <i class="fas fa-file-signature"></i> Qarz Rasmiylashtirish
                         </button>
                         <button type="button" class="btn btn-secondary" style="height: 42px; padding: 0 14px; font-size: 13px; font-weight: 700; border-radius: 10px; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.4); color: #10b981; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px;" onclick="MobileApp.openDebtModal(null, 'pay')">
                             <i class="fas fa-money-bill-wave"></i> Qarz To'lovi
                         </button>
+                    </div>
+                </div>
+
+                <!-- KELIB TUSHGAN ARIZALAR (@Qarzdorlik01_bot) INLINE BO'LIMI -->
+                <div id="m-home-debt-apps-section" style="margin-top: 14px; padding-top: 14px; border-top: 1px dashed rgba(245, 158, 11, 0.35);">
+                    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;">
+                        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                            <span style="font-size: 13.5px; font-weight: 800; color: #38bdf8; display: inline-flex; align-items: center; gap: 6px;">
+                                <i class="fab fa-telegram"></i> Kelib tushgan arizalar (@Qarzdorlik01_bot)
+                            </span>
+                            <span id="m-home-apps-pending-chip" style="background: rgba(245, 158, 11, 0.2); border: 1px solid rgba(245, 158, 11, 0.45); color: #fbbf24; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 6px;">
+                                Tasdiq kutmoqda: 0
+                            </span>
+                            <span id="m-home-apps-faceid-chip" style="background: rgba(56, 189, 248, 0.18); border: 1px solid rgba(56, 189, 248, 0.4); color: #38bdf8; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 6px;">
+                                Face ID kutmoqda: 0
+                            </span>
+                            <span id="m-home-apps-verified-chip" style="background: rgba(16, 185, 129, 0.18); border: 1px solid rgba(16, 185, 129, 0.4); color: #10b981; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 6px;">
+                                Tasdiqlangan: 0
+                            </span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <button type="button" onclick="MobileApp.loadDebtApplications(true)" style="height: 30px; padding: 0 10px; font-size: 11.5px; font-weight: 700; border-radius: 8px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #fff; cursor: pointer; display: inline-flex; align-items: center; gap: 5px;">
+                                <i class="fas fa-sync-alt" id="m-home-apps-sync-icon"></i> Yangilash
+                            </button>
+                            <button type="button" onclick="MobileApp.openDebtApplicationsModal('all')" style="height: 30px; padding: 0 10px; font-size: 11.5px; font-weight: 700; border-radius: 8px; background: rgba(56, 189, 248, 0.18); border: 1px solid rgba(56, 189, 248, 0.4); color: #38bdf8; cursor: pointer;">
+                                Barchasini ko'rish &rarr;
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="m-home-debt-apps-list">
+                        <div style="font-size: 12px; color: var(--text-muted); padding: 10px; text-align: center; background: rgba(0,0,0,0.2); border-radius: 10px;">
+                            @Qarzdorlik01_bot dan kelib tushgan arizalar yuklanmoqda...
+                        </div>
                     </div>
                 </div>
             </div>
@@ -970,12 +1011,15 @@
             </div>
 
             <!-- Operation Type Switcher Tabs -->
-            <div style="display: flex; border-bottom: 1px solid var(--border-color); background: rgba(0,0,0,0.2); padding: 0 14px;">
-                <button id="m-debt-tab-add" type="button" onclick="MobileApp.switchDebtTab('add')" style="flex: 1; padding: 11px 8px; font-size: 13px; font-weight: 700; border: none; background: transparent; color: #f59e0b; border-bottom: 2px solid #f59e0b; cursor: pointer; text-align: center;">
-                    <i class="fas fa-file-signature" style="margin-right: 4px;"></i> Qarzga Berish (Nasiya)
+            <div style="display: flex; border-bottom: 1px solid var(--border-color); background: rgba(0,0,0,0.2); padding: 0 10px;">
+                <button id="m-debt-tab-add" type="button" onclick="MobileApp.switchDebtTab('add')" style="flex: 1; padding: 11px 6px; font-size: 12.5px; font-weight: 700; border: none; background: transparent; color: #f59e0b; border-bottom: 2px solid #f59e0b; cursor: pointer; text-align: center;">
+                    <i class="fas fa-file-signature" style="margin-right: 4px;"></i> Qarzga Berish
                 </button>
-                <button id="m-debt-tab-pay" type="button" onclick="MobileApp.switchDebtTab('pay')" style="flex: 1; padding: 11px 8px; font-size: 13px; font-weight: 500; border: none; background: transparent; color: var(--text-muted); border-bottom: 2px solid transparent; cursor: pointer; text-align: center;">
-                    <i class="fas fa-money-bill-wave" style="margin-right: 4px;"></i> Qarz To'lovi (Kirim)
+                <button id="m-debt-tab-pay" type="button" onclick="MobileApp.switchDebtTab('pay')" style="flex: 1; padding: 11px 6px; font-size: 12.5px; font-weight: 500; border: none; background: transparent; color: var(--text-muted); border-bottom: 2px solid transparent; cursor: pointer; text-align: center;">
+                    <i class="fas fa-money-bill-wave" style="margin-right: 4px;"></i> Qarz To'lovi
+                </button>
+                <button type="button" onclick="MobileApp.closeDebtModal(); MobileApp.openDebtApplicationsModal('all')" style="flex: 1; padding: 11px 6px; font-size: 12.5px; font-weight: 700; border: none; background: transparent; color: #38bdf8; border-bottom: 2px solid transparent; cursor: pointer; text-align: center;">
+                    <i class="fas fa-inbox" style="margin-right: 4px;"></i> Kelib tushgan arizalar
                 </button>
             </div>
 
@@ -1152,6 +1196,133 @@
         </div>
     </div>
 
+    <!-- ========================================================== -->
+    <!-- 10. KELIB TUSHGAN ARIZALAR (@Qarzdorlik01_bot) MODAL       -->
+    <!-- ========================================================== -->
+    <div id="m-debt-apps-modal" class="m-modal" onclick="if(event.target === this) MobileApp.closeDebtApplicationsModal()">
+        <div class="m-sheet" style="max-height: 92vh; display: flex; flex-direction: column;">
+            <div class="m-sheet-header">
+                <div class="m-sheet-drag-handle"></div>
+                <div class="m-sheet-title">
+                    <i class="fab fa-telegram" style="color: #38bdf8; margin-right: 6px;"></i> Kelib tushgan arizalar (@Qarzdorlik01_bot)
+                </div>
+                <div style="display: flex; align-items: center; gap: 6px;">
+                    <button type="button" onclick="MobileApp.loadDebtApplications(true)" style="height: 32px; padding: 0 10px; font-size: 11.5px; font-weight: 700; border-radius: 8px; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.35); color: #38bdf8; cursor: pointer;">
+                        <i class="fas fa-sync-alt"></i> Yangilash
+                    </button>
+                    <button class="m-sheet-close" onclick="MobileApp.closeDebtApplicationsModal()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Filter Tabs -->
+            <div style="display: flex; gap: 6px; padding: 10px 14px; border-bottom: 1px solid var(--border-color); background: rgba(0,0,0,0.2); overflow-x: auto;">
+                <button type="button" id="m-apps-tab-all" onclick="MobileApp.setDebtAppsFilter('all')" style="padding: 7px 12px; font-size: 12px; font-weight: 700; border-radius: 8px; border: 1px solid #38bdf8; background: rgba(56, 189, 248, 0.2); color: #38bdf8; cursor: pointer; white-space: nowrap;">
+                    Barchasi (<span id="m-apps-cnt-all">0</span>)
+                </button>
+                <button type="button" id="m-apps-tab-pending" onclick="MobileApp.setDebtAppsFilter('pending_admin')" style="padding: 7px 12px; font-size: 12px; font-weight: 700; border-radius: 8px; border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.04); color: var(--text-muted); cursor: pointer; white-space: nowrap;">
+                    🕒 Tasdiq kutmoqda (<span id="m-apps-cnt-pending">0</span>)
+                </button>
+                <button type="button" id="m-apps-tab-faceid" onclick="MobileApp.setDebtAppsFilter('awaiting_client_faceid')" style="padding: 7px 12px; font-size: 12px; font-weight: 700; border-radius: 8px; border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.04); color: var(--text-muted); cursor: pointer; white-space: nowrap;">
+                    📤 Mijoz Face ID kutmoqda (<span id="m-apps-cnt-faceid">0</span>)
+                </button>
+                <button type="button" id="m-apps-tab-verified" onclick="MobileApp.setDebtAppsFilter('approved_verified')" style="padding: 7px 12px; font-size: 12px; font-weight: 700; border-radius: 8px; border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.04); color: var(--text-muted); cursor: pointer; white-space: nowrap;">
+                    ✅ Face ID Tasdiqlangan (<span id="m-apps-cnt-verified">0</span>)
+                </button>
+            </div>
+
+            <div class="m-sheet-content" id="m-debt-apps-modal-list" style="flex: 1; overflow-y: auto; padding: 14px;">
+                <!-- Populated dynamically -->
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================================== -->
+    <!-- 11. ARIZANI TASDIQLASH VA SHARTNOMA YUBORISH MODAL         -->
+    <!-- ========================================================== -->
+    <div id="m-approve-app-modal" class="m-modal" onclick="if(event.target === this) MobileApp.closeApproveAppModal()">
+        <div class="m-sheet" style="max-height: 92vh; display: flex; flex-direction: column;">
+            <div class="m-sheet-header">
+                <div class="m-sheet-drag-handle"></div>
+                <div class="m-sheet-title">
+                    <i class="fas fa-check-circle" style="color: #10b981; margin-right: 6px;"></i> Arizani Tasdiqlash va Shartnoma Yuborish
+                </div>
+                <button class="m-sheet-close" onclick="MobileApp.closeApproveAppModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="m-sheet-content" style="flex: 1; overflow-y: auto; padding: 14px;">
+                <form onsubmit="MobileApp.submitApproveApplication(event)">
+                    <input type="hidden" id="m-approve-app-id" value="">
+
+                    <div style="background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 12px; padding: 12px; margin-bottom: 12px;">
+                        <div style="font-size: 11.5px; color: #38bdf8; font-weight: 800; margin-bottom: 8px;">
+                            <i class="fab fa-telegram-plane"></i> @Qarzdorlik01_bot ARIZACHI MA'LUMOTLARI:
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                            <div>
+                                <label style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 3px;">Ism-sharifi (F.I.Sh.)</label>
+                                <input type="text" id="m-approve-full-name" class="form-control" required oninput="MobileApp.updateApproveContractPreview()" style="height: 38px; font-size: 13px; font-weight: 700;">
+                            </div>
+                            <div>
+                                <label style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 3px;">Telefon raqami</label>
+                                <input type="text" id="m-approve-phone" class="form-control" required oninput="MobileApp.updateApproveContractPreview()" style="height: 38px; font-size: 13px; font-weight: 700;">
+                            </div>
+                        </div>
+                        <div style="margin-top: 8px;">
+                            <label style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 3px;">Pasport seriyasi va raqami / JSHSHIR</label>
+                            <input type="text" id="m-approve-passport" class="form-control" required oninput="MobileApp.updateApproveContractPreview()" style="height: 38px; font-size: 13px; font-weight: 700; text-transform: uppercase;">
+                        </div>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 10px;">
+                        <label style="font-size: 12px; font-weight: 700; color: #fbbf24; margin-bottom: 4px; display: block;">
+                            Qarzga beriladigan summa (so'm)
+                        </label>
+                        <input type="number" id="m-approve-amount" class="form-control" placeholder="Masalan: 2000000" inputmode="numeric" oninput="MobileApp.updateApproveContractPreview()" style="height: 44px; font-size: 16px; font-weight: 800;">
+                        <div style="display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap;">
+                            <button type="button" class="btn btn-secondary" style="height: 28px; font-size: 11px; padding: 0 8px; border-radius: 6px;" onclick="document.getElementById('m-approve-amount').value=500000; MobileApp.updateApproveContractPreview()">500 000</button>
+                            <button type="button" class="btn btn-secondary" style="height: 28px; font-size: 11px; padding: 0 8px; border-radius: 6px;" onclick="document.getElementById('m-approve-amount').value=1000000; MobileApp.updateApproveContractPreview()">1 000 000</button>
+                            <button type="button" class="btn btn-secondary" style="height: 28px; font-size: 11px; padding: 0 8px; border-radius: 6px;" onclick="document.getElementById('m-approve-amount').value=3000000; MobileApp.updateApproveContractPreview()">3 000 000</button>
+                            <button type="button" class="btn btn-secondary" style="height: 28px; font-size: 11px; padding: 0 8px; border-radius: 6px;" onclick="document.getElementById('m-approve-amount').value=5000000; MobileApp.updateApproveContractPreview()">5 000 000</button>
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 10px; margin-bottom: 10px;">
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label style="font-size: 12px; font-weight: 700; color: var(--text-main); margin-bottom: 4px; display: block;">
+                                Olingan mahsulotlar / Izoh
+                            </label>
+                            <input type="text" id="m-approve-note" class="form-control" placeholder="Qurilish mollari..." oninput="MobileApp.updateApproveContractPreview()" style="height: 40px; font-size: 13px;">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label style="font-size: 12px; font-weight: 700; color: #fbbf24; margin-bottom: 4px; display: block;">
+                                Qaytarish muddati
+                            </label>
+                            <input type="date" id="m-approve-due-date" class="form-control" onchange="MobileApp.updateApproveContractPreview()" style="height: 40px; font-size: 13px; color-scheme: dark;">
+                        </div>
+                    </div>
+
+                    <div style="margin-bottom: 14px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                            <label style="font-size: 12px; font-weight: 800; color: #f87171;">
+                                <i class="fas fa-file-contract"></i> Mijozga avtomatik boradigan Shartnoma matni:
+                            </label>
+                            <span id="m-approve-contract-no" style="font-family: monospace; font-size: 11px; font-weight: 800; color: #fbbf24; background: rgba(245, 158, 11, 0.15); padding: 2px 8px; border-radius: 6px;">SH-000000</span>
+                        </div>
+                        <textarea id="m-approve-contract-text" class="form-control" rows="6" style="font-size: 12px; line-height: 1.45; background: rgba(0,0,0,0.35); color: #f8fafc; border-radius: 10px; padding: 10px;"></textarea>
+                    </div>
+
+                    <button type="submit" id="m-btn-approve-app-submit" class="btn btn-success btn-block" style="height: 50px; font-size: 14px; font-weight: 800; border-radius: 12px; background: linear-gradient(135deg, #10b981, #059669); border: none; color: #fff; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.35);">
+                        <i class="fas fa-paper-plane" style="margin-right: 6px;"></i> Tasdiqlash va Arizachiga Shartnoma Yuborish (Face ID uchun)
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <!-- Html5Qrcode & jsPDF Libraries -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -1184,13 +1355,13 @@
     </script>
 
     <!-- Mobile App Main Script -->
-    <script src="/js/mobile-app.js?v=3.7"></script>
+    <script src="/js/mobile-app.js?v=3.8"></script>
 
     <!-- Register Service Worker for PWA Offline / Standalone Installation -->
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw-mobile.js?v=15')
+                navigator.serviceWorker.register('/sw-mobile.js?v=16')
                     .then(reg => {
                         reg.update();
                         console.log('Webzone Mobile SW registered');

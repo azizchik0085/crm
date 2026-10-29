@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Qarz Shartnomasini O'qish va Face ID Tasdiqlash — GIPER BREND STROY</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        :root {
+            --bg-dark: #0b1120;
+            --card-bg: #111827;
+            --border-color: rgba(255, 255, 255, 0.1);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent: #f59e0b;
+            --success: #10b981;
+            --danger: #ef4444;
+        }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        }
+        body {
+            background: var(--bg-dark);
+            color: var(--text-main);
+            min-height: 100vh;
+            padding: 16px 14px 40px;
+        }
+        .container {
+            max-width: 540px;
+            margin: 0 auto;
+        }
+        .brand-header {
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.18), rgba(15, 23, 42, 0.95));
+            border: 1.5px solid rgba(245, 158, 11, 0.45);
+            border-radius: 16px;
+            padding: 16px;
+            text-align: center;
+            margin-bottom: 16px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4);
+        }
+        .brand-header h1 {
+            font-size: 17px;
+            font-weight: 800;
+            color: #fbbf24;
+            letter-spacing: 0.4px;
+            margin-bottom: 4px;
+        }
+        .brand-header p {
+            font-size: 12.5px;
+            color: var(--text-muted);
+        }
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 14px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+        }
+        .row-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 9px 0;
+            border-bottom: 1px dashed rgba(255, 255, 255, 0.08);
+            font-size: 13.5px;
+        }
+        .row-item:last-child {
+            border-bottom: none;
+        }
+        .row-label {
+            color: var(--text-muted);
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+        .row-val {
+            color: #fff;
+            font-weight: 700;
+            text-align: right;
+            word-break: break-word;
+        }
+        .contract-box {
+            background: rgba(15, 23, 42, 0.9);
+            border: 1.5px solid rgba(239, 68, 68, 0.45);
+            border-radius: 14px;
+            padding: 14px;
+            margin-bottom: 14px;
+        }
+        .contract-text-view {
+            background: rgba(0, 0, 0, 0.45);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 10px;
+            padding: 12px;
+            font-size: 13px;
+            line-height: 1.55;
+            color: #f1f5f9;
+            white-space: pre-wrap;
+            max-height: 280px;
+            overflow-y: auto;
+            margin-bottom: 12px;
+        }
+        .agree-label {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            cursor: pointer;
+            background: rgba(239, 68, 68, 0.12);
+            border: 1px solid rgba(239, 68, 68, 0.35);
+            padding: 11px 12px;
+            border-radius: 10px;
+        }
+        .agree-label input {
+            width: 20px;
+            height: 20px;
+            margin-top: 2px;
+            accent-color: #ef4444;
+            flex-shrink: 0;
+        }
+        .faceid-box {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(56, 189, 248, 0.08));
+            border: 1.5px solid rgba(16, 185, 129, 0.45);
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+        .btn {
+            border: none;
+            border-radius: 12px;
+            font-weight: 800;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: opacity 0.2s, transform 0.1s;
+        }
+        .btn:active {
+            transform: scale(0.98);
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #0ea5e9, #2563eb);
+            color: #fff;
+            height: 46px;
+            padding: 0 18px;
+            font-size: 14px;
+            width: 100%;
+        }
+        .btn-success {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: #fff;
+            height: 52px;
+            padding: 0 20px;
+            font-size: 15px;
+            width: 100%;
+            box-shadow: 0 6px 20px rgba(16, 185, 129, 0.35);
+        }
+        @keyframes pulseScan {
+            0%, 100% { box-shadow: 0 0 15px rgba(16, 185, 129, 0.35); }
+            50% { box-shadow: 0 0 30px rgba(16, 185, 129, 0.75); }
+        }
+        .scanner-frame {
+            position: relative;
+            width: 250px;
+            height: 300px;
+            margin: 0 auto 12px;
+            border-radius: 28px;
+            overflow: hidden;
+            border: 3px solid #10b981;
+            background: #000;
+            animation: pulseScan 2s infinite;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="brand-header">
+            <h1><i class="fas fa-shield-alt"></i> «GIPER BREND STROY»</h1>
+            <p>Elektron Qarz Shartnomasini O'qish va Face ID Tasdiqlash</p>
+        </div>
+
+        <div id="loading-state" class="card" style="text-align: center; padding: 36px 16px;">
+            <i class="fas fa-spinner fa-spin" style="font-size: 30px; color: #f59e0b; margin-bottom: 12px;"></i>
+            <div style="font-size: 14px; font-weight: 700;">Shartnoma ma'lumotlari yuklanmoqda...</div>
+        </div>
+
+        <div id="error-state" class="card" style="display: none; text-align: center; padding: 30px 16px; border-color: rgba(239, 68, 68, 0.4);">
+            <i class="fas fa-exclamation-triangle" style="font-size: 32px; color: #ef4444; margin-bottom: 10px;"></i>
+            <div id="error-msg" style="font-size: 14px; font-weight: 700; color: #fca5a5;">Shartnoma topilmadi</div>
+        </div>
+
+        <div id="verified-banner" class="card" style="display: none; text-align: center; padding: 28px 16px; background: linear-gradient(135deg, rgba(16, 185, 129, 0.18), rgba(6, 78, 59, 0.35)); border: 2px solid #10b981;">
+            <div style="width: 64px; height: 64px; border-radius: 50%; background: rgba(16, 185, 129, 0.25); color: #10b981; display: flex; align-items: center; justify-content: center; font-size: 32px; margin: 0 auto 12px;">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <h2 style="font-size: 18px; font-weight: 800; color: #10b981; margin-bottom: 6px;">
+                SHARTNOMA FACE ID ORQALI TASDIQLANDI!
+            </h2>
+            <p style="font-size: 13px; color: #d1fae5; line-height: 1.5;">
+                Sizning roziligingiz va Face ID biometrik tasdig'ingiz muvaffaqiyatli qabul qilindi. Tasdiqlangan PDF shartnoma nusxasi <b>@Qarzdorlik01_bot</b> orqali Telegramingizga yuborildi!
+            </p>
+        </div>
+
+        <div id="main-content" style="display: none;">
+            <!-- 1. Mijoz va Shartnoma Rekvizitlari -->
+            <div class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <span style="font-size: 13px; font-weight: 800; color: #fbbf24;">
+                        <i class="fas fa-file-contract"></i> SHARTNOMA MA'LUMOTLARI
+                    </span>
+                    <span id="v-contract-no" style="background: rgba(245, 158, 11, 0.18); border: 1px solid rgba(245, 158, 11, 0.4); color: #fbbf24; font-family: monospace; font-size: 12px; font-weight: 800; padding: 3px 9px; border-radius: 8px;">
+                        SH-000000
+                    </span>
+                </div>
+
+                <div class="row-item">
+                    <span class="row-label">Mijoz F.I.Sh.:</span>
+                    <span class="row-val" id="v-full-name">-</span>
+                </div>
+                <div class="row-item">
+                    <span class="row-label">Telefon raqami:</span>
+                    <span class="row-val" id="v-phone">-</span>
+                </div>
+                <div class="row-item">
+                    <span class="row-label">Pasport / JSHSHIR:</span>
+                    <span class="row-val" id="v-passport">-</span>
+                </div>
+                <div class="row-item">
+                    <span class="row-label">Qarz summasi:</span>
+                    <span class="row-val" id="v-amount" style="color: #fbbf24; font-size: 15px;">0 so'm</span>
+                </div>
+                <div class="row-item">
+                    <span class="row-label">Mahsulotlar / Izoh:</span>
+                    <span class="row-val" id="v-note">-</span>
+                </div>
+                <div class="row-item">
+                    <span class="row-label">Qaytarish muddati:</span>
+                    <span class="row-val" id="v-due-date" style="color: #f87171;">-</span>
+                </div>
+            </div>
+
+            <!-- 2. Shartnoma Matni va Rozilik -->
+            <div class="contract-box">
+                <div style="font-size: 13px; font-weight: 800; color: #f87171; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+                    <i class="fas fa-gavel"></i> 1-QADAM: SHARTNOMANI O'QIB CHIQING
+                </div>
+                <div id="v-contract-text" class="contract-text-view"></div>
+
+                <label class="agree-label" for="v-agree-checkbox">
+                    <input type="checkbox" id="v-agree-checkbox">
+                    <span style="font-size: 12.5px; font-weight: 700; color: #fca5a5; line-height: 1.45;">
+                        Men shartnomani to'liq o'qib chiqdim, barcha shartlariga hamda belgilangan muddatda qarz qaytarilmasa O'zR qonunchiligiga binoan <u style="color: #ef4444;">JAVOBGARLIKKA</u> tortilishimga roziman.
+                    </span>
+                </label>
+            </div>
+
+            <!-- 3. Face ID Biometrik Tasdiqlash -->
+            <div class="faceid-box" id="v-faceid-section">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 6px;">
+                    <div style="font-size: 13.5px; font-weight: 800; color: #10b981;">
+                        <i class="fas fa-user-check"></i> 2-QADAM: FACE ID TASDIQLASH
+                    </div>
+                    <span id="v-faceid-badge" style="background: rgba(239, 68, 68, 0.2); color: #f87171; font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 8px;">
+                        Suratga olinmagan
+                    </span>
+                </div>
+
+                <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px; line-height: 1.4;">
+                    Shartnomani tasdiqlash uchun Face ID kamerani yoqib, yuzingizni oval ramka ichiga to'g'rilab suratga oling:
+                </p>
+
+                <!-- Live Camera View -->
+                <div id="v-camera-container" style="display: none; text-align: center; margin-bottom: 12px;">
+                    <div class="scanner-frame">
+                        <video id="v-video" autoplay playsinline muted style="width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1);"></video>
+                        <div style="position: absolute; inset: 20px 32px; border: 2.5px dashed rgba(16, 185, 129, 0.85); border-radius: 50%; pointer-events: none; box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.38);"></div>
+                        <div style="position: absolute; bottom: 8px; left: 0; right: 0; text-align: center; font-size: 11px; font-weight: 800; color: #10b981; text-shadow: 0 1px 3px #000;">
+                            <i class="fas fa-expand"></i> FACE ID BIOMETRIC SCAN
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-success" onclick="VerifyApp.capturePhoto()" style="height: 44px; font-size: 13.5px;">
+                        <i class="fas fa-camera"></i> Yuzni Tasdiqlash (Suratga Olish)
+                    </button>
+                </div>
+
+                <!-- Start / File Fallback Controls -->
+                <div id="v-start-controls" style="display: flex; flex-direction: column; gap: 8px;">
+                    <button type="button" class="btn btn-primary" onclick="VerifyApp.startCamera()">
+                        <i class="fas fa-id-badge"></i> Face ID Kamerani Yoqish
+                    </button>
+                    <label class="btn" style="height: 42px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); color: #e2e8f0; font-size: 12.5px;">
+                        <i class="fas fa-camera-retro" style="color: #38bdf8;"></i> Telefon kamerasidan Selfi yuklash
+                        <input type="file" accept="image/*" capture="user" onchange="VerifyApp.handleFile(event)" style="display: none;">
+                    </label>
+                </div>
+
+                <!-- Captured Photo Preview -->
+                <div id="v-photo-preview-box" style="display: none; margin-top: 12px; text-align: center;">
+                    <div style="position: relative; width: 210px; margin: 0 auto 8px; border-radius: 14px; overflow: hidden; border: 2.5px solid #10b981;">
+                        <img id="v-photo-img" src="" style="width: 100%; display: block;">
+                    </div>
+                    <button type="button" onclick="VerifyApp.retakePhoto()" style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.35); color: #f87171; padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer;">
+                        <i class="fas fa-redo"></i> Qaytadan suratga olish
+                    </button>
+                </div>
+            </div>
+
+            <!-- 4. Submit Button -->
+            <button type="button" id="v-submit-btn" class="btn btn-success" onclick="VerifyApp.submitVerification()">
+                <i class="fas fa-check-double"></i> Shartnomani Face ID Bilan Tasdiqlash
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const VerifyApp = {
+            appId: '',
+            companyId: 'giperbrendstroy',
+            appData: null,
+            stream: null,
+            facePhotoDataUrl: '',
+
+            init: async function() {
+                if (window.Telegram && window.Telegram.WebApp) {
+                    try {
+                        window.Telegram.WebApp.ready();
+                        window.Telegram.WebApp.expand();
+                    } catch (e) {}
+                }
+
+                const params = new URLSearchParams(window.location.search);
+                this.appId = params.get('app_id') || params.get('id') || '';
+                this.companyId = params.get('company') || 'giperbrendstroy';
+
+                if (!this.appId) {
+                    this.showError("Shartnoma ID raqami ko'rsatilmagan!");
+                    return;
+                }
+
+                try {
+                    const resp = await fetch(`/api/debt-applications/${encodeURIComponent(this.appId)}`, {
+                        headers: { 'x-company-id': this.companyId }
+                    });
+                    if (!resp.ok) {
+                        throw new Error("Shartnoma topilmadi yoki muddati tugagan.");
+                    }
+                    const data = await resp.json();
+                    this.appData = data.application;
+                    this.renderApplication();
+                } catch (err) {
+                    this.showError(err.message || "Xatolik yuz berdi");
+                }
+            },
+
+            showError: function(msg) {
+                document.getElementById('loading-state').style.display = 'none';
+                const errBox = document.getElementById('error-state');
+                document.getElementById('error-msg').textContent = msg;
+                errBox.style.display = 'block';
+            },
+
+            renderApplication: function() {
+                document.getElementById('loading-state').style.display = 'none';
+                const a = this.appData;
+                if (!a) return;
+
+                document.getElementById('v-contract-no').textContent = a.contract_no || a.app_no || 'SH-000001';
+                document.getElementById('v-full-name').textContent = a.full_name || 'Mijoz';
+                document.getElementById('v-phone').textContent = `${a.phone || '-'}${a.phone2 ? ' / ' + a.phone2 : ''}`;
+                document.getElementById('v-passport').textContent = a.passport || '-';
+                document.getElementById('v-amount').textContent = `${Number(a.amount || 0).toLocaleString('uz-UZ')} so'm`;
+                document.getElementById('v-note').textContent = a.note || 'Qurilish mollari';
+                document.getElementById('v-due-date').textContent = (a.due_date_fmt || a.due_date || '-') + ' gacha';
+                document.getElementById('v-contract-text').textContent = a.contract_text || '';
+
+                document.getElementById('main-content').style.display = 'block';
+
+                if (a.status === 'approved_verified') {
+                    document.getElementById('verified-banner').style.display = 'block';
+                    document.getElementById('v-faceid-section').style.display = 'none';
+                    document.getElementById('v-submit-btn').style.display = 'none';
+                    document.getElementById('v-agree-checkbox').checked = true;
+                    document.getElementById('v-agree-checkbox').disabled = true;
+                }
+            },
+
+            startCamera: async function() {
+                this.stopCamera();
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    alert("Brauzerda to'g'ridan-to'g'ri kamera ruxsati yo'q. «Telefon kamerasidan Selfi yuklash» tugmasini bosing.");
+                    return;
+                }
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({
+                        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 800 } },
+                        audio: false
+                    });
+                    this.stream = stream;
+                    const video = document.getElementById('v-video');
+                    video.srcObject = stream;
+                    await video.play().catch(() => {});
+                    document.getElementById('v-camera-container').style.display = 'block';
+                    document.getElementById('v-start-controls').style.display = 'none';
+                } catch (err) {
+                    alert("Kamerani ochib bo'lmadi. Iltimos, «Telefon kamerasidan Selfi yuklash» tugmasidan foydalaning.");
+                }
+            },
+
+            stopCamera: function() {
+                if (this.stream) {
+                    try { this.stream.getTracks().forEach(t => t.stop()); } catch(e) {}
+                    this.stream = null;
+                }
+                const video = document.getElementById('v-video');
+                if (video) video.srcObject = null;
+                document.getElementById('v-camera-container').style.display = 'none';
+            },
+
+            stampBiometricOverlay: function(ctx, w, h) {
+                const a = this.appData || {};
+                const nowStr = new Date().toLocaleString('uz-UZ');
+                const contractNo = a.contract_no || 'SH';
+
+                ctx.strokeStyle = '#10b981';
+                ctx.lineWidth = 4;
+                const m = 16, len = 30;
+                ctx.beginPath(); ctx.moveTo(m, m + len); ctx.lineTo(m, m); ctx.lineTo(m + len, m); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(w - m - len, m); ctx.lineTo(w - m, m); ctx.lineTo(w - m, m + len); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(m, h - m - 58 - len); ctx.lineTo(m, h - m - 58); ctx.lineTo(m + len, h - m - 58); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(w - m - len, h - m - 58); ctx.lineTo(w - m, h - m - 58); ctx.lineTo(w - m, h - m - 58 - len); ctx.stroke();
+
+                ctx.fillStyle = 'rgba(6, 78, 59, 0.9)';
+                ctx.fillRect(0, h - 58, w, 58);
+                ctx.fillStyle = '#10b981';
+                ctx.fillRect(0, h - 58, w, 3);
+
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 16px sans-serif';
+                ctx.fillText(`✓ FACE ID TASDIQLANDI • ${contractNo}`, 14, h - 34);
+
+                ctx.fillStyle = '#a7f3d0';
+                ctx.font = '13px sans-serif';
+                ctx.fillText(`${a.full_name || 'Mijoz'} • ${nowStr}`, 14, h - 13);
+            },
+
+            capturePhoto: function() {
+                const video = document.getElementById('v-video');
+                if (!video || !this.stream) return;
+
+                const vw = video.videoWidth || 600;
+                const vh = video.videoHeight || 720;
+                const canvas = document.createElement('canvas');
+                const targetW = 640;
+                const targetH = Math.round((vh / vw) * targetW) || 760;
+                canvas.width = targetW;
+                canvas.height = targetH;
+
+                const ctx = canvas.getContext('2d');
+                ctx.save();
+                ctx.translate(targetW, 0);
+                ctx.scale(-1, 1);
+                ctx.drawImage(video, 0, 0, targetW, targetH);
+                ctx.restore();
+
+                this.stampBiometricOverlay(ctx, targetW, targetH);
+                this.facePhotoDataUrl = canvas.toDataURL('image/jpeg', 0.86);
+                this.stopCamera();
+                this.showPhotoPreview();
+            },
+
+            handleFile: function(event) {
+                const file = event?.target?.files?.[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        const targetW = 640;
+                        const targetH = Math.round((img.height / img.width) * targetW) || 760;
+                        canvas.width = targetW;
+                        canvas.height = targetH;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, targetW, targetH);
+                        this.stampBiometricOverlay(ctx, targetW, targetH);
+                        this.facePhotoDataUrl = canvas.toDataURL('image/jpeg', 0.86);
+                        this.showPhotoPreview();
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            },
+
+            showPhotoPreview: function() {
+                document.getElementById('v-photo-img').src = this.facePhotoDataUrl;
+                document.getElementById('v-photo-preview-box').style.display = 'block';
+                document.getElementById('v-start-controls').style.display = 'none';
+                const badge = document.getElementById('v-faceid-badge');
+                badge.style.background = 'rgba(16, 185, 129, 0.2)';
+                badge.style.color = '#10b981';
+                badge.innerHTML = '<i class="fas fa-check-circle"></i> Face ID Tayyor';
+            },
+
+            retakePhoto: function() {
+                this.facePhotoDataUrl = '';
+                document.getElementById('v-photo-preview-box').style.display = 'none';
+                document.getElementById('v-start-controls').style.display = 'flex';
+                const badge = document.getElementById('v-faceid-badge');
+                badge.style.background = 'rgba(239, 68, 68, 0.2)';
+                badge.style.color = '#f87171';
+                badge.textContent = 'Suratga olinmagan';
+            },
+
+            buildOfficialContractPdf: async function() {
+                const a = this.appData || {};
+                const W = 1240, H = 1754;
+                const canvas = document.createElement('canvas');
+                canvas.width = W;
+                canvas.height = H;
+                const ctx = canvas.getContext('2d');
+
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, W, H);
+                ctx.strokeStyle = '#1e293b';
+                ctx.lineWidth = 4;
+                ctx.strokeRect(36, 36, W - 72, H - 72);
+
+                ctx.fillStyle = '#0f172a';
+                ctx.fillRect(46, 46, W - 92, 130);
+                ctx.fillStyle = '#f59e0b';
+                ctx.font = 'bold 34px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('«GIPER BREND STROY» SAVDO MARKAZI', W / 2, 102);
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 24px sans-serif';
+                ctx.fillText(`QARZ (NASIYA) SHARTNOMASI № ${a.contract_no || 'SH'}`, W / 2, 148);
+
+                ctx.textAlign = 'left';
+                let y = 210;
+                const rowH = 48;
+                const rows = [
+                    ['Mijoz F.I.Sh.:', a.full_name || 'Mijoz'],
+                    ['Telefon raqami:', `${a.phone || '-'}${a.phone2 ? ' / ' + a.phone2 : ''}`],
+                    ['Pasport / JSHSHIR:', a.passport || '-'],
+                    ['Mahsulotlar / Izoh:', a.note || 'Qurilish mollari'],
+                    ['QARZ SUMMASI:', `${Number(a.amount || 0).toLocaleString('uz-UZ')} so'm`],
+                    ['QAYTARISH MUDDATI:', `${a.due_date_fmt || a.due_date || '-'} gacha`],
+                    ['TASDIQLANGAN VAQT:', new Date().toLocaleString('uz-UZ')]
+                ];
+
+                rows.forEach((r, idx) => {
+                    const hi = idx >= 4;
+                    ctx.fillStyle = hi ? '#fffbeb' : (idx % 2 === 0 ? '#ffffff' : '#f8fafc');
+                    ctx.fillRect(70, y, W - 140, rowH);
+                    ctx.strokeStyle = '#cbd5e1';
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(70, y, W - 140, rowH);
+                    ctx.fillStyle = hi ? '#991b1b' : '#334155';
+                    ctx.font = 'bold 19px sans-serif';
+                    ctx.fillText(r[0], 88, y + 31);
+                    ctx.fillStyle = '#0f172a';
+                    ctx.font = hi ? 'bold 21px sans-serif' : '19px sans-serif';
+                    ctx.fillText(String(r[1]).slice(0, 65), 430, y + 31);
+                    y += rowH;
+                });
+
+                y += 28;
+                ctx.fillStyle = '#fef2f2';
+                ctx.fillRect(70, y, W - 140, 350);
+                ctx.strokeStyle = '#ef4444';
+                ctx.lineWidth = 2.5;
+                ctx.strokeRect(70, y, W - 140, 350);
+                ctx.fillStyle = '#b91c1c';
+                ctx.font = 'bold 22px sans-serif';
+                ctx.fillText('SHARTNOMA MATNI VA JAVOBGARLIK BANDI:', 92, y + 38);
+
+                ctx.fillStyle = '#1e293b';
+                ctx.font = '18px sans-serif';
+                const paragraphs = String(a.contract_text || '').split('\n');
+                let curY = y + 74;
+                for (let p = 0; p < paragraphs.length; p++) {
+                    const words = paragraphs[p].split(' ');
+                    let line = '';
+                    for (let n = 0; n < words.length; n++) {
+                        const testLine = line + words[n] + ' ';
+                        if (ctx.measureText(testLine).width > (W - 184) && n > 0) {
+                            ctx.fillText(line.trim(), 92, curY);
+                            line = words[n] + ' ';
+                            curY += 26;
+                        } else {
+                            line = testLine;
+                        }
+                    }
+                    if (line.trim()) {
+                        ctx.fillText(line.trim(), 92, curY);
+                        curY += 26;
+                    }
+                }
+
+                y += 380;
+                ctx.fillStyle = '#ecfdf5';
+                ctx.fillRect(70, y, W - 140, 520);
+                ctx.strokeStyle = '#10b981';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(70, y, W - 140, 520);
+                ctx.fillStyle = '#065f46';
+                ctx.font = 'bold 22px sans-serif';
+                ctx.fillText('✓ MIJOZ TOMONIDAN FACE ID ORQALI TASDIQLANDI:', 92, y + 38);
+
+                if (this.facePhotoDataUrl) {
+                    const img = await new Promise(res => {
+                        const im = new Image();
+                        im.onload = () => res(im);
+                        im.onerror = () => res(null);
+                        im.src = this.facePhotoDataUrl;
+                    });
+                    if (img) {
+                        ctx.drawImage(img, 96, y + 60, 340, 410);
+                        ctx.strokeStyle = '#059669';
+                        ctx.lineWidth = 3;
+                        ctx.strokeRect(96, y + 60, 340, 410);
+                    }
+                }
+
+                // Official Digital Verification Stamp
+                const sx = 500, sy = y + 110;
+                ctx.strokeStyle = '#059669';
+                ctx.lineWidth = 4;
+                ctx.strokeRect(sx, sy, 600, 240);
+                ctx.fillStyle = '#065f46';
+                ctx.font = 'bold 24px sans-serif';
+                ctx.fillText('GIPER BREND STROY SAVDO MARKAZI', sx + 30, sy + 50);
+                ctx.fillStyle = '#059669';
+                ctx.font = 'bold 26px sans-serif';
+                ctx.fillText('✓ FACE ID TASDIQLANDI', sx + 30, sy + 95);
+                ctx.fillStyle = '#0f172a';
+                ctx.font = '20px sans-serif';
+                ctx.fillText(`Mijoz: ${a.full_name || 'Mijoz'}`, sx + 30, sy + 140);
+                ctx.fillText(`Shartnoma: ${a.contract_no || '-'} | Sana: ${new Date().toLocaleString('uz-UZ')}`, sx + 30, sy + 175);
+                ctx.fillStyle = '#dc2626';
+                ctx.font = 'bold 19px sans-serif';
+                ctx.fillText('SHARTNOMA O\'QIB CHIQILDI VA ROZILIK TASDIQLANDI', sx + 30, sy + 215);
+
+                const jpegDataUrl = canvas.toDataURL('image/jpeg', 0.86);
+                let pdfB64 = '';
+                try {
+                    if (window.jspdf && window.jspdf.jsPDF) {
+                        const doc = new window.jspdf.jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+                        doc.addImage(jpegDataUrl, 'JPEG', 0, 0, 210, 297);
+                        pdfB64 = doc.output('datauristring').split(',')[1] || '';
+                    }
+                } catch (e) {}
+
+                return {
+                    contractJpegBase64: jpegDataUrl.split(',')[1] || '',
+                    pdfBase64: pdfB64
+                };
+            },
+
+            submitVerification: async function() {
+                const agreed = document.getElementById('v-agree-checkbox')?.checked;
+                if (!agreed) {
+                    alert("Iltimos, avval shartnomani o'qib chiqib, rozilik katakchasini belgilang!");
+                    return;
+                }
+                if (!this.facePhotoDataUrl) {
+                    alert("Iltimos, Face ID kamerani yoqib, yuzingizni suratga olib tasdiqlang!");
+                    return;
+                }
+
+                const btn = document.getElementById('v-submit-btn');
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Shartnoma PDF imzolanmoqda va yuborilmoqda...';
+
+                try {
+                    const docs = await this.buildOfficialContractPdf();
+                    const resp = await fetch(`/api/debt-applications/${encodeURIComponent(this.appId)}/verify-faceid`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'x-company-id': this.companyId
+                        },
+                        body: JSON.stringify({
+                            company_id: this.companyId,
+                            face_photos: [this.facePhotoDataUrl],
+                            contract_jpeg_base64: docs.contractJpegBase64,
+                            pdf_base64: docs.pdfBase64
+                        })
+                    });
+
+                    const res = await resp.json().catch(() => ({}));
+                    if (!resp.ok || !res.ok) {
+                        throw new Error(res.detail || "Tasdiqlashda xatolik yuz berdi");
+                    }
+
+                    document.getElementById('verified-banner').style.display = 'block';
+                    document.getElementById('v-faceid-section').style.display = 'none';
+                    btn.style.display = 'none';
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                } catch (err) {
+                    alert("Xatolik: " + err.message);
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-check-double"></i> Shartnomani Face ID Bilan Tasdiqlash';
+                }
+            }
+        };
+
+        window.addEventListener('DOMContentLoaded', () => VerifyApp.init());
+    </script>
+</body>
+</html>

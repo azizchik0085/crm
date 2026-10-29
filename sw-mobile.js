@@ -1,4 +1,4 @@
-const CACHE_NAME = 'webzone-mobile-v15';
+const CACHE_NAME = 'webzone-mobile-v16';
 const ASSETS_TO_CACHE = [
   '/mobile.html',
   '/css/mobile-app.css',

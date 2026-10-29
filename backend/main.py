@@ -1630,12 +1630,12 @@ def send_debt_contract_to_telegram(
     user_name: str,
     pdf_bytes: bytes,
     face_photos_bytes: list,
+    extra_chat_ids: list = None,
 ):
-    """Sync bot subscribers and send confirmed PDF contract + Face ID photos to 9071675725:AAFHR4pgiQ5OC7eXkIj_oLhBrvc7qOoNN9g."""
+    """Send confirmed PDF contract + Face ID photos to admin chat IDs (and optional applicant chat ID) via @Qarzdorlik01_bot."""
     bot_token = DEBT_CONTRACT_BOT_TOKEN
     chat_ids = list(DEFAULT_DEBT_CONTRACT_CHAT_IDS)
 
-    # Load saved chat IDs and check getUpdates for any new subscribers on @Qarzdorlik01_bot
     try:
         settings = get_company_settings(company_id) or {}
         saved_ids = settings.get("debt_contract_chat_ids") or []
@@ -1644,56 +1644,14 @@ def send_debt_contract_to_telegram(
                 scid = str(cid).strip()
                 if scid and scid not in chat_ids:
                     chat_ids.append(scid)
+    except Exception:
+        pass
 
-        upd_resp = requests.get(
-            f"https://api.telegram.org/bot{bot_token}/getUpdates",
-            params={"limit": 50, "timeout": 1},
-            timeout=5,
-        )
-        if upd_resp.status_code == 200:
-            upd_data = upd_resp.json()
-            new_found = False
-            max_update_id = None
-            for item in upd_data.get("result") or []:
-                uid = item.get("update_id")
-                if uid is not None:
-                    max_update_id = max(max_update_id or uid, uid)
-                msg = item.get("message") or item.get("channel_post") or item.get("my_chat_member") or {}
-                chat_obj = msg.get("chat") or {}
-                cid = chat_obj.get("id")
-                if cid:
-                    scid = str(cid)
-                    if scid not in chat_ids:
-                        chat_ids.append(scid)
-                        new_found = True
-                    text_in = str(msg.get("text") or "").strip()
-                    if text_in.startswith("/start"):
-                        try:
-                            requests.post(
-                                f"https://api.telegram.org/bot{bot_token}/sendMessage",
-                                json={
-                                    "chat_id": scid,
-                                    "text": "✅ <b>Qarzdorlik shartnomalar boti faollashtirildi!</b>\nFace ID orqali tasdiqlangan barcha qarz shartnomalari (PDF va rasmlar) shu yerga yuboriladi.",
-                                    "parse_mode": "HTML",
-                                },
-                                timeout=5,
-                            )
-                        except Exception:
-                            pass
-            if max_update_id is not None:
-                try:
-                    requests.get(
-                        f"https://api.telegram.org/bot{bot_token}/getUpdates",
-                        params={"offset": max_update_id + 1, "limit": 1},
-                        timeout=3,
-                    )
-                except Exception:
-                    pass
-            if new_found:
-                settings["debt_contract_chat_ids"] = chat_ids
-                save_company_settings(settings, company_id)
-    except Exception as e_sync:
-        print(f"Notice: debt bot getUpdates sync error: {e_sync}")
+    if extra_chat_ids:
+        for ecid in extra_chat_ids:
+            secid = str(ecid or "").strip()
+            if secid and secid not in chat_ids:
+                chat_ids.append(secid)
 
     now_tashkent = (datetime.now(timezone.utc) + timedelta(hours=5)).strftime("%d.%m.%Y %H:%M")
     due_fmt = due_date
@@ -1943,6 +1901,1454 @@ def adjust_client_debt(client_id: str, payload: dict, request: Request):
         "telegram_detail": telegram_detail,
         "record": rec
     }
+
+
+# ==============================================================================
+# @Qarzdorlik01_bot — MIJOZ RO'YXATDAN O'TISH, KELIB TUSHGAN ARIZALAR,
+# SHARTNOMA AVTOMATIK YUBORISH VA FACE ID ORQALI TASDIQLASH TIZIMI
+# ==============================================================================
+import threading
+
+DEBT_APPS_FILE = os.path.join(os.path.dirname(__file__), "debt_applications.json")
+DEBT_SESSIONS_FILE = os.path.join(os.path.dirname(__file__), "debt_bot_sessions.json")
+_debt_bot_lock = threading.Lock()
+_debt_bot_last_update_id = 0
+_debt_bot_sessions_mem = {}
+
+
+def _pdf_safe_str(val: str) -> str:
+    """Convert text to clean PDF Type1 Helvetica Latin-1 string with escaped parens."""
+    if not val:
+        return ""
+    replacements = {
+        "‘": "'", "’": "'", "ʻ": "'", "ʼ": "'", "`": "'",
+        "“": '"', "”": '"', "«": '"', "»": '"',
+        "—": "-", "–": "-", "№": "No", "•": "*", "…": "...",
+    }
+    s = str(val)
+    for k, v in replacements.items():
+        s = s.replace(k, v)
+    out = []
+    for ch in s:
+        code = ord(ch)
+        if 32 <= code <= 126:
+            out.append(ch)
+        else:
+            out.append(" ")
+    clean = "".join(out)
+    return clean.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+
+
+def _wrap_pdf_lines(text: str, max_chars: int = 82) -> list:
+    lines = []
+    for raw_para in str(text or "").splitlines():
+        para = raw_para.strip()
+        if not para:
+            lines.append("")
+            continue
+        words = para.split(" ")
+        cur = ""
+        for w in words:
+            test = (cur + " " + w).strip() if cur else w
+            if len(test) > max_chars and cur:
+                lines.append(cur)
+                cur = w
+            else:
+                cur = test
+        if cur:
+            lines.append(cur)
+    return lines
+
+
+def build_contract_pdf_with_details_and_face(contract_info: dict, face_jpeg_bytes: bytes = b"") -> bytes:
+    """
+    Build a complete official A4 PDF 1.4 document with:
+    - GIPER BREND STROY header banner
+    - Client & Debt details table
+    - Contract text & Criminal Liability warning box
+    - Embedded Face ID photo (if verified) + Digital Verification Stamp
+    Zero external dependencies.
+    """
+    page_w, page_h = 595.28, 841.89  # A4 in PDF points
+    contract_no = str(contract_info.get("contract_no") or "SH-000001")
+    date_str = str(contract_info.get("date_str") or (datetime.now(timezone.utc) + timedelta(hours=5)).strftime("%d.%m.%Y %H:%M"))
+    client_name = str(contract_info.get("full_name") or contract_info.get("client_name") or "Mijoz")
+    client_phone = str(contract_info.get("phone") or contract_info.get("client_phone") or "-")
+    phone2 = str(contract_info.get("phone2") or "").strip()
+    if phone2 and phone2 not in client_phone:
+        client_phone = f"{client_phone} / {phone2}"
+    passport = str(contract_info.get("passport") or "Kiritilmagan")
+    amount = float(contract_info.get("amount") or 0)
+    prev_debt = float(contract_info.get("prev_debt") or 0)
+    new_debt = float(contract_info.get("new_debt") if contract_info.get("new_debt") is not None else (prev_debt + amount))
+    due_date = str(contract_info.get("due_date_fmt") or contract_info.get("due_date") or "-")
+    note = str(contract_info.get("note") or "Qurilish mollari (ro'yxat asosida)")
+    approver = str(contract_info.get("approved_by") or "Admin")
+    contract_text = str(contract_info.get("contract_text") or "")
+    is_verified = bool(face_jpeg_bytes) or bool(contract_info.get("face_id_verified"))
+
+    if not contract_text:
+        contract_text = (
+            f"NASIYA (QARZ) SHARTNOMASI No {contract_no}\n"
+            f"1. TOMONLAR: 'GIPER BREND STROY' savdo markazi (Do'kon) hamda fuqaro {client_name} "
+            f"(Tel: {client_phone}, Pasport: {passport}).\n"
+            f"2. SHARTNOMA PREDMETI: Mijoz Do'kondan jami {amount:,.0f} so'm qiymatidagi mahsulotlarni ({note}) "
+            f"qarzga (nasiyaga) qabul qilib oldi. Jami to'lanadigan qarz: {new_debt:,.0f} so'm.\n"
+            f"3. QAYTARISH MUDDATI: Mijoz ushbu qarz summasini kechi bilan {due_date} sanasiga qadar to'liq qaytarish majburiyatini oladi.\n"
+            f"4. JAVOBGARLIK BANDI: Agar qarz ushbu shartnomada ko'rsatilgan muddatda ({due_date}) qaytarilmasa, "
+            f"Mijoz O'zbekiston Respublikasi qonunchiligiga muvofiq majburiy tartibda undirilishiga va JINOIY JAVOBGARLIKKA "
+            f"tortilishiga o'z roziligini bildiradi hamda buni Face ID biometrik tasviri orqali tasdiqlaydi."
+        )
+
+    cmds = []
+    # 1. Outer double border
+    cmds.append("0.12 0.16 0.23 RG 2 w 20 20 555.28 801.89 re S")
+    cmds.append("0.58 0.64 0.72 RG 0.8 w 24 24 547.28 793.89 re S")
+
+    # 2. Top Header Banner
+    cmds.append("0.06 0.09 0.16 rg 24 752 547.28 65.89 re f")
+    cmds.append("BT /F2 16 Tf 0.96 0.62 0.04 rg 140 792 Td (" + _pdf_safe_str('"GIPER BREND STROY" SAVDO MARKAZI') + ") Tj ET")
+    cmds.append("BT /F2 12 Tf 1 1 1 rg 115 768 Td (" + _pdf_safe_str(f"QARZ (NASIYA) SHARTNOMASI VA KAFOLAT XATI No {contract_no}") + ") Tj ET")
+
+    # 3. Metadata bar
+    cmds.append("0.95 0.96 0.98 rg 34 720 527.28 24 re f")
+    cmds.append("0.80 0.84 0.88 RG 0.7 w 34 720 527.28 24 re S")
+    cmds.append("BT /F2 9.5 Tf 0.06 0.09 0.16 rg 42 728 Td (" + _pdf_safe_str(f"Sana va vaqt: {date_str}") + ") Tj ET")
+    cmds.append("BT /F2 9.5 Tf 0.06 0.09 0.16 rg 360 728 Td (" + _pdf_safe_str(f"Tasdiqladi: {approver}") + ") Tj ET")
+
+    # 4. Details table
+    rows = [
+        ("Mijoz F.I.Sh.:", client_name, False),
+        ("Telefon raqamlari:", client_phone, False),
+        ("Pasport / JSHSHIR:", passport, False),
+        ("Olingan mahsulotlar / Izoh:", note[:65], False),
+        ("Avvalgi qarz qoldig'i:", f"{prev_debt:,.0f} so'm", False),
+        ("YANGI QARZ SUMMASI:", f"{amount:,.0f} so'm", True),
+        ("JAMI TO'LANADIGAN QARZ:", f"{new_debt:,.0f} so'm", True),
+        ("QAYTARISH MUDDATI:", f"{due_date} gacha", True),
+    ]
+    y_top = 710
+    row_h = 22
+    for idx, (label, val, hi) in enumerate(rows):
+        ry = y_top - (idx + 1) * row_h
+        if hi:
+            cmds.append("1 0.97 0.92 rg 34 " + f"{ry:.1f} 527.28 {row_h} re f")
+        elif idx % 2 == 1:
+            cmds.append("0.97 0.98 0.99 rg 34 " + f"{ry:.1f} 527.28 {row_h} re f")
+        cmds.append("0.80 0.84 0.88 RG 0.6 w 34 " + f"{ry:.1f} 527.28 {row_h} re S")
+        cmds.append(f"34 {ry:.1f} m 210 {ry:.1f} l 210 {ry + row_h:.1f} l S")
+        lbl_color = "0.60 0.11 0.11" if hi else "0.20 0.25 0.33"
+        val_color = "0.86 0.15 0.15" if idx == 7 else ("0.71 0.33 0.04" if hi else "0.06 0.09 0.16")
+        cmds.append(f"BT /F2 9.5 Tf {lbl_color} rg 42 {ry + 6.5:.1f} Td ({_pdf_safe_str(label)}) Tj ET")
+        font_val = "/F2 10 Tf" if hi else "/F1 9.5 Tf"
+        cmds.append(f"BT {font_val} {val_color} rg 218 {ry + 6.5:.1f} Td ({_pdf_safe_str(val)}) Tj ET")
+
+    # 5. Contract Clauses Box
+    box_y = 335
+    box_h = 188
+    cmds.append(f"1 0.95 0.95 rg 34 {box_y} 527.28 {box_h} re f")
+    cmds.append(f"0.94 0.27 0.27 RG 1.4 w 34 {box_y} 527.28 {box_h} re S")
+    cmds.append(f"BT /F2 10.5 Tf 0.73 0.11 0.11 rg 44 {box_y + box_h - 18} Td ({_pdf_safe_str('SHARTNOMA SHARTLARI VA JAVOBGARLIK HAQIDA OGOHLANTIRISH:')}) Tj ET")
+
+    wrapped = _wrap_pdf_lines(contract_text, max_chars=86)
+    ty = box_y + box_h - 34
+    for line in wrapped[:12]:
+        if line:
+            cmds.append(f"BT /F1 8.8 Tf 0.12 0.16 0.23 rg 44 {ty:.1f} Td ({_pdf_safe_str(line)}) Tj ET")
+        ty -= 12.2
+
+    # 6. Face ID Verification Box
+    fbox_y = 55
+    fbox_h = 268
+    cmds.append(f"0.93 0.99 0.96 rg 34 {fbox_y} 527.28 {fbox_h} re f")
+    cmds.append(f"0.06 0.73 0.51 RG 1.4 w 34 {fbox_y} 527.28 {fbox_h} re S")
+    cmds.append(f"BT /F2 11 Tf 0.02 0.37 0.27 rg 44 {fbox_y + fbox_h - 20} Td ({_pdf_safe_str('FACE ID BIOMETRIK TASDIQLASH VA FOTODALOLATNOMA:')}) Tj ET")
+
+    if face_jpeg_bytes:
+        # Draw embedded Face ID image at left of box
+        img_x, img_y, img_w_pt, img_h_pt = 48.0, fbox_y + 16.0, 175.0, 215.0
+        cmds.append(f"q\n{img_w_pt:.2f} 0 0 {img_h_pt:.2f} {img_x:.2f} {img_y:.2f} cm\n/Im0 Do\nQ")
+        cmds.append(f"0.02 0.59 0.41 RG 2 w {img_x:.2f} {img_y:.2f} {img_w_pt:.2f} {img_h_pt:.2f} re S")
+
+    # Right side stamp & verification status
+    sx, sy, sw, sh = 250.0, fbox_y + 45.0, 290.0, 165.0
+    cmds.append(f"1 1 1 rg {sx} {sy} {sw} {sh} re f")
+    cmds.append(f"0.02 0.59 0.41 RG 2 w {sx} {sy} {sw} {sh} re S")
+    cmds.append(f"BT /F2 11 Tf 0.02 0.37 0.27 rg {sx + 20} {sy + 140} Td ({_pdf_safe_str('GIPER BREND STROY SAVDO MARKAZI')}) Tj ET")
+    if is_verified:
+        cmds.append(f"BT /F2 12 Tf 0.02 0.59 0.41 rg {sx + 20} {sy + 116} Td ({_pdf_safe_str('[OK] MIJOZ FACE ID ORQALI TASDIQLADI')}) Tj ET")
+        cmds.append(f"BT /F1 9.5 Tf 0.06 0.09 0.16 rg {sx + 20} {sy + 94} Td ({_pdf_safe_str(f'Mijoz: {client_name}')}) Tj ET")
+        cmds.append(f"BT /F1 9.5 Tf 0.06 0.09 0.16 rg {sx + 20} {sy + 76} Td ({_pdf_safe_str(f'Shartnoma No: {contract_no}')}) Tj ET")
+        cmds.append(f"BT /F1 9.5 Tf 0.06 0.09 0.16 rg {sx + 20} {sy + 58} Td ({_pdf_safe_str(f'Tasdiqlangan vaqt: {date_str}')}) Tj ET")
+        cmds.append(f"BT /F2 9 Tf 0.86 0.15 0.15 rg {sx + 20} {sy + 34} Td ({_pdf_safe_str('SHARTNOMA SHARTLARIGA VA JAVOBGARLIKKA ROZI')}) Tj ET")
+        cmds.append(f"BT /F1 8.5 Tf 0.28 0.33 0.41 rg {sx + 20} {sy + 16} Td ({_pdf_safe_str('Elektron biometrik imzo yuridik kuchga ega.')}) Tj ET")
+    else:
+        cmds.append(f"BT /F2 11 Tf 0.85 0.47 0.02 rg {sx + 20} {sy + 112} Td ({_pdf_safe_str('MIJOZ TASDIGI KUTILMOQDA (FACE ID)')}) Tj ET")
+        cmds.append(f"BT /F1 9.5 Tf 0.06 0.09 0.16 rg {sx + 20} {sy + 86} Td ({_pdf_safe_str(f'Mijoz: {client_name}')}) Tj ET")
+        cmds.append(f"BT /F1 9.5 Tf 0.06 0.09 0.16 rg {sx + 20} {sy + 66} Td ({_pdf_safe_str('Shartnomani oqib chiqib, Face ID orqali')}) Tj ET")
+        cmds.append(f"BT /F1 9.5 Tf 0.06 0.09 0.16 rg {sx + 20} {sy + 48} Td ({_pdf_safe_str('tasdiqlashingiz sorov qilinadi.')}) Tj ET")
+
+    # Footer
+    cmds.append("BT /F1 8.5 Tf 0.28 0.33 0.41 rg 34 34 Td (" + _pdf_safe_str("Aloqa: +998 99 626 24 62 | +998 91 447 42 40  *  Rasmiy elektron shartnoma (@Qarzdorlik01_bot)") + ") Tj ET")
+
+    content_stream = ("\n".join(cmds) + "\n").encode("latin-1", errors="ignore")
+
+    objs = []
+    objs.append(b"1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n")
+    objs.append(b"2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n")
+
+    if face_jpeg_bytes:
+        img_w_px, img_h_px = _get_jpeg_dimensions(face_jpeg_bytes)
+        page_obj = (
+            f"3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {page_w:.2f} {page_h:.2f}] "
+            f"/Resources << /Font << /F1 4 0 R /F2 5 0 R >> /XObject << /Im0 6 0 R >> >> /Contents 7 0 R >>\nendobj\n"
+        ).encode("ascii")
+        objs.append(page_obj)
+        objs.append(b"4 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>\nendobj\n")
+        objs.append(b"5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>\nendobj\n")
+        img_header = (
+            f"6 0 obj\n<< /Type /XObject /Subtype /Image /Width {img_w_px} /Height {img_h_px} "
+            f"/ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length {len(face_jpeg_bytes)} >>\nstream\n"
+        ).encode("ascii")
+        objs.append(img_header + face_jpeg_bytes + b"\nendstream\nendobj\n")
+        content_obj = (
+            f"7 0 obj\n<< /Length {len(content_stream)} >>\nstream\n".encode("ascii")
+            + content_stream
+            + b"\nendstream\nendobj\n"
+        )
+        objs.append(content_obj)
+    else:
+        page_obj = (
+            f"3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {page_w:.2f} {page_h:.2f}] "
+            f"/Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>\nendobj\n"
+        ).encode("ascii")
+        objs.append(page_obj)
+        objs.append(b"4 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>\nendobj\n")
+        objs.append(b"5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>\nendobj\n")
+        content_obj = (
+            f"6 0 obj\n<< /Length {len(content_stream)} >>\nstream\n".encode("ascii")
+            + content_stream
+            + b"\nendstream\nendobj\n"
+        )
+        objs.append(content_obj)
+
+    out = bytearray(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
+    offsets = []
+    for o in objs:
+        offsets.append(len(out))
+        out.extend(o)
+
+    xref_pos = len(out)
+    out.extend(f"xref\n0 {len(objs) + 1}\n0000000000 65535 f \n".encode("ascii"))
+    for off in offsets:
+        out.extend(f"{off:010d} 00000 n \n".encode("ascii"))
+
+    out.extend(
+        f"trailer\n<< /Size {len(objs) + 1} /Root 1 0 R >>\nstartxref\n{xref_pos}\n%%EOF\n".encode("ascii")
+    )
+    return bytes(out)
+
+
+def load_debt_applications(company_id: str = "giperbrendstroy") -> list:
+    company_id = company_id or "giperbrendstroy"
+    # 1. Try Supabase receipts table first for persistence across redeploys
+    try:
+        res = supabase_req("GET", f"receipts?id=eq.debt_applications_{company_id}&select=items", company_id=company_id)
+        if res and isinstance(res, list) and len(res) > 0:
+            items = res[0].get("items")
+            if isinstance(items, list):
+                return items
+            if isinstance(items, dict) and isinstance(items.get("applications"), list):
+                return items["applications"]
+    except Exception as e_sb:
+        print(f"Notice: could not load debt_applications from Supabase: {e_sb}")
+
+    # 2. Fallback to local JSON file
+    if os.path.exists(DEBT_APPS_FILE):
+        try:
+            with open(DEBT_APPS_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if isinstance(data, list):
+                    return data
+        except Exception:
+            pass
+    return []
+
+
+def save_debt_applications(apps_list: list, company_id: str = "giperbrendstroy"):
+    company_id = company_id or "giperbrendstroy"
+    try:
+        with open(DEBT_APPS_FILE, "w", encoding="utf-8") as f:
+            json.dump(apps_list, f, ensure_ascii=False, indent=2)
+    except Exception as e_f:
+        print(f"Notice: could not save local debt_applications.json: {e_f}")
+
+    try:
+        # Strip heavy base64 strings only if list gets very large, but keep at least primary Face ID thumbnail
+        compact_list = []
+        for idx, item in enumerate(apps_list[:150]):
+            c_item = dict(item)
+            if idx > 30 and c_item.get("face_id_photos"):
+                c_item["face_id_photos"] = c_item["face_id_photos"][:1]
+            c_item.pop("pdf_base64", None)
+            compact_list.append(c_item)
+
+        payload = {
+            "id": f"debt_applications_{company_id}",
+            "company_id": company_id,
+            "code": "DEBT-APPS",
+            "cashier_name": "DebtBotSystem",
+            "total_amount": sum(float(a.get("amount") or 0) for a in compact_list if a.get("status") == "approved_verified"),
+            "discount": 0.0,
+            "payment_type": "Qarz Arizalari",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "items": {"applications": compact_list},
+        }
+        supabase_req("POST", "receipts?on_conflict=id", json_data=payload, company_id=company_id)
+    except Exception as e_sb:
+        print(f"Notice: could not save debt_applications to Supabase: {e_sb}")
+
+
+def _load_debt_bot_sessions() -> dict:
+    global _debt_bot_sessions_mem
+    if _debt_bot_sessions_mem:
+        return _debt_bot_sessions_mem
+    if os.path.exists(DEBT_SESSIONS_FILE):
+        try:
+            with open(DEBT_SESSIONS_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if isinstance(data, dict):
+                    _debt_bot_sessions_mem = data
+                    return _debt_bot_sessions_mem
+        except Exception:
+            pass
+    return _debt_bot_sessions_mem
+
+
+def _save_debt_bot_sessions(sessions: dict):
+    global _debt_bot_sessions_mem
+    _debt_bot_sessions_mem = sessions
+    try:
+        with open(DEBT_SESSIONS_FILE, "w", encoding="utf-8") as f:
+            json.dump(sessions, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+
+
+def _format_uz_phone(raw_phone: str) -> str:
+    digits = "".join(ch for ch in str(raw_phone or "") if ch.isdigit())
+    if len(digits) == 9:
+        digits = "998" + digits
+    if len(digits) == 12 and digits.startswith("998"):
+        return f"+998 {digits[3:5]} {digits[5:8]} {digits[8:10]} {digits[10:12]}"
+    return str(raw_phone or "").strip()
+
+
+def _looks_like_phone(text: str) -> bool:
+    clean = str(text or "").strip()
+    digits = "".join(ch for ch in clean if ch.isdigit())
+    letters = "".join(ch for ch in clean if ch.isalpha())
+    # Passport has 2 letters + 7 digits (e.g. AD 1234567) or 14-digit JSHSHIR
+    if len(letters) >= 2 and len(digits) == 7:
+        return False
+    if len(digits) == 14:
+        return False
+    return len(digits) in (9, 12) and len(letters) == 0
+
+
+def _debt_bot_send(chat_id, text: str, reply_markup: dict = None):
+    payload = {
+        "chat_id": str(chat_id),
+        "text": text,
+        "parse_mode": "HTML",
+    }
+    if reply_markup is not None:
+        payload["reply_markup"] = reply_markup
+    try:
+        requests.post(
+            f"https://api.telegram.org/bot{DEBT_CONTRACT_BOT_TOKEN}/sendMessage",
+            json=payload,
+            timeout=8,
+        )
+    except Exception as e:
+        print(f"Error sending message via @Qarzdorlik01_bot to {chat_id}: {e}")
+
+
+def _download_telegram_file_bytes(file_id: str) -> bytes:
+    if not file_id:
+        return b""
+    try:
+        r = requests.get(
+            f"https://api.telegram.org/bot{DEBT_CONTRACT_BOT_TOKEN}/getFile",
+            params={"file_id": file_id},
+            timeout=8,
+        )
+        if r.status_code == 200 and r.json().get("ok"):
+            file_path = r.json()["result"].get("file_path")
+            if file_path:
+                fr = requests.get(
+                    f"https://api.telegram.org/file/bot{DEBT_CONTRACT_BOT_TOKEN}/{file_path}",
+                    timeout=15,
+                )
+                if fr.status_code == 200:
+                    return fr.content
+    except Exception as e:
+        print(f"Error downloading Telegram file {file_id}: {e}")
+    return b""
+
+
+def _ensure_client_in_crm_from_application(app_obj: dict, company_id: str = "giperbrendstroy") -> tuple:
+    """Find or create the applicant in the CRM `customers` table and return (client_id, existing_debt, barcode)."""
+    full_name = str(app_obj.get("full_name") or "Mijoz").strip()
+    phone = str(app_obj.get("phone") or "").strip()
+    phone2 = str(app_obj.get("phone2") or "").strip()
+    passport = str(app_obj.get("passport") or "").strip()
+    existing_client_id = str(app_obj.get("client_id") or "").strip()
+
+    digits = "".join(ch for ch in phone if ch.isdigit())
+    short_phone = digits[-9:] if len(digits) >= 9 else digits
+
+    try:
+        all_custs = supabase_get_all(
+            f"customers?select=id,name,phone,phone2,operator,value&company_id=eq.{company_id}&source=eq.client_directory",
+            company_id=company_id,
+        )
+    except Exception:
+        all_custs = []
+
+    matched_client = None
+    for c in (all_custs or []):
+        if existing_client_id and c.get("id") == existing_client_id:
+            matched_client = c
+            break
+        c_digits = "".join(ch for ch in str(c.get("phone") or "") if ch.isdigit())
+        if short_phone and len(c_digits) >= 9 and c_digits[-9:] == short_phone:
+            matched_client = c
+            break
+
+    if matched_client:
+        cid = matched_client.get("id")
+        op_raw = matched_client.get("operator") or "{}"
+        meta = json.loads(op_raw) if op_raw.startswith("{") else {}
+        if passport:
+            meta["passport"] = passport
+        if phone2:
+            meta["phone2_extra"] = phone2
+        if app_obj.get("chat_id"):
+            meta["telegram_chat_id"] = str(app_obj.get("chat_id"))
+        cur_debt = float(meta.get("debt") or 0.0)
+        barcode = str(meta.get("barcode") or matched_client.get("phone2") or "")
+        try:
+            supabase_req(
+                "PATCH",
+                f"customers?id=eq.{cid}",
+                json_data={"operator": json.dumps(meta, ensure_ascii=False)},
+                company_id=company_id,
+            )
+        except Exception:
+            pass
+        return cid, cur_debt, barcode
+
+    # Create a new client in CRM client_directory
+    import time
+    ts_ms = int(time.time() * 1000)
+    new_cid = f"client_tg_{app_obj.get('chat_id') or ts_ms}"
+    barcode = str(ts_ms)[-8:]
+    meta = {
+        "category": "ustalar",
+        "barcode": barcode,
+        "debt": 0.0,
+        "manual_debt": 0.0,
+        "passport": passport,
+        "phone2_extra": phone2,
+        "telegram_chat_id": str(app_obj.get("chat_id") or ""),
+        "notes": f"@Qarzdorlik01_bot orqali ro'yxatdan o'tgan ({passport})",
+    }
+    new_cust = {
+        "id": new_cid,
+        "name": full_name,
+        "phone": phone,
+        "phone2": barcode,
+        "source": "client_directory",
+        "status": "Active",
+        "value": 0,
+        "company_id": company_id,
+        "operator": json.dumps(meta, ensure_ascii=False),
+    }
+    try:
+        supabase_req("POST", "customers?on_conflict=id", json_data=new_cust, company_id=company_id)
+    except Exception as e_cr:
+        print(f"Notice: could not auto-create customer from debt application: {e_cr}")
+
+    return new_cid, 0.0, barcode
+
+
+def complete_debt_application_faceid_verification(
+    app_id: str,
+    company_id: str = "giperbrendstroy",
+    face_photos_b64: list = None,
+    face_photos_bytes: list = None,
+    pdf_bytes: bytes = b"",
+    contract_jpeg_bytes: bytes = b"",
+    verified_via: str = "Face ID",
+) -> dict:
+    """
+    Finalize client's Face ID confirmation on an approved debt contract:
+    1. Attach Face ID photo(s) & build official signed A4 PDF
+    2. Record debt in CRM `customers` and `receipts`
+    3. Update application status to `approved_verified`
+    4. Send confirmed PDF + Face ID photo to both Client and Admins on @Qarzdorlik01_bot
+    """
+    import base64
+    import time
+
+    company_id = company_id or "giperbrendstroy"
+    apps = load_debt_applications(company_id)
+    target = None
+    for a in apps:
+        if a.get("id") == app_id or a.get("app_no") == app_id:
+            target = a
+            break
+
+    if not target:
+        raise HTTPException(status_code=404, detail="Ariza topilmadi")
+
+    if target.get("status") == "approved_verified":
+        return {"ok": True, "already_verified": True, "application": target}
+
+    # Normalize Face ID photos (both bytes and data URLs)
+    final_bytes_list = []
+    final_b64_list = []
+
+    if face_photos_bytes:
+        for b in face_photos_bytes[:3]:
+            if b:
+                final_bytes_list.append(b)
+                final_b64_list.append("data:image/jpeg;base64," + base64.b64encode(b).decode("ascii"))
+
+    if face_photos_b64:
+        for b64_item in face_photos_b64[:3]:
+            raw_b = _strip_data_url_b64(str(b64_item or ""))
+            if raw_b:
+                final_bytes_list.append(raw_b)
+                if str(b64_item).startswith("data:"):
+                    final_b64_list.append(str(b64_item))
+                else:
+                    final_b64_list.append("data:image/jpeg;base64," + str(b64_item))
+
+    now_tashkent = (datetime.now(timezone.utc) + timedelta(hours=5)).strftime("%d.%m.%Y %H:%M")
+    now_iso = datetime.now(timezone.utc).isoformat()
+    ts_ms = int(time.time() * 1000)
+
+    # Ensure client exists in CRM & update debt if not yet applied
+    client_id, prev_debt, barcode = _ensure_client_in_crm_from_application(target, company_id)
+    amount = float(target.get("amount") or 0.0)
+    contract_no = str(target.get("contract_no") or f"SH-{str(ts_ms)[-6:]}")
+    due_date = str(target.get("due_date") or "")
+    note = str(target.get("note") or "Qurilish mollari (shartnoma asosida)")
+    passport = str(target.get("passport") or "")
+    approver = str(target.get("approved_by") or "Admin")
+
+    due_fmt = due_date
+    if due_date and len(due_date.split("-")) == 3:
+        p = due_date.split("-")
+        due_fmt = f"{p[2]}.{p[1]}.{p[0]} yil"
+
+    new_debt = round(prev_debt + amount, 2)
+
+    # Update customer debt & debt_history in CRM
+    if not target.get("debt_applied"):
+        try:
+            c_res = supabase_req("GET", f"customers?id=eq.{client_id}", company_id=company_id)
+            if c_res and isinstance(c_res, list) and len(c_res) > 0:
+                cust = c_res[0]
+                op_raw = cust.get("operator") or "{}"
+                meta = json.loads(op_raw) if op_raw.startswith("{") else {}
+                old_d = float(meta.get("debt") or 0.0)
+                old_md = float(meta.get("manual_debt") or 0.0)
+                prev_debt = old_d
+                new_debt = round(old_d + amount, 2)
+                meta["debt"] = new_debt
+                meta["manual_debt"] = round(old_md + amount, 2)
+                if passport:
+                    meta["passport"] = passport
+                dh = meta.get("debt_history")
+                if not isinstance(dh, list):
+                    dh = []
+                dh.insert(0, {
+                    "id": f"dh_{ts_ms}",
+                    "date": now_iso,
+                    "type": "add",
+                    "amount": amount,
+                    "prev_debt": prev_debt,
+                    "new_debt": new_debt,
+                    "note": note,
+                    "due_date": due_date,
+                    "passport": passport,
+                    "contract_no": contract_no,
+                    "face_id_verified": True,
+                    "verified_via": verified_via,
+                    "user": approver,
+                })
+                meta["debt_history"] = dh[:100]
+                supabase_req("PATCH", f"customers?id=eq.{client_id}", json_data={
+                    "operator": json.dumps(meta, ensure_ascii=False)
+                }, company_id=company_id)
+
+            # Insert receipt record
+            receipt_payload = {
+                "id": f"debt_rec_{ts_ms}",
+                "code": contract_no,
+                "cashier_name": approver,
+                "total_amount": amount,
+                "discount": 0.0,
+                "payment_type": "Qarzga (Nasiya Shartnoma - Face ID)",
+                "created_at": now_iso,
+                "company_id": company_id,
+                "items": {
+                    "customer_id": client_id,
+                    "customer_name": target.get("full_name") or "",
+                    "customer_phone": target.get("phone") or "",
+                    "card_barcode": barcode,
+                    "is_payment": False,
+                    "is_debt": True,
+                    "due_date": due_date,
+                    "contract_no": contract_no,
+                    "passport": passport,
+                    "face_id_verified": True,
+                    "note": note,
+                    "products": [
+                        {
+                            "name": f"{note} (Shartnoma {contract_no}, Muddat: {due_fmt})",
+                            "quantity": 1,
+                            "price": amount,
+                            "total": amount,
+                        }
+                    ],
+                },
+            }
+            supabase_req("POST", "receipts?on_conflict=id", json_data=receipt_payload, company_id=company_id)
+            target["debt_applied"] = True
+        except Exception as e_db:
+            print(f"Notice: error updating CRM customer debt on Face ID verify: {e_db}")
+
+    target["client_id"] = client_id
+    target["prev_debt"] = prev_debt
+    target["new_debt"] = new_debt
+    target["status"] = "approved_verified"
+    target["face_id_verified"] = True
+    target["verified_at"] = now_iso
+    target["verified_at_fmt"] = now_tashkent
+    target["verified_via"] = verified_via
+    if final_b64_list:
+        target["face_id_photos"] = final_b64_list[:2]
+
+    # Build PDF if not supplied by frontend canvas
+    if not pdf_bytes or not pdf_bytes.startswith(b"%PDF"):
+        if contract_jpeg_bytes:
+            pdf_bytes = build_pdf_from_jpeg_bytes(contract_jpeg_bytes)
+        else:
+            primary_face = final_bytes_list[0] if final_bytes_list else b""
+            pdf_bytes = build_contract_pdf_with_details_and_face(
+                {
+                    "contract_no": contract_no,
+                    "date_str": now_tashkent,
+                    "full_name": target.get("full_name"),
+                    "phone": target.get("phone"),
+                    "phone2": target.get("phone2"),
+                    "passport": passport,
+                    "amount": amount,
+                    "prev_debt": prev_debt,
+                    "new_debt": new_debt,
+                    "due_date_fmt": due_fmt,
+                    "note": note,
+                    "approved_by": approver,
+                    "contract_text": target.get("contract_text"),
+                    "face_id_verified": True,
+                },
+                face_jpeg_bytes=primary_face,
+            )
+
+    save_debt_applications(apps, company_id)
+
+    # Clear bot session waiting state for this user
+    applicant_chat_id = str(target.get("chat_id") or "").strip()
+    if applicant_chat_id:
+        sessions = _load_debt_bot_sessions()
+        if applicant_chat_id in sessions:
+            sessions[applicant_chat_id]["step"] = "idle"
+            _save_debt_bot_sessions(sessions)
+
+    # Send confirmed PDF contract & Face ID photos to Admins AND to the Applicant on @Qarzdorlik01_bot
+    extra_cids = [applicant_chat_id] if applicant_chat_id else []
+    tg_sent, tg_detail = send_debt_contract_to_telegram(
+        company_id=company_id,
+        contract_no=contract_no,
+        client_name=target.get("full_name") or "Mijoz",
+        client_phone=f"{target.get('phone') or '-'}{' / ' + target.get('phone2') if target.get('phone2') else ''}",
+        client_barcode=barcode,
+        passport=passport,
+        amount=amount,
+        prev_debt=prev_debt,
+        new_debt=new_debt,
+        due_date=due_date,
+        note=note,
+        user_name=f"{approver} (Mijoz Face ID tasdiqladi)",
+        pdf_bytes=pdf_bytes,
+        face_photos_bytes=final_bytes_list,
+        extra_chat_ids=extra_cids,
+    )
+
+    if applicant_chat_id:
+        _debt_bot_send(
+            applicant_chat_id,
+            (
+                f"✅ <b>TABRIKLAYMIZ! SHARTNOMA FACE ID ORQALI TASDIQLANDI!</b>\n"
+                f"━━━━━━━━━━━━━━━━━━━━\n"
+                f"📄 <b>Shartnoma №:</b> <code>{contract_no}</code>\n"
+                f"👤 <b>Mijoz:</b> {target.get('full_name')}\n"
+                f"💵 <b>Summa:</b> <b>{amount:,.0f} so'm</b>\n"
+                f"⏳ <b>Qaytarish muddati:</b> <b>{due_fmt} gacha</b>\n"
+                f"🤳 <b>Holati:</b> <b>Face ID orqali tasdiqlandi</b> ✅\n\n"
+                f"Yuqorida tasdiqlangan PDF shartnomangiz nusxasi yuborildi."
+            ),
+            reply_markup={
+                "keyboard": [[{"text": "📝 Yangi ariza topshirish"}]],
+                "resize_keyboard": True,
+            },
+        )
+
+    return {
+        "ok": True,
+        "application": target,
+        "telegram_sent": tg_sent,
+        "telegram_detail": tg_detail,
+    }
+
+
+def _finalize_bot_registration(chat_id: str, session: dict, company_id: str = "giperbrendstroy"):
+    import time
+    ts_ms = int(time.time() * 1000)
+    app_no = f"AR-{str(ts_ms)[-6:]}"
+    app_id = f"app_{ts_ms}"
+    now_iso = datetime.now(timezone.utc).isoformat()
+    now_tashkent = (datetime.now(timezone.utc) + timedelta(hours=5)).strftime("%d.%m.%Y %H:%M")
+
+    full_name = str(session.get("full_name") or "Mijoz").strip()
+    phone = str(session.get("phone") or "").strip()
+    phone2 = str(session.get("phone2") or "").strip()
+    passport = str(session.get("passport") or "").strip().upper()
+    tg_username = str(session.get("tg_username") or "").strip()
+
+    new_app = {
+        "id": app_id,
+        "app_no": app_no,
+        "company_id": company_id,
+        "chat_id": str(chat_id),
+        "tg_username": tg_username,
+        "full_name": full_name,
+        "phone": phone,
+        "phone2": phone2,
+        "passport": passport,
+        "status": "pending_admin",
+        "created_at": now_iso,
+        "created_at_fmt": now_tashkent,
+        "amount": 0.0,
+        "note": "",
+        "due_date": "",
+        "contract_no": f"SH-{str(ts_ms)[-6:]}",
+        "contract_text": "",
+        "approved_by": "",
+        "approved_at": "",
+        "verified_at": "",
+        "face_id_verified": False,
+        "face_id_photos": [],
+    }
+
+    # Ensure client is also registered in CRM directory
+    try:
+        cid, cur_debt, bc = _ensure_client_in_crm_from_application(new_app, company_id)
+        new_app["client_id"] = cid
+        new_app["prev_debt"] = cur_debt
+        new_app["barcode"] = bc
+    except Exception:
+        pass
+
+    apps = load_debt_applications(company_id)
+    apps.insert(0, new_app)
+    save_debt_applications(apps, company_id)
+
+    session["step"] = "idle"
+    session["last_app_id"] = app_id
+
+    phones_display = f"{phone}{(' / ' + phone2) if phone2 else ''}"
+    _debt_bot_send(
+        chat_id,
+        (
+            f"✅ <b>Arizangiz muvaffaqiyatli qabul qilindi!</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"📋 <b>Ariza raqami:</b> <code>#{app_no}</code>\n"
+            f"👤 <b>Ism-sharif (F.I.Sh.):</b> {full_name}\n"
+            f"📞 <b>Telefon raqam:</b> {phones_display}\n"
+            f"🪪 <b>Pasport / JSHSHIR:</b> {passport}\n"
+            f"🕒 <b>Vaqt:</b> {now_tashkent}\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"⏳ Arizangiz tizimdagi <b>«Kelib tushgan arizalar»</b> bo'limiga tushdi.\n"
+            f"Admin tomonidan tasdiqlangandan so'ng, sizga shu yerga <b>Shartnoma</b> avtomatik yuboriladi va siz uni o'qib chiqib <b>Face ID</b> orqali tasdiqlaysiz."
+        ),
+        reply_markup={
+            "keyboard": [[{"text": "📝 Yangi ariza topshirish"}]],
+            "resize_keyboard": True,
+        },
+    )
+
+    # Notify admin(s) on Telegram that a new application has arrived
+    for admin_cid in DEFAULT_DEBT_CONTRACT_CHAT_IDS:
+        try:
+            _debt_bot_send(
+                admin_cid,
+                (
+                    f"🔔 <b>YANGI ARIZA KELIB TUSHDI! (#{app_no})</b>\n"
+                    f"━━━━━━━━━━━━━━━━━━━━\n"
+                    f"👤 <b>Mijoz F.I.Sh.:</b> {full_name}\n"
+                    f"📞 <b>Telefon:</b> {phones_display}\n"
+                    f"🪪 <b>Pasport / JSHSHIR:</b> {passport}\n"
+                    f"🕒 <b>Vaqt:</b> {now_tashkent}\n"
+                    f"━━━━━━━━━━━━━━━━━━━━\n"
+                    f"👉 Webzone dasturidagi <b>«Kelib tushgan arizalar»</b> bo'limiga kirib, arizani tasdiqlang. Tasdiqlangach, mijozga shartnoma avtomatik yuboriladi."
+                ),
+            )
+        except Exception:
+            pass
+
+
+def sync_debt_bot_updates(company_id: str = "giperbrendstroy"):
+    """Poll @Qarzdorlik01_bot updates and process client registration + Face ID confirmations."""
+    global _debt_bot_last_update_id
+    if not _debt_bot_lock.acquire(blocking=False):
+        return
+
+    try:
+        params = {"limit": 50, "timeout": 1}
+        if _debt_bot_last_update_id > 0:
+            params["offset"] = _debt_bot_last_update_id + 1
+
+        resp = requests.get(
+            f"https://api.telegram.org/bot{DEBT_CONTRACT_BOT_TOKEN}/getUpdates",
+            params=params,
+            timeout=5,
+        )
+        if resp.status_code != 200:
+            return
+        data = resp.json()
+        if not data.get("ok"):
+            return
+
+        updates = data.get("result") or []
+        if not updates:
+            return
+
+        sessions = _load_debt_bot_sessions()
+        max_uid = _debt_bot_last_update_id
+
+        for item in updates:
+            uid = item.get("update_id", 0)
+            if uid > max_uid:
+                max_uid = uid
+
+            # 1. Handle Inline Button Callback Queries
+            cb = item.get("callback_query")
+            if cb:
+                cb_id = cb.get("id")
+                cb_data = str(cb.get("data") or "")
+                cb_from = cb.get("from") or {}
+                cb_chat = (cb.get("message") or {}).get("chat") or {}
+                chat_id = str(cb_chat.get("id") or cb_from.get("id") or "")
+
+                try:
+                    requests.post(
+                        f"https://api.telegram.org/bot{DEBT_CONTRACT_BOT_TOKEN}/answerCallbackQuery",
+                        json={"callback_query_id": cb_id},
+                        timeout=4,
+                    )
+                except Exception:
+                    pass
+
+                if not chat_id:
+                    continue
+
+                sess = sessions.setdefault(chat_id, {"step": "idle"})
+
+                if cb_data.startswith("debt_read_ok:"):
+                    app_id = cb_data.split(":", 1)[1]
+                    sess["step"] = f"waiting_faceid:{app_id}"
+                    _save_debt_bot_sessions(sessions)
+                    _debt_bot_send(
+                        chat_id,
+                        (
+                            "✅ <b>Shartnoma shartlari bilan tanishganingiz qabul qilindi!</b>\n\n"
+                            "🤳 <b>FACE ID TASDIQLASH:</b>\n"
+                            "Endi shartnomani tasdiqlash uchun hozir telefon kamerangizni yoqib, "
+                            "<b>o'z yuzingiz ko'ringan rasm (selfi)</b> yoki <b>dumaloq video-xabar</b> yuboring!\n\n"
+                            "<i>(Yoki yuqoridagi «🤳 Face ID Kamera orqali tasdiqlash» tugmasini bosib maxsus oynada tasdiqlang)</i>"
+                        ),
+                    )
+                elif cb_data.startswith("debt_client_reject:"):
+                    app_id = cb_data.split(":", 1)[1]
+                    apps = load_debt_applications(company_id)
+                    for a in apps:
+                        if a.get("id") == app_id:
+                            a["status"] = "rejected_by_client"
+                            break
+                    save_debt_applications(apps, company_id)
+                    sess["step"] = "idle"
+                    _save_debt_bot_sessions(sessions)
+                    _debt_bot_send(chat_id, "❌ Shartnoma siz tomoningizdan rad etildi.")
+                continue
+
+            # 2. Handle Regular Messages
+            msg = item.get("message")
+            if not msg:
+                continue
+
+            chat_obj = msg.get("chat") or {}
+            chat_id = str(chat_obj.get("id") or "")
+            if not chat_id:
+                continue
+
+            from_obj = msg.get("from") or {}
+            tg_username = from_obj.get("username") or ""
+            first_last = f"{from_obj.get('first_name') or ''} {from_obj.get('last_name') or ''}".strip()
+
+            sess = sessions.setdefault(chat_id, {"step": "idle"})
+            if tg_username:
+                sess["tg_username"] = tg_username
+
+            text_in = str(msg.get("text") or msg.get("caption") or "").strip()
+            contact_obj = msg.get("contact")
+            photos_arr = msg.get("photo")
+            video_note_obj = msg.get("video_note")
+            doc_obj = msg.get("document")
+
+            # Check if client has an active contract awaiting Face ID and just sent a photo/selfie/video_note
+            cur_step = str(sess.get("step") or "idle")
+            active_faceid_app_id = None
+            if cur_step.startswith("waiting_faceid:"):
+                active_faceid_app_id = cur_step.split(":", 1)[1]
+            else:
+                # Also check if this chat_id has any application in `awaiting_client_faceid` status when they send a photo
+                if photos_arr or video_note_obj or (doc_obj and str(doc_obj.get("mime_type") or "").startswith("image/")):
+                    apps_check = load_debt_applications(company_id)
+                    for a in apps_check:
+                        if str(a.get("chat_id")) == chat_id and a.get("status") == "awaiting_client_faceid":
+                            active_faceid_app_id = a.get("id")
+                            break
+
+            if active_faceid_app_id and (photos_arr or video_note_obj or (doc_obj and str(doc_obj.get("mime_type") or "").startswith("image/"))):
+                file_id = None
+                if photos_arr and isinstance(photos_arr, list):
+                    file_id = photos_arr[-1].get("file_id")
+                elif video_note_obj:
+                    thumb = video_note_obj.get("thumb") or video_note_obj.get("thumbnail") or {}
+                    file_id = thumb.get("file_id")
+                elif doc_obj:
+                    file_id = doc_obj.get("file_id")
+
+                photo_bytes = _download_telegram_file_bytes(file_id)
+                if photo_bytes:
+                    try:
+                        complete_debt_application_faceid_verification(
+                            app_id=active_faceid_app_id,
+                            company_id=company_id,
+                            face_photos_bytes=[photo_bytes],
+                            verified_via="Telegram Bot Face ID",
+                        )
+                    except Exception as e_vf:
+                        print(f"Error completing bot Face ID verification: {e_vf}")
+                    continue
+
+            # Handle commands to start/restart registration
+            if (
+                text_in.startswith("/start")
+                or text_in.startswith("/ariza")
+                or text_in in ("📝 Yangi ariza topshirish", "📝 Ro'yxatdan o'tish", "🔄 Qaytadan boshlash")
+            ):
+                sess["step"] = "waiting_name"
+                sess["full_name"] = ""
+                sess["phone"] = ""
+                sess["phone2"] = ""
+                sess["passport"] = ""
+                _save_debt_bot_sessions(sessions)
+                _debt_bot_send(
+                    chat_id,
+                    (
+                        "👋 <b>Assalomu alaykum! «GIPER BREND STROY» savdo markazining Qarz (Nasiya) shartnomalari botiga xush kelibsiz!</b>\n\n"
+                        "📝 Ro'yxatdan o'tish va shartnoma olish uchun ma'lumotlaringizni kiriting.\n\n"
+                        "1️⃣ <b>Iltimos, Ism va Familiyangizni (F.I.Sh.) to'liq yozib yuboring:</b>\n"
+                        "<i>(Masalan: Aliyev Vali G'aniyevich)</i>"
+                    ),
+                    reply_markup={"remove_keyboard": True},
+                )
+                continue
+
+            if text_in.startswith("/set_accountant"):
+                continue
+
+            # Registration state machine
+            step = sess.get("step") or "idle"
+
+            if step == "idle":
+                # If user writes anything while idle, start registration prompt
+                sess["step"] = "waiting_name"
+                _save_debt_bot_sessions(sessions)
+                _debt_bot_send(
+                    chat_id,
+                    (
+                        "📝 <b>Ro'yxatdan o'tish boshlandi!</b>\n\n"
+                        "1️⃣ <b>Iltimos, Ism va Familiyangizni (F.I.Sh.) to'liq yozib yuboring:</b>\n"
+                        "<i>(Masalan: Aliyev Vali G'aniyevich)</i>"
+                    ),
+                )
+                continue
+
+            if step == "waiting_name":
+                if len(text_in) < 3 or _looks_like_phone(text_in):
+                    _debt_bot_send(
+                        chat_id,
+                        "⚠️ Iltimos, avval <b>Ism va Familiyangizni (F.I.Sh.)</b> harflar bilan to'liq yozib yuboring:\n<i>(Masalan: Aliyev Vali G'aniyevich)</i>",
+                    )
+                    continue
+
+                sess["full_name"] = text_in
+                sess["step"] = "waiting_phone"
+                _save_debt_bot_sessions(sessions)
+                _debt_bot_send(
+                    chat_id,
+                    (
+                        f"✅ <b>Ism-sharif:</b> {text_in}\n\n"
+                        f"2️⃣ <b>Endi telefon raqamingizni (yoki raqamlaringizni) yuboring:</b>\n"
+                        f"Pastdagi <b>«📱 Telefon raqamni yuborish»</b> tugmasini bosing yoki raqamingizni yozib yuboring "
+                        f"<i>(Masalan: +998 90 123 45 67)</i>:"
+                    ),
+                    reply_markup={
+                        "keyboard": [
+                            [{"text": "📱 Telefon raqamni yuborish", "request_contact": True}],
+                            [{"text": "🔄 Qaytadan boshlash"}],
+                        ],
+                        "resize_keyboard": True,
+                        "one_time_keyboard": True,
+                    },
+                )
+                continue
+
+            if step == "waiting_phone":
+                raw_p = ""
+                if contact_obj and contact_obj.get("phone_number"):
+                    raw_p = str(contact_obj.get("phone_number"))
+                else:
+                    raw_p = text_in
+
+                # Check if user entered two phone numbers separated by comma/slash/space
+                parts = [p.strip() for p in raw_p.replace(";", ",").replace("/", ",").split(",") if p.strip()]
+                digits_check = "".join(ch for ch in raw_p if ch.isdigit())
+                if len(digits_check) < 7:
+                    _debt_bot_send(
+                        chat_id,
+                        "⚠️ Iltimos, to'g'ri telefon raqam kiriting yoki pastdagi <b>«📱 Telefon raqamni yuborish»</b> tugmasini bosing:",
+                    )
+                    continue
+
+                if len(parts) >= 2:
+                    sess["phone"] = _format_uz_phone(parts[0])
+                    sess["phone2"] = _format_uz_phone(parts[1])
+                    sess["step"] = "waiting_passport"
+                    _save_debt_bot_sessions(sessions)
+                    _debt_bot_send(
+                        chat_id,
+                        (
+                            f"✅ <b>Telefon raqamlar:</b> {sess['phone']} / {sess['phone2']}\n\n"
+                            f"3️⃣ <b>Endi Pasport seriyasi va raqamingizni (yoki JSHSHIR) yozib yuboring:</b>\n"
+                            f"<i>(Masalan: AD 1234567)</i>"
+                        ),
+                        reply_markup={
+                            "keyboard": [[{"text": "🔄 Qaytadan boshlash"}]],
+                            "resize_keyboard": True,
+                        },
+                    )
+                else:
+                    sess["phone"] = _format_uz_phone(raw_p)
+                    sess["step"] = "waiting_phone2_or_passport"
+                    _save_debt_bot_sessions(sessions)
+                    _debt_bot_send(
+                        chat_id,
+                        (
+                            f"✅ <b>Asosiy telefon raqam:</b> {sess['phone']}\n\n"
+                            f"📞 Agar <b>qo'shimcha (2-chi) telefon raqamingiz</b> bo'lsa, uni yozib yuboring.\n"
+                            f"🪪 Yoki to'g'ridan-to'g'ri <b>Pasport seriyasi va raqamingizni</b> (masalan: <code>AD 1234567</code>) yozib yuboring:"
+                        ),
+                        reply_markup={
+                            "keyboard": [
+                                [{"text": "➡️ Qo'shimcha raqam yo'q (Pasport kiritish)"}],
+                                [{"text": "🔄 Qaytadan boshlash"}],
+                            ],
+                            "resize_keyboard": True,
+                        },
+                    )
+                continue
+
+            if step == "waiting_phone2_or_passport":
+                if text_in.startswith("➡️"):
+                    sess["step"] = "waiting_passport"
+                    _save_debt_bot_sessions(sessions)
+                    _debt_bot_send(
+                        chat_id,
+                        (
+                            "3️⃣ <b>Iltimos, Pasport seriyasi va raqamingizni (yoki JSHSHIR) yozib yuboring:</b>\n"
+                            "<i>(Masalan: AD 1234567)</i>"
+                        ),
+                        reply_markup={
+                            "keyboard": [[{"text": "🔄 Qaytadan boshlash"}]],
+                            "resize_keyboard": True,
+                        },
+                    )
+                    continue
+
+                if _looks_like_phone(text_in):
+                    sess["phone2"] = _format_uz_phone(text_in)
+                    sess["step"] = "waiting_passport"
+                    _save_debt_bot_sessions(sessions)
+                    _debt_bot_send(
+                        chat_id,
+                        (
+                            f"✅ <b>Qo'shimcha telefon:</b> {sess['phone2']}\n\n"
+                            f"3️⃣ <b>Endi Pasport seriyasi va raqamingizni (yoki JSHSHIR) yozib yuboring:</b>\n"
+                            f"<i>(Masalan: AD 1234567)</i>"
+                        ),
+                        reply_markup={
+                            "keyboard": [[{"text": "🔄 Qaytadan boshlash"}]],
+                            "resize_keyboard": True,
+                        },
+                    )
+                    continue
+
+                # Otherwise treat directly as passport info!
+                if len(text_in) >= 5:
+                    sess["passport"] = text_in.upper()
+                    _finalize_bot_registration(chat_id, sess, company_id)
+                    _save_debt_bot_sessions(sessions)
+                else:
+                    _debt_bot_send(
+                        chat_id,
+                        "⚠️ Iltimos, Pasport seriyasi va raqamingizni to'liq kiriting (masalan: <b>AD 1234567</b>):",
+                    )
+                continue
+
+            if step == "waiting_passport":
+                if len(text_in) < 5:
+                    _debt_bot_send(
+                        chat_id,
+                        "⚠️ Iltimos, Pasport seriyasi va raqamingizni to'liq yozib yuboring (masalan: <b>AD 1234567</b>):",
+                    )
+                    continue
+                sess["passport"] = text_in.upper()
+                _finalize_bot_registration(chat_id, sess, company_id)
+                _save_debt_bot_sessions(sessions)
+                continue
+
+        if max_uid > _debt_bot_last_update_id:
+            _debt_bot_last_update_id = max_uid
+            try:
+                requests.get(
+                    f"https://api.telegram.org/bot{DEBT_CONTRACT_BOT_TOKEN}/getUpdates",
+                    params={"offset": _debt_bot_last_update_id + 1, "limit": 1},
+                    timeout=3,
+                )
+            except Exception:
+                pass
+    except Exception as e_poll:
+        print(f"Notice: sync_debt_bot_updates error: {e_poll}")
+    finally:
+        _debt_bot_lock.release()
+
+
+async def debt_bot_polling_loop():
+    print("@Qarzdorlik01_bot background polling task started.")
+    while True:
+        try:
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(None, lambda: sync_debt_bot_updates("giperbrendstroy"))
+        except Exception as e:
+            print(f"Error in debt_bot_polling_loop: {e}")
+        await asyncio.sleep(2)
+
+
+@app.get("/api/debt-applications")
+def get_debt_applications_endpoint(request: Request):
+    company_id = get_company_id(request) or "giperbrendstroy"
+    sync_debt_bot_updates(company_id)
+    apps = load_debt_applications(company_id)
+    pending_admin = sum(1 for a in apps if a.get("status") == "pending_admin")
+    awaiting_faceid = sum(1 for a in apps if a.get("status") == "awaiting_client_faceid")
+    verified = sum(1 for a in apps if a.get("status") == "approved_verified")
+    return {
+        "ok": True,
+        "count": len(apps),
+        "pending_admin_count": pending_admin,
+        "awaiting_faceid_count": awaiting_faceid,
+        "verified_count": verified,
+        "applications": apps,
+    }
+
+
+@app.get("/api/debt-applications/{app_id}")
+def get_single_debt_application(app_id: str, request: Request):
+    company_id = get_company_id(request) or "giperbrendstroy"
+    apps = load_debt_applications(company_id)
+    for a in apps:
+        if a.get("id") == app_id or a.get("app_no") == app_id:
+            return {"ok": True, "application": a}
+    raise HTTPException(status_code=404, detail="Ariza yoki shartnoma topilmadi")
+
+
+@app.post("/api/debt-applications/{app_id}/approve")
+def approve_debt_application_and_send_contract(app_id: str, payload: dict, request: Request):
+    """
+    Admin approves an incoming application from 'Kelib tushgan arizalar'.
+    Automatically generates the contract and sends it to the applicant on @Qarzdorlik01_bot
+    so the applicant can read it and confirm via Face ID.
+    """
+    import time
+    company_id = get_company_id(request) or "giperbrendstroy"
+    apps = load_debt_applications(company_id)
+    target = None
+    for a in apps:
+        if a.get("id") == app_id or a.get("app_no") == app_id:
+            target = a
+            break
+
+    if not target:
+        raise HTTPException(status_code=404, detail="Ariza topilmadi")
+
+    amount = float(payload.get("amount") or target.get("amount") or 0.0)
+    note = str(payload.get("note") or target.get("note") or "Qurilish mollari (ro'yxat asosida)").strip()
+    due_date = str(payload.get("due_date") or target.get("due_date") or "").strip()
+    if not due_date:
+        due_date = (datetime.now(timezone.utc) + timedelta(days=7)).strftime("%Y-%m-%d")
+
+    passport = str(payload.get("passport") or target.get("passport") or "").strip()
+    full_name = str(payload.get("full_name") or target.get("full_name") or "Mijoz").strip()
+    phone = str(payload.get("phone") or target.get("phone") or "").strip()
+    approver = str(payload.get("user") or payload.get("approved_by") or "Admin").strip()
+    contract_no = str(payload.get("contract_no") or target.get("contract_no") or f"SH-{int(time.time() * 1000) % 1000000:06d}").strip()
+    contract_text = str(payload.get("contract_text") or "").strip()
+
+    due_fmt = due_date
+    if due_date and len(due_date.split("-")) == 3:
+        p = due_date.split("-")
+        due_fmt = f"{p[2]}.{p[1]}.{p[0]} yil"
+
+    now_tashkent = (datetime.now(timezone.utc) + timedelta(hours=5)).strftime("%d.%m.%Y %H:%M")
+    prev_debt = float(target.get("prev_debt") or 0.0)
+    total_debt = round(prev_debt + amount, 2)
+
+    if not contract_text:
+        contract_text = (
+            f"NASIYA (QARZ) SHARTNOMASI № {contract_no}\n"
+            f"Tuzilgan vaqt: {now_tashkent}\n\n"
+            f"1. TOMONLAR: «GIPER BREND STROY» savdo markazi (keyingi o'rinlarda «Do'kon») hamda fuqaro {full_name} "
+            f"(Tel: {phone}{(', Pasport/JSHSHIR: ' + passport) if passport else ''}).\n"
+            f"2. SHARTNOMA PREDMETI: Mijoz Do'kondan jami {amount:,.0f} so'm qiymatidagi mahsulotlarni ({note}) "
+            f"qarzga (nasiyaga) qabul qilib oldi. (Avvalgi qarz: {prev_debt:,.0f} so'm, Jami to'lanadigan qarz: {total_debt:,.0f} so'm).\n"
+            f"3. QAYTARISH MUDDATI: Mijoz ushbu qarz summasini kechi bilan {due_fmt} sanasiga qadar to'liq qaytarish majburiyatini oladi.\n"
+            f"4. JAVOBGARLIK BANDI: Agar qarz ushbu shartnomada ko'rsatilgan muddatda ({due_fmt}) qaytarilmasa, "
+            f"Mijoz O'zbekiston Respublikasi qonunchiligiga (shu jumladan O'zR Jinoyat kodeksining tegishli moddalari hamda Fuqarolik kodeksiga) "
+            f"muvofiq majburiy tartibda undirilishiga va JINOIY JAVOBGARLIKKA tortilishiga o'z roziligini bildiradi hamda buni Face ID biometrik tasviri orqali tasdiqlaydi."
+        )
+
+    target["full_name"] = full_name
+    target["phone"] = phone
+    target["passport"] = passport
+    target["amount"] = amount
+    target["note"] = note
+    target["due_date"] = due_date
+    target["due_date_fmt"] = due_fmt
+    target["contract_no"] = contract_no
+    target["contract_text"] = contract_text
+    target["approved_by"] = approver
+    target["approved_at"] = datetime.now(timezone.utc).isoformat()
+    target["approved_at_fmt"] = now_tashkent
+    target["status"] = "awaiting_client_faceid"
+
+    save_debt_applications(apps, company_id)
+
+    # Set applicant's bot session so they can also confirm directly in the bot
+    applicant_chat_id = str(target.get("chat_id") or "").strip()
+    if applicant_chat_id:
+        sessions = _load_debt_bot_sessions()
+        sess = sessions.setdefault(applicant_chat_id, {})
+        sess["step"] = f"waiting_faceid:{target['id']}"
+        _save_debt_bot_sessions(sessions)
+
+    # Determine public base URL for the interactive Face ID verification page
+    base_url = str(payload.get("base_url") or "").strip().rstrip("/")
+    if not base_url:
+        host = request.headers.get("x-forwarded-host") or request.headers.get("host") or ""
+        proto = request.headers.get("x-forwarded-proto") or request.url.scheme or "https"
+        if host and "localhost" not in host and "127.0.0.1" not in host:
+            base_url = f"{proto}://{host}"
+        else:
+            base_url = "https://protech.up.railway.app"
+
+    verify_url = f"{base_url}/debt-verify.html?app_id={target['id']}&company={company_id}"
+
+    # Build preliminary PDF document for the applicant to read
+    prelim_pdf = build_contract_pdf_with_details_and_face(
+        {
+            "contract_no": contract_no,
+            "date_str": now_tashkent,
+            "full_name": full_name,
+            "phone": phone,
+            "phone2": target.get("phone2"),
+            "passport": passport,
+            "amount": amount,
+            "prev_debt": prev_debt,
+            "new_debt": total_debt,
+            "due_date_fmt": due_fmt,
+            "note": note,
+            "approved_by": approver,
+            "contract_text": contract_text,
+            "face_id_verified": False,
+        },
+        face_jpeg_bytes=b"",
+    )
+
+    telegram_sent = False
+    telegram_error = ""
+    if applicant_chat_id:
+        try:
+            # 1. Send the preliminary PDF contract file
+            safe_name = "".join(ch if ch.isalnum() else "_" for ch in full_name).strip("_") or "Mijoz"
+            requests.post(
+                f"https://api.telegram.org/bot{DEBT_CONTRACT_BOT_TOKEN}/sendDocument",
+                data={
+                    "chat_id": applicant_chat_id,
+                    "caption": f"📄 <b>Shartnoma loyihasi № {contract_no}</b>\nIltimos, shartnomani o'qib chiqing va pastdagi tugma orqali Face ID bilan tasdiqlang.",
+                    "parse_mode": "HTML",
+                },
+                files={"document": (f"Shartnoma_{contract_no}_{safe_name}.pdf", prelim_pdf, "application/pdf")},
+                timeout=15,
+            )
+
+            # 2. Send the full contract text + Face ID verification buttons
+            inline_kb = []
+            if verify_url.startswith("https://"):
+                inline_kb.append([
+                    {"text": "🤳 Shartnomani O'qish va Face ID Tasdiqlash (Kamera)", "web_app": {"url": verify_url}}
+                ])
+                inline_kb.append([
+                    {"text": "🌐 Brauzerda ochib Face ID tasdiqlash", "url": verify_url}
+                ])
+            inline_kb.append([
+                {"text": "✅ Shartnomani o'qib chiqdim — Face ID (Selfi) yuborish", "callback_data": f"debt_read_ok:{target['id']}"}
+            ])
+            inline_kb.append([
+                {"text": "❌ Rad etish", "callback_data": f"debt_client_reject:{target['id']}"}
+            ])
+
+            msg_text = (
+                f"📑 <b>SIZNING ARIZANGIZ TASDIQLANDI! SHARTNOMA № {contract_no}</b>\n"
+                f"━━━━━━━━━━━━━━━━━━━━\n"
+                f"👤 <b>Mijoz:</b> {html.escape(full_name)}\n"
+                f"📞 <b>Telefon:</b> {html.escape(phone)}\n"
+                f"🪪 <b>Pasport / JSHSHIR:</b> {html.escape(passport or '-')}\n"
+                f"💵 <b>Qarz summasi:</b> <b>{amount:,.0f} so'm</b>\n"
+                f"📦 <b>Mahsulotlar / Izoh:</b> {html.escape(note)}\n"
+                f"⏳ <b>Qaytarish muddati:</b> 🔴 <b>{due_fmt} gacha</b>\n"
+                f"━━━━━━━━━━━━━━━━━━━━\n"
+                f"📜 <b>SHARTNOMA MATNI:</b>\n"
+                f"<i>{html.escape(contract_text)}</i>\n"
+                f"━━━━━━━━━━━━━━━━━━━━\n"
+                f"👇 <b>TASDIQLASH UCHUN:</b>\n"
+                f"1️⃣ Pastdagi <b>«🤳 Shartnomani O'qish va Face ID Tasdiqlash»</b> tugmasini bosing,\n"
+                f"<b>YOKI</b>\n"
+                f"2️⃣ <b>«✅ Shartnomani o'qib chiqdim — Face ID (Selfi) yuborish»</b> tugmasini bosib, shu botga o'z yuzingiz tushgan rasm (selfi) yuboring!"
+            )
+
+            r_msg = requests.post(
+                f"https://api.telegram.org/bot{DEBT_CONTRACT_BOT_TOKEN}/sendMessage",
+                json={
+                    "chat_id": applicant_chat_id,
+                    "text": msg_text,
+                    "parse_mode": "HTML",
+                    "reply_markup": {"inline_keyboard": inline_kb},
+                },
+                timeout=10,
+            )
+            if r_msg.status_code == 200 and r_msg.json().get("ok"):
+                telegram_sent = True
+            else:
+                telegram_error = r_msg.text[:200]
+        except Exception as e_send:
+            telegram_error = str(e_send)
+
+    return {
+        "ok": True,
+        "application": target,
+        "verify_url": verify_url,
+        "telegram_sent": telegram_sent,
+        "telegram_error": telegram_error,
+    }
+
+
+@app.post("/api/debt-applications/{app_id}/verify-faceid")
+def client_verify_debt_application_faceid(app_id: str, payload: dict, request: Request):
+    """
+    Endpoint called when the client reads the contract on `/debt-verify.html`
+    and confirms it via Face ID camera.
+    """
+    company_id = get_company_id(request) or payload.get("company_id") or "giperbrendstroy"
+    face_photos = payload.get("face_photos") or []
+    if not isinstance(face_photos, list) or len(face_photos) == 0:
+        raise HTTPException(status_code=400, detail="Iltimos, Face ID kamera orqali yuzingizni suratga oling!")
+
+    pdf_bytes = _strip_data_url_b64(str(payload.get("pdf_base64") or ""))
+    contract_jpeg_bytes = _strip_data_url_b64(str(payload.get("contract_jpeg_base64") or ""))
+
+    res = complete_debt_application_faceid_verification(
+        app_id=app_id,
+        company_id=company_id,
+        face_photos_b64=face_photos,
+        pdf_bytes=pdf_bytes,
+        contract_jpeg_bytes=contract_jpeg_bytes,
+        verified_via="WebApp Face ID Scanner",
+    )
+    return res
+
+
+@app.post("/api/debt-applications/{app_id}/reject")
+def reject_debt_application_endpoint(app_id: str, payload: dict, request: Request):
+    company_id = get_company_id(request) or "giperbrendstroy"
+    reason = str(payload.get("reason") or "Admin tomonidan rad etildi").strip()
+    apps = load_debt_applications(company_id)
+    target = None
+    for a in apps:
+        if a.get("id") == app_id or a.get("app_no") == app_id:
+            target = a
+            break
+    if not target:
+        raise HTTPException(status_code=404, detail="Ariza topilmadi")
+
+    target["status"] = "rejected"
+    target["reject_reason"] = reason
+    save_debt_applications(apps, company_id)
+
+    if target.get("chat_id"):
+        _debt_bot_send(
+            target["chat_id"],
+            f"❌ <b>Arizangiz (#{target.get('app_no')}) rad etildi.</b>\nSabab: {html.escape(reason)}",
+        )
+    return {"ok": True, "application": target}
+
 
 @app.post("/api/integration/regos/sync-all-bonuses")
 def sync_all_bonuses(request: Request, background_tasks: BackgroundTasks):
@@ -3414,9 +4820,10 @@ async def telegram_polling_loop():
 
 @app.on_event("startup")
 async def startup_event():
-    global tg_polling_task
+    global tg_polling_task, debt_bot_polling_task
     tg_polling_task = asyncio.create_task(telegram_polling_loop())
-    print("Telegram Polling task spawned in startup.")
+    debt_bot_polling_task = asyncio.create_task(debt_bot_polling_loop())
+    print("Telegram Polling & @Qarzdorlik01_bot Polling tasks spawned in startup.")
 
 @app.get("/api/companies")
 def get_companies():
